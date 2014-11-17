@@ -19,7 +19,6 @@ let work_on_bytes = ref false
 let arg_specs =
   ("-wpt", Arg.String(fun s -> f_wpt := s), "weighted prefix tree file")
   :: ("-bin-dir", Arg.String(fun s -> d_bin := Some s), "test binary directory")
-  (* :: ("-bin", Arg.String(fun s -> bin := Some s), "test binary") *)
   :: ("-o-dir", Arg.String(fun s -> d_out := Some s; try Unix.mkdir s 0o755 with _ -> ()), "output directory")
   :: ("-o", Arg.String(fun s -> out := open_out s), "output file")
   :: ("-t", Arg.Float(fun f -> threshold := f), "threshold")

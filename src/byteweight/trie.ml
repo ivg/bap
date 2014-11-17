@@ -32,7 +32,6 @@ module MakeM (Key : Hashtbl.Key) : (M with type key = Key.t) = struct
   let format a = Sexp.to_string_hum (Key.sexp_of_t a)
 end
 
-
 module Make (M : M) : (TRIE with type key = M.key list) = struct
   type key = M.key list
   type 'a t = Node of 'a * 'a t M.t
@@ -95,24 +94,3 @@ module Make (M : M) : (TRIE with type key = M.key list) = struct
     rec_output [] trie;
     Out_channel.close oc
 end
-
-(*
-module type DISM = sig
-  type t
-  val equal : t -> t -> bool
-  val hash : t -> int
-end
-
-module Dism : DISM = struct
-  type t = string
-  let equal i j = i = j
-  let hash = Hashtbl.hash
-end
-
-module M = struct
-  module D = Hashtbl.Make(Dism)
-  include D
-  let format a = a
-end
-
-module DismTrie = Make(M) *)

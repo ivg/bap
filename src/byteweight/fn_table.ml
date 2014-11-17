@@ -16,7 +16,6 @@ module Bitvector_Map = struct
     end)
 end
 
-(* module Addr = Bitvector_Map *)
 
 type arch
 type addr = Addr.t with sexp,compare
@@ -45,7 +44,6 @@ module Map = struct
   let is_empty = is_empty
   let iter map ~f =
     iter map ~f:(fun ~key ~data -> f key data)
-  (* let fold = fold *)
   let fold map ~init ~f =
     fold map ~init ~f:(fun ~key ~data a -> f key data a)
   let fold_range map ~min ~max ~init ~f =
@@ -97,15 +95,6 @@ let fsi segments arch weight_threshold (module LocalMode : Mode.MODE) : t =
     fsi_rec byte_list start res
   ) in
   Map.of_alist_exn fsi_list
-  (*
-    let open List in
-    let segments_bl = segments >>| (fun (addr, bytes) ->
-    addr, List.rev (String.to_list_rev bytes)) in
-    let folded_fsi = segments_bl >>| (fun (addr, byte_list) ->
-    (* List.iter byte_list (fun byte -> Printf.printf "%02x " (Char.to_int byte));
-    Printf.printf "\n"; *)
-    fsi_rec byte_list addr []) in
-    Map.of_alist_exn (List.join folded_fsi) *)
 
 let create ?signatures ?(weight_threshold=default_weight_threshold)
     ?(work_on_bytes=false)

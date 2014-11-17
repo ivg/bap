@@ -1,7 +1,6 @@
 open Core_kernel.Std
 open Or_error
 open Bap.Std
-(* open Mode *)
 
 module Byte : (Mode.MODE with type t = char) = struct
   type t = char
