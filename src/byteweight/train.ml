@@ -20,44 +20,6 @@ let parse_command =
   | Some d, Some out -> d, out
   | _ -> raise (Arg.Bad usage)
 
-  (*
-(* build_sigs : (addr list * Container.exec_container) list -> string Hashtbl.t *)
-let build_sigs info : 'a Sigs.t =
-  let sigs = Sigs.create () in
-  List.iter info ~f:(fun (fs, sections, container) ->
-      List.iter fs ~f:(fun addr ->
-        (* Printf.printf "%s\n" (Bitvector.to_hex addr); *)
-        let keys =
-          let sec_end =
-            let rec rec_sec_end addr = function
-              | (st, nd) :: tl ->
-                if (Bitvector.bool_of (Bitvector.le addr nd))
-                && (Bitvector.bool_of (Bitvector.le st addr))
-                then nd
-                else rec_sec_end addr tl
-              | [] ->
-                failwith (
-                  Printf.sprintf "Function %s is not in executable segment"
-                    (Bitvector.to_hex addr))
-            in
-            rec_sec_end addr sections
-          in
-            (* let disms = Dism.consecutive addr sec_end k container in
-            Dism.generate_keys disms *)
-          Dism.generate_keys addr sec_end k container
-        in
-        List.iter keys ~f:(fun key ->
-          match Sigs.find sigs key with
-          | Some (p, n) ->
-              Sigs.replace sigs key (p + 1, n)
-          | None ->
-              Sigs.add_exn sigs key (1, 0)
-        )
-      )
-    );
-  sigs
-  *)
-
 let funs_of_section img sec =
   let syms = Image.symbols_of_section img sec in
   Sequence.filter_map syms ~f:(fun s ->
@@ -126,30 +88,6 @@ let update_sigs (sigs:'a Sigs.t) imgs =
       iterate sec_st
     )
   )
-  (*
-  List.iter ~f:(fun (fs, sections, container) ->
-      List.iter ~f:(fun (start_addr, end_addr) ->
-          let rec rec_update addr =
-            if addr > end_addr then ()
-            else if List.mem fs addr then
-              rec_update (Bitvector.incr addr)
-            else (
-              let keys =
-                Dism.generate_keys addr end_addr k container
-              in
-              List.iter ~f:(fun key ->
-                match Sigs.find sigs key with
-                | Some (p, n) ->
-                  Sigs.replace sigs key (p, n + 1)
-                | None -> ()
-              ) keys;
-              rec_update (Bitvector.incr addr)
-            )
-          in
-          rec_update start_addr
-        ) sections
-    ) info
-  *)
 
 let train d =
   let bins =

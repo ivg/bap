@@ -24,34 +24,6 @@ module Byte : (Mode.MODE with type t = char) = struct
 
   let find = Tree.find trie
   let len = 30
-  (*
-  let consecutive_container addr end_addr len container : t list =
-    let real_end =
-      let max_addr = Addr.(++) addr len in
-      (* if Addr.bool_of (Addr.lt end_addr max_addr) then end_addr *)
-      if end_addr < max_addr then end_addr
-      else max_addr
-    in
-    List.rev (String.to_list_rev
-      (* (Exec_container.Reader.get_bytes container addr real_end) *)
-      let word_table = Image.words container 8 in
-      Table.rev map one_to:Table.one word_table
-    )
-  *)
-  (* let generate_keys addr end_addr len container : t list list =
-    (*
-     * let word_table =
-      let rev_table = Image.words container 8 in
-      match Table.rev_map one_to:Table.one  rev_table
-      *)
-    let byte_list = consecutive_container addr end_addr len container in
-    let rec rec_g res prefix = function
-      | [] -> res
-      | hd :: tl ->
-          let elt = List.rev (hd :: List.rev prefix) in
-          rec_g (elt :: res) elt tl
-    in rec_g [] [] byte_list
-  *)
   let generate_keys mem ?from len : key list =
     let max_key_rev =
       let sub_mem =

@@ -1,11 +1,7 @@
 open Core_kernel.Std
 open Bap.Std
 open Or_error
-(* TODO: convert to Core_list? *)
-
 (* TODO: enable dism when bap has disassembler *)
-(* module DismTrie = Dism.Dism.Tree
-module Dism = Dism.Dism *)
 let usage = "./byteweight [binary file]"
 type granularity = | Byte | Dism
 let k = 10
@@ -19,7 +15,6 @@ let bin = ref None
 let out = ref stdout
 let f_wpt = ref g_wpt
 let work_on_bytes = ref false
-(* let arch = ref None *)
 
 let arg_specs =
   ("-wpt", Arg.String(fun s -> f_wpt := s), "weighted prefix tree file")
