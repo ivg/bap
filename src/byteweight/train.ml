@@ -30,12 +30,10 @@ let funs_of_section img sec =
         let a = Memory.min_addr mem in
         let a_min =
           let a_seq = Sequence.map mem_seq ~f:Memory.min_addr in
-          Sequence.min_elt a_seq ~cmp:Addr.compare
-        in
+          Sequence.min_elt a_seq ~cmp:Addr.compare in
         match a_min with
         | Some aa -> Addr.min a aa
-        | None -> a
-      in
+        | None -> a in
       Some fs
   )
 
@@ -43,8 +41,7 @@ let build_sigs imgs : 'a Sigs.t =
   let sigs = Sigs.create () in
   List.iter imgs ~f:(fun img ->
     let code_sections =
-      Table.filter (Image.sections img) ~f:Image.Sec.is_executable
-    in
+      Table.filter (Image.sections img) ~f:Image.Sec.is_executable in
     Table.iteri code_sections ~f:(fun mem sec ->
       let fsi = funs_of_section img sec in
       Sequence.iter fsi ~f:(fun addr ->
@@ -66,8 +63,7 @@ let build_sigs imgs : 'a Sigs.t =
 let update_sigs (sigs:'a Sigs.t) imgs =
   List.iter imgs ~f:(fun img ->
     let code_sections =
-      Table.filter (Image.sections img) ~f:Image.Sec.is_executable
-    in
+      Table.filter (Image.sections img) ~f:Image.Sec.is_executable in
     Table.iteri code_sections ~f:(fun mem sec ->
       let fsi = funs_of_section img sec in
       let sec_st = Memory.min_addr mem in
@@ -83,16 +79,14 @@ let update_sigs (sigs:'a Sigs.t) imgs =
             | Some (p, n) ->
               Sigs.replace sigs key (p, n + 1)
             | None -> ()
-          ) keys;
-      in
+          ) keys; in
       iterate sec_st
     )
   )
 
 let train d =
   let bins =
-    List.map ~f:(Filename.concat d) (Array.to_list (Sys.readdir d))
-  in
+    List.map ~f:(Filename.concat d) (Array.to_list (Sys.readdir d)) in
   let imgs = List.filter_map bins ~f:(fun bin ->
     match Image.create bin with
     | Ok (img, _) -> Some img

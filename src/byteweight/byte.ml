@@ -29,17 +29,14 @@ module Byte : (Mode.MODE with type t = char) = struct
       let sub_mem =
         match Memory.copy ?from ~words:len mem with
         | Ok m -> m
-        | Error _ -> mem
-      in
+        | Error _ -> mem in
       let hexdump = Memory.hexdump sub_mem in
-      String.to_list_rev hexdump
-    in
+      String.to_list_rev hexdump in
     let rec rec_g res key_rev =
       match key_rev with
       | [] -> List.map res ~f:List.rev
       | _ :: tl ->
-        rec_g (key_rev :: res) tl
-    in
+        rec_g (key_rev :: res) tl in
     rec_g [] max_key_rev
 
 
@@ -52,11 +49,9 @@ module Byte : (Mode.MODE with type t = char) = struct
           let p_n = Str.split (Str.regexp ",") counts in
           match p_n with
           | [p;n] -> Float.of_string p, Float.of_string n
-          | _ -> failwith "WPT File Format error"
-        in
+          | _ -> failwith "WPT File Format error" in
         List.rev (String.to_list_rev bytes_str), (p /. (p +. n))
-      | _ -> failwith "WPT File Format error"
-    in
+      | _ -> failwith "WPT File Format error" in
     let sigs = ref [] in
     let line = ref "" in
     try

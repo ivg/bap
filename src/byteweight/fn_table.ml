@@ -90,8 +90,7 @@ let fsi segments arch weight_threshold (module LocalMode : Mode.MODE) : t =
         let fn = Fn.create addr weight in
         fsi_rec tl (Addr.(++) addr 1) ((addr, fn) :: res)
       else
-        fsi_rec tl (Addr.(++) addr 1) res
-  in
+        fsi_rec tl (Addr.(++) addr 1) res in
   let fsi_list = Table.foldi segments ~init:[] ~f:(fun mem _ res ->
     let start = Memory.min_addr mem in
     let byte_list = List.rev (String.to_list_rev (Memory.hexdump mem)) in
@@ -118,7 +117,7 @@ let create ?signatures ?(weight_threshold=default_weight_threshold)
     | None -> decide_signature work_on_bytes arch in
   let mode =
     Byte.load sig_file;
-    (module Byte : Mode.MODE)
+    (module Byte : Mode.MODE) in
     (* if work_on_bytes then (
       Byte.load sig_file;
       (module Byte : Mode.MODE)
@@ -128,7 +127,6 @@ let create ?signatures ?(weight_threshold=default_weight_threshold)
       (module Dism : Mode.MODE)
     )
     *)
-  in
   fsi segments arch weight_threshold mode
 
 include Map

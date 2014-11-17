@@ -66,21 +66,18 @@ let () =
       match !d_out with
       | None ->
         let err =
-          Printf.sprintf "Output directory is required.\n" ^ usage
-        in
+          Printf.sprintf "Output directory is required.\n" ^ usage in
         raise (Arg.Bad err)
       | Some d_o ->
         let bins = List.map
           ~f:(Filename.concat d_i)
-          (Array.to_list (Sys.readdir d_i))
-        in
+          (Array.to_list (Sys.readdir d_i)) in
         List.iter ~f:(fun bin ->
           Printf.printf "%s\n%!" bin;
           let fs_list = fsi_bin_fn bin in
           let oc =
             let bin_out = Filename.concat d_o (Filename.basename bin) in
-            open_out bin_out
-          in
+            open_out bin_out in
           output oc fs_list
         ) bins
     )

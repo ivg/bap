@@ -55,15 +55,13 @@ module Make (M : M) : (TRIE with type key = M.key list) = struct
     | hd :: tl ->
       match trie with
       | Node (_, m) ->
-        let subtrie =
-          match M.find m hd with
+        let subtrie = match M.find m hd with
           | Some s -> s
           | None ->
-              (* If this is a new node, add to its father node's map *)
-              let subtrie_init = init v in
-              M.add m hd subtrie_init;
-              subtrie_init
-        in
+            (* If this is a new node, add to its father node's map *)
+            let subtrie_init = init v in
+            M.add m hd subtrie_init;
+            subtrie_init in
         add subtrie tl v
 
   (* find : 'a t -> key -> 'a -> 'a *)
@@ -74,16 +72,12 @@ module Make (M : M) : (TRIE with type key = M.key list) = struct
       | hd :: tl ->
         match trie with
         | Node (_, m) ->
-          (* let subtrie = M.find m hd in
-             match subtrie with *)
           match M.find m hd with
           | Some (Node (v, _) as subtrie) ->
             rec_find subtrie tl v
-          | None -> t_v
-    in
+          | None -> t_v in
     let root_v = match trie with
-      | Node (v, _) -> v
-    in
+      | Node (v, _) -> v in
     rec_find trie k root_v
 
   (* output : 'a t -> string -> ('a -> string) -> unit *)
@@ -97,8 +91,7 @@ module Make (M : M) : (TRIE with type key = M.key list) = struct
         Out_channel.output_string oc s;
         M.iter (fun k v ->
             rec_output (M.format k :: prefix) v
-        ) m
-    in
+        ) m in
     rec_output [] trie;
     Out_channel.close oc
 end

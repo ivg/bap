@@ -13,8 +13,7 @@ let fb bin =
          start=strtonum(\"0x\"$1); \
          size=strtonum(\"0x\"$5); \
          printf(\"%%x %%x\\n\", start, start+size)}` | sort -u > %s"
-      bin tmp_file
-  in
+      bin tmp_file in
   let () = Sys.command command in
   read_fb tmp_file
 *)
@@ -32,8 +31,7 @@ let fs_objdump bin =
     Printf.sprintf
       "arm-linux-gnueabi-objdump -t %s | grep \"F .text\" | \
        awk '{print $1}' | sort -u > %s"
-      bin tmp_file
-  in
+      bin tmp_file in
   (* Printf.printf "%s%!" command; *)
   let _ = Sys.command command in
   read_fs tmp_file
