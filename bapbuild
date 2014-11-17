@@ -6,7 +6,7 @@ ocamlbuild \
     -syntax camlp4o \
     -pkg bap \
     -pkg core_kernel \
-    -pkg sexplib.syntax,comparelib.syntax,fieldslib.syntax,variantslib.syntax \
+    -pkg sexplib.syntax,comparelib.syntax,fieldslib.syntax,variantslib.syntax,str \
     -pkg bin_prot.syntax \
     -tag thread \
     -tag debug \
