@@ -247,6 +247,13 @@ Executable readbin
   CompiledObject: best
   BuildDepends:   bap, bap.disasm
 
+Executable bap-mc
+  Path:           src/bap-mc
+  MainIs:         bap-mc.ml
+  Install:        true
+  CompiledObject: best
+  BuildDepends:   bap, bap.disasm
+
 Executable byteweight
   Path:           src/byteweight
   MainIs:         byteweight.ml
