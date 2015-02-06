@@ -754,7 +754,7 @@ module ToIR = struct
       :: (match pcmpinfo with
           | {out=Index; _} -> Move (rcx, sb (Exp.Var int_res_2))
           (* FIXME: ymms should be used instead of xmms here *)
-          | {out=Mask; _} -> Move (ymm0, mask (Exp.Var int_res_2)))
+          | {out=Mask; _} -> Move (ymms.(0), mask (Exp.Var int_res_2)))
       :: Move (cf, Exp.(Var int_res_2 <> it 0 16))
       :: Move (zf ,contains_null xmm2m128_e)
       :: Move (sf, contains_null xmm1_e)
