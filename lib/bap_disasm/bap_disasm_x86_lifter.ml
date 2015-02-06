@@ -9,10 +9,15 @@ open Bap_disasm_x86_env
 
 module ToIR = struct
 
-  (* stmt helpers *)
+  let cf_e = Exp.var cf
+  let pf_e = Exp.var pf
+  let af_e = Exp.var af
+  let zf_e = Exp.var zf
+  let sf_e = Exp.var sf
+  let of_e = Exp.var oF
+  let df_e = Exp.var df
 
-  (*let move v e =*)
-  (*Move(v, e)*)
+  (* stmt helpers *)
 
   let size_of_typ s = Size.of_int_exn (!!s) (** doubts here  *)
   let litz = bitvector_of_z

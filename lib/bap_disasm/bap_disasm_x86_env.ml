@@ -17,8 +17,8 @@ let ymm_t = r256
 let st_t = Type.imm 80
 
 type multimodereg = { v32: var; v64: var }
-(* new multi-mode variable *)
 
+(* new multi-mode variable *)
 let nmv n32 t32 n64 t64 = { v32=Var.create n32 t32; v64=Var.create n64 t64; }
 let mvs {v64; v32} = [v64; v32]
 
@@ -63,10 +63,6 @@ let mxcsr = Var.create "R_MXCSR" r32
 (* r8 -> r15 *)
 let nums = Array.init 8 ~f:(fun i -> nmv "ERROR" (Type.imm 0) (Printf.sprintf "R_R%d" (i+8)) r64)
 
-(*
-let xmms = Array.init 8 ~f:(fun i -> Var.new_var (Printf.sprintf "R_XMM%d" i) xmm_t)
-*)
-
 let ymms = Array.init 16 ~f:(fun i -> Var.create (Printf.sprintf "R_YMM%d" i) ymm_t)
 
 (* floating point registers *)
@@ -85,10 +81,6 @@ let regs_x86 : var list =
   @ List.map ~f:(fun {v32; _} -> v32) shared_multi_regs
   (*@ List.map ~f:(fun {v64; v32} -> v32) shared_multi_regs*)
   @ Array.to_list (Array.sub ymms ~pos:0 ~len:8)
-
-let (r_8, r_9, r_10, r_11, r_12, r_13, r_14, r_15) = match Array.to_list nums with
-  | (r_8::r_9::r_10::r_11::r_12::r_13::r_14::r_15::[]) -> (r_8, r_9, r_10, r_11, r_12, r_13, r_14, r_15)
-  | _ -> failwith "Impossible, matching against a list of known size"
 
 let regs_x86_64 : var list =
   shared_regs
@@ -117,48 +109,27 @@ let o_ds = Oseg 3
 let o_fs = Oseg 4
 let o_gs = Oseg 5
 
-(* let esp_e = Var esp *)
-(* and ebp_e = Var ebp *)
-(* and esi_e = Var esi *)
-(* and edi_e = Var edi *)
-(* and ecx_e = Var ecx *)
-(* and eax_e = Var eax *)
-(* and edx_e = Var edx *)
-
 let mem = nmv "mem32" (Type.mem `r32 `r8) "mem64" (Type.mem `r64 `r8)
 
-(* 32-bit registers *)
-module R32 = struct
-  let eip = rip.v32
-  let eax = rax.v32
-  let ecx = rcx.v32
-  let edx = rdx.v32
-  let ebx = rbx.v32
-  let esp = rsp.v32
-  let ebp = rbp.v32
-  let esi = rsi.v32
-  let edi = rdi.v32
-  let mem = mem.v32
-end
+(* prefix names *)
+let pref_lock = 0xf0
+let repnz = 0xf2
+let repz = 0xf3
+let hint_bnt = 0x2e
+let hint_bt = 0x3e
+let pref_cs = 0x2e
+let pref_ss = 0x36
+let pref_ds = 0x3e
+let pref_es = 0x26
+let pref_fs = 0x64
+let pref_gs = 0x65
+let pref_opsize = 0x66
+let pref_addrsize = 0x67
 
-(* 64-bit registers *)
-module R64 = struct
-  let rip = rip.v64
-  let rax = rax.v64
-  let rcx = rcx.v64
-  let rdx = rdx.v64
-  let rbx = rbx.v64
-  let rsp = rsp.v64
-  let rbp = rbp.v64
-  let rsi = rsi.v64
-  let rdi = rdi.v64
-  let mem = mem.v64
-  let r8 = r_8.v64
-  let r9 = r_9.v64
-  let r10 = r_10.v64
-  let r11 = r_11.v64
-  let r12 = r_12.v64
-  let r13 = r_13.v64
-  let r14 = r_14.v64
-  let r15 = r_15.v64
-end
+(* Prefixes that we can usually handle automatically *)
+let standard_prefs = [pref_opsize; pref_addrsize; hint_bnt; hint_bt; pref_cs; pref_ss; pref_ds; pref_es; pref_fs; pref_gs]
+
+let seg_cs = None
+let seg_ds = None
+let seg_fs = Some fs_base
+let seg_gs = Some gs_base

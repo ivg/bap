@@ -183,25 +183,8 @@ let sig_to_mask =
   | LSB -> Bitmask
   | MSB -> Bytemask
 
-(* prefix names *)
-let pref_lock = 0xf0
-let repnz = 0xf2
-let repz = 0xf3
-let hint_bnt = 0x2e
-let hint_bt = 0x3e
-let pref_cs = 0x2e
-let pref_ss = 0x36
-let pref_ds = 0x3e
-let pref_es = 0x26
-let pref_fs = 0x64
-let pref_gs = 0x65
-let pref_opsize = 0x66
-let pref_addrsize = 0x67
-
-(* Prefixes that we can usually handle automatically *)
-let standard_prefs = [pref_opsize; pref_addrsize; hint_bnt; hint_bt; pref_cs; pref_ss; pref_ds; pref_es; pref_fs; pref_gs]
-
 exception Arch_exception of Arch.x86 * string
+
 (** disfailwith is a non-fatal disassembly exception. *)
 let disfailwith m s =
   let a = match m with
@@ -221,21 +204,8 @@ let regs_of_mode = function
   | X86 -> regs_x86
   | X8664 -> regs_x86_64
 
-let cf_e = Exp.var cf
-let pf_e = Exp.var pf
-let af_e = Exp.var af
-let zf_e = Exp.var zf
-let sf_e = Exp.var sf
-let of_e = Exp.var oF
-
-let df_e = Exp.var df
-
-let seg_cs = None
 let seg_ss = None
-let seg_ds = None
 let seg_es = None
-let seg_fs = Some fs_base
-let seg_gs = Some gs_base
 
 (* eflags *)
 let df_to_offset mode e =
@@ -249,7 +219,7 @@ let bap_to_rflags =
   let undefined d = Exp.unknown (Printf.sprintf "Undefined RFLAGS bit %d" d) r1 in
   let unmodeled s = Exp.unknown ("Unmodeled RFLAGS bit " ^ s) r1 in
   (List.map ~f:undefined (List.range ~stride:(-1) ~stop:`inclusive 64 32))
-  @  undefined 31               (* 31 *)
+  @  undefined 31                  (* 31 *)
      :: undefined 30               (* 30 *)
      :: undefined 29               (* 29 *)
      :: undefined 28               (* 28 *)
@@ -269,19 +239,20 @@ let bap_to_rflags =
      :: unmodeled "NT"             (* 14 *)
      :: unmodeled "IOPL1"          (* 13 *)
      :: unmodeled "IOPL2"          (* 12 *)
-     :: of_e                       (* 11 *)
-     :: df_e                       (* 10 *)
+     :: Exp.var oF                 (* 11 *)
+     :: Exp.var df                 (* 10 *)
      :: unmodeled "IF"             (*  9 *)
      :: unmodeled "TF"             (*  8 *)
-     :: sf_e                       (*  7 *)
-     :: zf_e                       (*  6 *)
+     :: Exp.var sf                 (*  7 *)
+     :: Exp.var zf                 (*  6 *)
      :: undefined 5                (*  5 *)
-     :: af_e                       (*  4 *)
+     :: Exp.var af                 (*  4 *)
      :: undefined 3                (*  3 *)
-     :: pf_e                       (*  2 *)
+     :: Exp.var pf                 (*  2 *)
      :: undefined 1                (*  1 *)
-     :: cf_e                       (*  0 *)
+     :: Exp.var cf                 (*  0 *)
      :: []
+
 let bap_to_eflags = List.drop bap_to_rflags 32
 let bap_to_flags = List.drop bap_to_eflags 16
 let bap_to_lflags = List.drop bap_to_flags 16
@@ -327,9 +298,11 @@ let rflags_to_bap =
      :: None                       (* 01 *)
      :: assn cf                    (* 00 *)
      :: []
+
 let eflags_to_bap = List.drop rflags_to_bap 32
 let flags_to_bap = List.drop eflags_to_bap 16
 let lflags_to_bap = List.drop flags_to_bap 8
+
 (* A list of functions for assigning each bit in rflags *)
 let assns_rflags_to_bap =
   List.map
