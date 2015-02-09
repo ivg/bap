@@ -194,15 +194,7 @@ let disfailwith m s =
 
 let unimplemented a s  = disfailwith a ("disasm_i386: unimplemented feature: "^s)
 
-let gv mode { v32; v64 } = match mode with
-  | X86 -> v32
-  | X8664 -> v64
-
 let ge mode mv = gv mode mv |> Exp.var
-
-let regs_of_mode = function
-  | X86 -> regs_x86
-  | X8664 -> regs_x86_64
 
 let seg_ss = None (* this two terrible variables are used in different ways: *)
 let seg_es = None (* as var option and as multimodereg option. to be refactored *)

@@ -12,10 +12,9 @@ val r128  : Type.t
 val r256  : Type.t
 
 (** new multi-mode variable *)
-type multimodereg = { v32: var; v64: var }
+type multimodereg
 
-val nmv: string -> Type.t -> string -> Type.t -> multimodereg
-val mvs: multimodereg -> var list
+val gv: mode -> multimodereg -> var
 
 (** registers *)
 val rbp : multimodereg
@@ -58,9 +57,6 @@ val mxcsr    : var
 (** r8 -> r15 *)
 val nums: multimodereg array
 val ymms: var array
-
-val regs_x86   : var list
-val regs_x86_64: var list
 
 val o_rax : operand
 val o_rcx : operand

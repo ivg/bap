@@ -18,9 +18,12 @@ let st_t = Type.imm 80
 
 type multimodereg = { v32: var; v64: var }
 
+let gv mode { v32; v64 } = match mode with
+  | X86 -> v32
+  | X8664 -> v64
+
 (* new multi-mode variable *)
 let nmv n32 t32 n64 t64 = { v32=Var.create n32 t32; v64=Var.create n64 t64; }
-let mvs {v64; v32} = [v64; v32]
 
 (* registers *)
 let rbp = nmv "R_EBP_32" r32 "R_RBP" r64
@@ -66,32 +69,6 @@ let nums = Array.init 8 ~f:(fun i -> nmv "ERROR" (Type.imm 0) (Printf.sprintf "R
 let ymms = Array.init 16 ~f:(fun i -> Var.create (Printf.sprintf "R_YMM%d" i) ymm_t)
 
 (* floating point registers *)
-let st = Array.init 8 ~f:(fun i -> Var.create (Printf.sprintf "R_ST%d" i) st_t)
-
-let shared_regs =
-  [cf; pf; af; zf; sf; oF; df; cs; ds; es; fs; gs; ss; fpu_ctrl; mxcsr]
-  @ Array.to_list st
-
-let shared_multi_regs =
-  [rbp; rsp; rsi; rdi; rip; rax; rbx; rcx; rdx; rflags; fs_base;
-  gs_base]
-
-let regs_x86 : var list =
-  shared_regs
-  @ List.map ~f:(fun {v32; _} -> v32) shared_multi_regs
-  (*@ List.map ~f:(fun {v64; v32} -> v32) shared_multi_regs*)
-  @ Array.to_list (Array.sub ymms ~pos:0 ~len:8)
-
-let regs_x86_64 : var list =
-  shared_regs
-  @ List.map ~f:(fun {v64; _} -> v64) (shared_multi_regs @ (Array.to_list nums))
-  @ Array.to_list ymms
-
-let regs_full : var list =
-  shared_regs
-  @ List.concat (List.map ~f:(fun {v64; v32} -> [v32; v64]) shared_multi_regs)
-  @ List.map ~f:(fun {v64; _} -> v64) (Array.to_list nums)
-  @ Array.to_list ymms
 
 let o_rax = Oreg 0
 let o_rcx = Oreg 1
