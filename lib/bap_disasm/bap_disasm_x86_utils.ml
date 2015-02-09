@@ -425,10 +425,10 @@ let bits2reg16e mode b =
 
 let bits2reg8e mode ?(has_rex=false) b =
   if b < 4 || has_rex then
-    bits2reg32e mode b |> Exp.(cast Cast.low (!!r8))
+    bits2reg32e mode b |> Exp.(cast Cast.low (!!reg8_t))
   else
     b land 3 |> bits2reg32e mode |>
-    Exp.(cast Cast.low (!!r16)) |>  Exp.(cast Cast.high (!!r8))
+    Exp.(cast Cast.low (!!r16)) |>  Exp.(cast Cast.high (!!reg8_t))
 
 let reg2xmm r =  reg2bits r |> bits2xmm
 

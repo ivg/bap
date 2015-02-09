@@ -48,7 +48,7 @@ module ToIR = struct
     | Oreg r when t = r64 -> (bits2reg64e mode r, t)
     | Oreg r when t = r32 -> (bits2reg32e mode r, t)
     | Oreg r when t = r16 -> (bits2reg16e mode r, t)
-    | Oreg r when t = r8 -> (bits2reg8e mode ~has_rex r, t)
+    | Oreg r when t = reg8_t -> (bits2reg8e mode ~has_rex r, t)
     | Oreg _ -> unimplemented mode "unknown register"
     | Oseg r when t = r64 -> Exp.(Cast (Cast.UNSIGNED, !!r64, bits2segrege r), t)
     (* There is no 32-bit extension of segment selectors; this is not a bug *)
@@ -70,7 +70,7 @@ module ToIR = struct
     | Oreg r when t = r64 -> bits2reg64e mode r
     | Oreg r when t = r32 -> bits2reg32e mode r
     | Oreg r when t = r16 -> bits2reg16e mode r
-    | Oreg r when t = r8 -> bits2reg8e mode ~has_rex r
+    | Oreg r when t = reg8_t -> bits2reg8e mode ~has_rex r
     | Oreg _ -> unimplemented mode "unknown register"
     | Oseg r when t = r64 -> Exp.(Cast (Cast.UNSIGNED, !!r64, bits2segrege r))
     (* There is no 32-bit extension of segment selectors; this is not a bug *)
@@ -176,7 +176,7 @@ module ToIR = struct
 
   let string_incr mode t v =
     let i n = Exp.Int (int_of_mode mode n) in
-    if t = r8 then
+    if t = reg8_t then
       Stmt.Move (v, Exp.(Var v + df_to_offset mode df_e))
     else
       Stmt.Move (v, Exp.(Var v + (df_to_offset mode df_e * i (Strip.bytes_of_width t))))
@@ -851,7 +851,7 @@ module ToIR = struct
       [assn t o1 Exp.(Cast (Cast.UNSIGNED, !!t, c))]
     | Shift(st, s, dst, shift) ->
       let open Exp.Binop in
-      assert (List.mem [r8; r16; r32; r64] s);
+      assert (List.mem [reg8_t; r16; r32; r64] s);
       let origCOUNT, origDEST = Var.create ~tmp:true "origCOUNT" s,
                                 Var.create ~tmp:true "origDEST" s in
       let s' = Strip.bits_of_width s in
@@ -983,8 +983,8 @@ module ToIR = struct
           let shift = Exp.(offset land it Pervasives.(t' - 1) t') in
           reg, shift
         | Oaddr a ->
-          let byte = load (size_of_typ r8) Exp.(a + (offset lsr it 3 t')) in
-          let shift = Exp.(Cast (Cast.LOW, !!r8, offset) land it 7 8) in
+          let byte = load (size_of_typ reg8_t) Exp.(a + (offset lsr it 3 t')) in
+          let shift = Exp.(Cast (Cast.LOW, !!reg8_t, offset) land it 7 8) in
           byte, shift
         | Ovec _ | Oseg _ | Oimm _ -> disfailwith "Invalid bt operand"
       in
@@ -1165,7 +1165,7 @@ module ToIR = struct
       :: List.map ~f:(fun r -> Stmt.Move (r, it 0 1)) [cf; oF; sf; af; pf]
     | Sahf ->
       let assnsf = assns_lflags_to_bap in
-      let tah = Var.create ~tmp:true "AH" r8 in
+      let tah = Var.create ~tmp:true "AH" reg8_t in
       let extractlist =
         List.map
           ~f:(fun i ->
@@ -1176,7 +1176,7 @@ module ToIR = struct
       :: List.concat (List.map2_exn ~f:(fun f e -> f e) assnsf extractlist)
     | Lahf ->
       let o_ah = Oreg 4 in
-      [assn r8 o_ah lflags_e]
+      [assn reg8_t o_ah lflags_e]
     | Add(t, o1, o2) ->
       let tmp = Var.create ~tmp:true "t1" t in
       let tmp2 = Var.create ~tmp:true "t2" t in

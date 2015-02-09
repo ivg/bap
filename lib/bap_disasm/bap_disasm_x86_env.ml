@@ -4,9 +4,7 @@ open Bap_types.Std
 open Bap_disasm_x86_types
 
 (* register widths *)
-let r1 = Type.imm 1
 let r4 = Type.imm 4
-let r8 = Type.imm 8
 let r16 = Type.imm 16
 let r32 = Type.imm 32
 let r64 = Type.imm 64
