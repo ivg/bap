@@ -793,13 +793,13 @@ let parse_instr mode g addr =
         | 0x10 | 0x11 when (prefix.repeat || prefix.nrepeat) -> (* MOVSS, MOVSD *)
           let r, rm, rv, na = parse_modrm_vec None na in
           let t = if prefix.repeat then reg32_t else reg64_t in
-          let d, s, td = if b2 = 0x10 then r, rm, r128 else rm, r, t in
+          let d, s, td = if b2 = 0x10 then r, rm, reg128_t else rm, r, t in
           (match rm, rv with
            | Ovec _, Some rv ->
              let nt = Strip.bits_of_width t in
-             (Movoffset((r128, d),
-                        {offlen=Type.imm (128 - nt); offtyp=r128; offop=rv; offsrcoffset=nt; offdstoffset=nt}
-                        :: {offlen=t; offtyp=r128; offop=s; offsrcoffset=0; offdstoffset=0} :: []), na)
+             (Movoffset((reg128_t, d),
+                        {offlen=Type.imm (128 - nt); offtyp=reg128_t; offop=rv; offsrcoffset=nt; offdstoffset=nt}
+                        :: {offlen=t; offtyp=reg128_t; offop=s; offsrcoffset=0; offdstoffset=0} :: []), na)
            | Ovec _, None ->
              (Movdq(t, s, t, d, false), na)
            | Oaddr _, _ ->
@@ -820,8 +820,8 @@ let parse_instr mode g addr =
                 | Some r -> r
                 | None -> disfailwith "impossible"
               in
-              let src2 = [{offlen=reg64_t; offtyp=r128; offop=rm; offsrcoffset=offs2; offdstoffset=offd2}] in
-              r128, r, reg64_t, r128, rv, offs1, offd1, src2
+              let src2 = [{offlen=reg64_t; offtyp=reg128_t; offop=rm; offsrcoffset=offs2; offdstoffset=offd2}] in
+              reg128_t, r, reg64_t, reg128_t, rv, offs1, offd1, src2
             | 0x12 | 0x13 | 0x16 | 0x17 ->
               let offset = match b2 with
                 | 0x12 | 0x13 -> 0
@@ -834,8 +834,8 @@ let parse_instr mode g addr =
                 | (0x13 | 0x17), _ -> r, rm, offset, 0
                 | _ -> disfailwith "impossible"
               in
-              let ts = match s with Ovec _ -> r128 | _ -> reg64_t in
-              r128, d, reg64_t, ts, s, offs, offd, []
+              let ts = match s with Ovec _ -> reg128_t | _ -> reg64_t in
+              reg128_t, d, reg64_t, ts, s, offs, offd, []
             | _ -> disfailwith "impossible"
           in
           (Movoffset((tdst, dst),
@@ -855,13 +855,13 @@ let parse_instr mode g addr =
                 | 0x28 | 0x29 -> true
                 | _ -> disfailwith "impossible"
               in
-              let t = if prefix.mopsize = r256 then r256 else r128 in
+              let t = if prefix.mopsize = reg256_t then reg256_t else reg128_t in
               s, d, t, t, align
             | 0x6e | 0x7e -> (* MOVD, MOVQ *)
               let t = if prefix.opsize = reg64_t then reg64_t else reg32_t in
               let s, d, ts, td = match b2 with
-                | 0x6e -> toreg rm, r, t, r128
-                | 0x7e when prefix.repeat -> rm, r, reg64_t, r128
+                | 0x6e -> toreg rm, r, t, reg128_t
+                | 0x7e when prefix.repeat -> rm, r, reg64_t, reg128_t
                 | 0x7e -> r, toreg rm, t, t
                 | _ -> disfailwith "impossible"
               in
@@ -872,7 +872,7 @@ let parse_instr mode g addr =
                 | 0x7f -> r, rm
                 | _ -> disfailwith "impossible"
               in
-              let size = if prefix.repeat && prefix.vex = None then r128 else prefix.mopsize in
+              let size = if prefix.repeat && prefix.vex = None then reg128_t else prefix.mopsize in
               let align = if prefix.opsize_override then true else false in
               s, d, size, size, align
             | 0xd6 -> (* MOVQ *)
@@ -963,7 +963,7 @@ let parse_instr mode g addr =
           (Mov(prefix.opsize, r, rm, Some(cc_to_exp b2)), na)
         | 0x57 ->
           let r, rm, rv, na = parse_modrm_vec None na in
-          let t = if prefix.mopsize = r256 then r256 else r128 in
+          let t = if prefix.mopsize = reg256_t then reg256_t else reg128_t in
           (Ppackedbinop(t, prefix.opsize, Exp.(lxor), "xorp", r, rm, rv), na)
         | 0x60 | 0x61 | 0x62 | 0x68 | 0x69 | 0x6a ->
           let order = match b2 with
@@ -1147,7 +1147,7 @@ let parse_instr mode g addr =
           (Pbinop(prefix.mopsize, Exp.(lxor), "pxor", r, rm, rv), na)
         | 0xf0 ->
           let r, rm, _, na = parse_modrm_vec None na in
-          let t = if prefix.mopsize = r256 then r256 else r128 in
+          let t = if prefix.mopsize = reg256_t then reg256_t else reg128_t in
           (Movdq(t, rm, t, r, false), na)
         | 0xf8 | 0xf9 | 0xfa | 0xfb ->
           let r, rm, rv, na = parse_modrm_vec None na in
@@ -1184,7 +1184,7 @@ let parse_instr mode g addr =
      operands larger.  *)
   let modesize = type_of_mode mode in
   let opsize, bopsize, mopsize =
-    if List.mem pref pref_opsize then reg16_t,reg16_t,r128 else reg32_t,modesize,reg64_t
+    if List.mem pref pref_opsize then reg16_t,reg16_t,reg128_t else reg32_t,modesize,reg64_t
   in
   let opsize = match rex with
     | Some {rex_w=true; _} -> reg64_t (* See Table 3-4: Effective Operand-
@@ -1196,8 +1196,8 @@ let parse_instr mode g addr =
     | _ -> opsize
   in
   let mopsize = match vex with
-    | Some {vex_l=false; _} -> r128
-    | Some {vex_l=true; _} -> r256
+    | Some {vex_l=false; _} -> reg128_t
+    | Some {vex_l=true; _} -> reg256_t
     | None -> mopsize
   in
   let addrsize = match mode with

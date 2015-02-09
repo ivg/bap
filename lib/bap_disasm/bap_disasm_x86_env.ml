@@ -3,14 +3,6 @@ open Bap_types.Std
 
 open Bap_disasm_x86_types
 
-(* register widths *)
-let r4 = Type.imm 4
-let r128 = Type.imm 128
-let r256 = Type.imm 256
-let xmm_t = r128
-let ymm_t = r256
-let st_t = Type.imm 80
-
 type multimodereg = { v32: var; v64: var }
 
 let gv mode { v32; v64 } = match mode with
@@ -61,7 +53,7 @@ let mxcsr = Var.create "R_MXCSR" reg32_t
 (* r8 -> r15 *)
 let nums = Array.init 8 ~f:(fun i -> nmv "ERROR" (Type.imm 0) (Printf.sprintf "R_R%d" (i+8)) reg64_t)
 
-let ymms = Array.init 16 ~f:(fun i -> Var.create (Printf.sprintf "R_YMM%d" i) ymm_t)
+let ymms = Array.init 16 ~f:(fun i -> Var.create (Printf.sprintf "R_YMM%d" i) reg256_t)
 
 (* floating point registers *)
 

@@ -36,8 +36,8 @@ module ToIR = struct
 
   (* copypasted from op2e_s below, but keeps the opcode width *)
   let op2e_s_keep_width mode ss has_rex t = function
-    | Ovec r when t = r256 -> (bits2ymme r, t)
-    | Ovec r when t = r128 -> (bits2ymm128e r, t)
+    | Ovec r when t = reg256_t -> (bits2ymme r, t)
+    | Ovec r when t = reg128_t -> (bits2ymm128e r, t)
     | Ovec r when t = reg64_t -> (bits2ymm64e r, t)
     | Ovec r when t = reg32_t -> (bits2ymm32e r, t)
     | Ovec _ ->
@@ -58,8 +58,8 @@ module ToIR = struct
     | Oimm i -> Exp.(Int (litz i (Strip.bits_of_width t)), t)
 
   let op2e_s mode ss has_rex t = function
-    | Ovec r when t = r256 -> bits2ymme r
-    | Ovec r when t = r128 -> bits2ymm128e r
+    | Ovec r when t = reg256_t -> bits2ymme r
+    | Ovec r when t = reg128_t -> bits2ymm128e r
     | Ovec r when t = reg64_t -> bits2ymm64e r
     | Ovec r when t = reg32_t -> bits2ymm32e r
     | Ovec _ ->
@@ -106,7 +106,7 @@ module ToIR = struct
     (* Zero-extend 128-bit assignments to 256-bit ymms. *)
     | Ovec r, Type.Imm (128|64|32) when has_vex ->
       let v = bits2ymm r in
-      sub_assn r256 v Exp.(Cast (Cast.UNSIGNED, !!r256, e))
+      sub_assn reg256_t v Exp.(Cast (Cast.UNSIGNED, !!reg256_t, e))
     | Ovec r, Type.Imm (256|128|64|32) ->
       let v = bits2ymm r in
       sub_assn t v e
@@ -346,7 +346,7 @@ module ToIR = struct
         (* Extract index into table *)
         let entry_size, entry_shift = match mode with
           | X86 -> reg64_t, 6  (* "1<<6 = 64" *)
-          | X8664 -> r128, 7 (* "1<<7 = 128" *)
+          | X8664 -> reg128_t, 7 (* "1<<7 = 128" *)
         in
         let index = Exp.(Cast (Cast.UNSIGNED, !!mt, (Extract (15, 4, e)) lsl (Int (mi entry_shift)))) in
         (* Load the table entry *)
@@ -719,7 +719,7 @@ module ToIR = struct
       let mask e =
         match imm8cb with
         | {outselectmask=Bitmask; _} ->
-          Exp.(Cast (Cast.UNSIGNED, !!r128, e))
+          Exp.(Cast (Cast.UNSIGNED, !!reg128_t, e))
         | {outselectmask=Bytemask; _} ->
           let get_element i =
             Exp.(Cast (Cast.UNSIGNED, !!elemt, Extract (i, i, e)))

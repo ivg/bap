@@ -400,7 +400,7 @@ let bits2ymme b = bits2ymm b |> Exp.var
 let (!!) = function Type.Imm v -> v | _ -> failwith "internal error"
 
 let bits2ymm128e b =
-  bits2ymme b |> Exp.(cast Cast.low (!!r128))
+  bits2ymme b |> Exp.(cast Cast.low (!!reg128_t))
 
 let bits2ymm64e b =
   bits2ymme b |> Exp.(cast Cast.low (!!reg64_t))

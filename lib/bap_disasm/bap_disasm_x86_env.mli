@@ -1,11 +1,6 @@
 open Bap_types.Std
 open Bap_disasm_x86_types
 
-(** register widths *)
-val r4    : Type.t
-val r128  : Type.t
-val r256  : Type.t
-
 (** new multi-mode variable *)
 type multimodereg
 
