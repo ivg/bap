@@ -403,10 +403,10 @@ let bits2ymm128e b =
   bits2ymme b |> Exp.(cast Cast.low (!!r128))
 
 let bits2ymm64e b =
-  bits2ymme b |> Exp.(cast Cast.low (!!r64))
+  bits2ymme b |> Exp.(cast Cast.low (!!reg64_t))
 
 let bits2ymm32e b =
-  bits2ymme b |> Exp.(cast Cast.low (!!r32))
+  bits2ymme b |> Exp.(cast Cast.low (!!reg32_t))
 
 let bits2xmm = bits2ymm128e
 
@@ -418,7 +418,7 @@ let bits2reg64e mode b =
   ge mode (bits2genreg b)
 
 let bits2reg32e mode b =
-  bits2genreg b |> ge mode |> Exp.(cast Cast.low (!!r32))
+  bits2genreg b |> ge mode |> Exp.(cast Cast.low (!!reg32_t))
 
 let bits2reg16e mode b =
   bits2reg32e mode b |> Exp.(cast Cast.low (!!reg16_t))

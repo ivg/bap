@@ -38,19 +38,19 @@ module ToIR = struct
   let op2e_s_keep_width mode ss has_rex t = function
     | Ovec r when t = r256 -> (bits2ymme r, t)
     | Ovec r when t = r128 -> (bits2ymm128e r, t)
-    | Ovec r when t = r64 -> (bits2ymm64e r, t)
-    | Ovec r when t = r32 -> (bits2ymm32e r, t)
+    | Ovec r when t = reg64_t -> (bits2ymm64e r, t)
+    | Ovec r when t = reg32_t -> (bits2ymm32e r, t)
     | Ovec _ ->
       let i = match t with
         | Type.Imm n -> ": "^(string_of_int n)
         | _ -> "" in
       disfailwith mode ("invalid SIMD register size for op2e"^i)
-    | Oreg r when t = r64 -> (bits2reg64e mode r, t)
-    | Oreg r when t = r32 -> (bits2reg32e mode r, t)
+    | Oreg r when t = reg64_t -> (bits2reg64e mode r, t)
+    | Oreg r when t = reg32_t -> (bits2reg32e mode r, t)
     | Oreg r when t = reg16_t -> (bits2reg16e mode r, t)
     | Oreg r when t = reg8_t -> (bits2reg8e mode ~has_rex r, t)
     | Oreg _ -> unimplemented mode "unknown register"
-    | Oseg r when t = r64 -> Exp.(Cast (Cast.UNSIGNED, !!r64, bits2segrege r), t)
+    | Oseg r when t = reg64_t -> Exp.(Cast (Cast.UNSIGNED, !!reg64_t, bits2segrege r), t)
     (* There is no 32-bit extension of segment selectors; this is not a bug *)
     | Oseg r when t = reg16_t -> (bits2segrege r, t)
     | Oseg _ -> (disfailwith mode "Segment register when t is not r16", t)
@@ -60,19 +60,19 @@ module ToIR = struct
   let op2e_s mode ss has_rex t = function
     | Ovec r when t = r256 -> bits2ymme r
     | Ovec r when t = r128 -> bits2ymm128e r
-    | Ovec r when t = r64 -> bits2ymm64e r
-    | Ovec r when t = r32 -> bits2ymm32e r
+    | Ovec r when t = reg64_t -> bits2ymm64e r
+    | Ovec r when t = reg32_t -> bits2ymm32e r
     | Ovec _ ->
       let i = match t with
         | Type.Imm n -> ": "^(string_of_int n)
         | _ -> "" in
       disfailwith mode ("invalid SIMD register size for op2e"^i)
-    | Oreg r when t = r64 -> bits2reg64e mode r
-    | Oreg r when t = r32 -> bits2reg32e mode r
+    | Oreg r when t = reg64_t -> bits2reg64e mode r
+    | Oreg r when t = reg32_t -> bits2reg32e mode r
     | Oreg r when t = reg16_t -> bits2reg16e mode r
     | Oreg r when t = reg8_t -> bits2reg8e mode ~has_rex r
     | Oreg _ -> unimplemented mode "unknown register"
-    | Oseg r when t = r64 -> Exp.(Cast (Cast.UNSIGNED, !!r64, bits2segrege r))
+    | Oseg r when t = reg64_t -> Exp.(Cast (Cast.UNSIGNED, !!reg64_t, bits2segrege r))
     (* There is no 32-bit extension of segment selectors; this is not a bug *)
     | Oseg r when t = reg16_t -> bits2segrege r
     | Oseg _ -> disfailwith mode "Segment register when t is not r16"
@@ -114,7 +114,7 @@ module ToIR = struct
     (* Zero-extend 32-bit assignments to 64-bit registers. *)
     | Oreg r, Type.Imm 32 when is8664 ->
       let v = gv mode (bits2genreg r) in
-      sub_assn r64 v Exp.(Cast (Cast.UNSIGNED, !!r64, e))
+      sub_assn reg64_t v Exp.(Cast (Cast.UNSIGNED, !!reg64_t, e))
     | Oreg r, Type.Imm (64|32|16) ->
       let v = gv mode (bits2genreg r) in
       sub_assn t v e
@@ -139,8 +139,8 @@ module ToIR = struct
     match t with
     | Imm 8 -> [reg16_t, o_rax]
     | Imm 16 -> [reg16_t, o_rdx; reg16_t, o_rax]
-    | Imm 32 -> [r32, o_rdx; r32, o_rax]
-    | Imm 64 -> [r64, o_rdx; r64, o_rax]
+    | Imm 32 -> [reg32_t, o_rdx; reg32_t, o_rax]
+    | Imm 64 -> [reg64_t, o_rdx; reg64_t, o_rax]
     | _ -> disfailwith X86 "op_dbl only defined for Reg 8, 16, 32, and 64"
 
   (* Return an expression for a double-width operand, as used by the div
@@ -345,7 +345,7 @@ module ToIR = struct
         let base = Exp.Ite (ti, ge mode ldt, ge mode gdt) in
         (* Extract index into table *)
         let entry_size, entry_shift = match mode with
-          | X86 -> r64, 6  (* "1<<6 = 64" *)
+          | X86 -> reg64_t, 6  (* "1<<6 = 64" *)
           | X8664 -> r128, 7 (* "1<<7 = 128" *)
         in
         let index = Exp.(Cast (Cast.UNSIGNED, !!mt, (Extract (15, 4, e)) lsl (Int (mi entry_shift)))) in
@@ -528,7 +528,7 @@ module ToIR = struct
       (* could also be done with shifts *)
       let padt = Type.Imm(32 - nbytes) in
       let or_together_bits = List.fold_left ~f:(fun acc i -> Exp.Concat(acc,i)) ~init:(it 0 (Strip.bits_of_width padt)) all_bits in
-      [assn r32 dst or_together_bits]
+      [assn reg32_t dst or_together_bits]
     | Palignr (t,dst,src,vsrc,imm) ->
       let (dst_e, t_concat) = op2e_keep_width t dst in
       let (src_e, t_concat') = op2e_keep_width t src in
@@ -851,7 +851,7 @@ module ToIR = struct
       [assn t o1 Exp.(Cast (Cast.UNSIGNED, !!t, c))]
     | Shift(st, s, dst, shift) ->
       let open Exp.Binop in
-      assert (List.mem [reg8_t; reg16_t; r32; r64] s);
+      assert (List.mem [reg8_t; reg16_t; reg32_t; reg64_t] s);
       let origCOUNT, origDEST = Var.create ~tmp:true "origCOUNT" s,
                                 Var.create ~tmp:true "origDEST" s in
       let s' = Strip.bits_of_width s in
@@ -1024,26 +1024,26 @@ module ToIR = struct
       List.map ~f:undef [cf; oF; sf; af; pf]
     | Hlt -> [] (* x86 Hlt is essentially a NOP *)
     | Rdtsc ->
-      let undef reg = assn r32 reg (Exp.Unknown ("rdtsc", r32)) in
+      let undef reg = assn reg32_t reg (Exp.Unknown ("rdtsc", reg32_t)) in
       List.map ~f:undef [o_rax; o_rdx]
     | Cpuid ->
-      let undef reg = assn r32 reg (Exp.Unknown ("cpuid", r32)) in
+      let undef reg = assn reg32_t reg (Exp.Unknown ("cpuid", reg32_t)) in
       List.map ~f:undef [o_rax; o_rbx; o_rcx; o_rdx]
     | Xgetbv ->
-      let undef reg = assn r32 reg (Exp.Unknown ("xgetbv", r32)) in
+      let undef reg = assn reg32_t reg (Exp.Unknown ("xgetbv", reg32_t)) in
       List.map ~f:undef [o_rax; o_rdx]
     | Stmxcsr (dst) ->
       let dst = match dst with
         | Oaddr addr -> addr
         | _ -> disfailwith "stmxcsr argument cannot be non-memory"
       in
-      [store r32 dst (Exp.Var mxcsr);(*(Unknown ("stmxcsr", r32));*) ]
+      [store reg32_t dst (Exp.Var mxcsr);(*(Unknown ("stmxcsr", reg32_t));*) ]
     | Ldmxcsr (src) ->
       let src = match src with
         | Oaddr addr -> addr
         | _ -> disfailwith "ldmxcsr argument cannot be non-memory"
       in
-      [ Stmt.Move (mxcsr, load (size_of_typ r32) src); ]
+      [ Stmt.Move (mxcsr, load (size_of_typ reg32_t) src); ]
     | Fnstcw (dst) ->
       let dst = match dst with
         | Oaddr addr -> addr
@@ -1259,21 +1259,21 @@ module ToIR = struct
         :: assn t o_rax (Exp.Ite (zf_e, eax_e, dst_e))
         :: []
     | Cmpxchg8b o -> (* only 32bit case *)
-      let accumulator = Exp.Concat((op2e r32 o_rdx),(op2e r32 o_rax)) in
-      let dst_e = op2e r64 o in
-      let src_e = Exp.Concat((op2e r32 o_rcx),(op2e r32 o_rbx)) in
+      let accumulator = Exp.Concat((op2e reg32_t o_rdx),(op2e reg32_t o_rax)) in
+      let dst_e = op2e reg64_t o in
+      let src_e = Exp.Concat((op2e reg32_t o_rcx),(op2e reg32_t o_rbx)) in
       let dst_low_e = Exp.Extract(63, 32, dst_e) in
       let dst_hi_e = Exp.Extract(31, 0, dst_e) in
-      let eax_e = op2e r32 o_rax in
-      let edx_e = op2e r32 o_rdx in
+      let eax_e = op2e reg32_t o_rax in
+      let edx_e = op2e reg32_t o_rdx in
       let equal = Var.create ~tmp:true "t" bool_t in
       let equal_v = Exp.Var equal in
       [
         Stmt.Move (equal, Exp.(accumulator = dst_e));
         Stmt.Move (zf, equal_v);
-        assn r64 o (Exp.Ite (equal_v, src_e, dst_e));
-        assn r32 o_rax (Exp.Ite (equal_v, eax_e, dst_low_e));
-        assn r32 o_rdx (Exp.Ite (equal_v, edx_e, dst_hi_e))
+        assn reg64_t o (Exp.Ite (equal_v, src_e, dst_e));
+        assn reg32_t o_rax (Exp.Ite (equal_v, eax_e, dst_low_e));
+        assn reg32_t o_rdx (Exp.Ite (equal_v, edx_e, dst_hi_e))
       ]
     | Xadd(t, dst, src) ->
       let tmp = Var.create ~tmp:true "t" t in
