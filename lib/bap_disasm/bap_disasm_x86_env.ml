@@ -5,7 +5,6 @@ open Bap_disasm_x86_types
 
 (* register widths *)
 let r4 = Type.imm 4
-let r16 = Type.imm 16
 let r32 = Type.imm 32
 let r64 = Type.imm 64
 let r128 = Type.imm 128
@@ -48,17 +47,17 @@ let df = Var.create "R_DF" bool_t
 let fs_base = nmv "R_FS_BASE_32" r32 "R_FS_BASE_64" r64
 let gs_base = nmv "R_GS_BASE_32" r32 "R_GS_BASE_64" r64
 
-let cs = Var.create "R_CS" r16
-let ds = Var.create "R_DS" r16
-let es = Var.create "R_ES" r16
-let fs = Var.create "R_FS" r16
-let gs = Var.create "R_GS" r16
-let ss = Var.create "R_SS" r16
+let cs = Var.create "R_CS" reg16_t
+let ds = Var.create "R_DS" reg16_t
+let es = Var.create "R_ES" reg16_t
+let fs = Var.create "R_FS" reg16_t
+let gs = Var.create "R_GS" reg16_t
+let ss = Var.create "R_SS" reg16_t
 
 let gdt = nmv "R_GDTR" r32 "R_GDTR" r64
 let ldt = nmv "R_LDTR" r32 "R_LDTR" r64
 
-let fpu_ctrl = Var.create "R_FPU_CONTROL" r16
+let fpu_ctrl = Var.create "R_FPU_CONTROL" reg16_t
 let mxcsr = Var.create "R_MXCSR" r32
 
 (* r8 -> r15 *)

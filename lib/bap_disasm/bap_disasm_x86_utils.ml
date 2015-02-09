@@ -421,20 +421,20 @@ let bits2reg32e mode b =
   bits2genreg b |> ge mode |> Exp.(cast Cast.low (!!r32))
 
 let bits2reg16e mode b =
-  bits2reg32e mode b |> Exp.(cast Cast.low (!!r16))
+  bits2reg32e mode b |> Exp.(cast Cast.low (!!reg16_t))
 
 let bits2reg8e mode ?(has_rex=false) b =
   if b < 4 || has_rex then
     bits2reg32e mode b |> Exp.(cast Cast.low (!!reg8_t))
   else
     b land 3 |> bits2reg32e mode |>
-    Exp.(cast Cast.low (!!r16)) |>  Exp.(cast Cast.high (!!reg8_t))
+    Exp.(cast Cast.low (!!reg16_t)) |>  Exp.(cast Cast.high (!!reg8_t))
 
 let reg2xmm r =  reg2bits r |> bits2xmm
 
 (* effective addresses for 16-bit addressing *)
 let eaddr16 mode =
-  let e v = ge mode v |> Exp.(cast Cast.low (!!r16)) in
+  let e v = ge mode v |> Exp.(cast Cast.low (!!reg16_t)) in
   let open Exp in
   function
   (* R/M byte *)

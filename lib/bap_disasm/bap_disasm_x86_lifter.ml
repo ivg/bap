@@ -47,12 +47,12 @@ module ToIR = struct
       disfailwith mode ("invalid SIMD register size for op2e"^i)
     | Oreg r when t = r64 -> (bits2reg64e mode r, t)
     | Oreg r when t = r32 -> (bits2reg32e mode r, t)
-    | Oreg r when t = r16 -> (bits2reg16e mode r, t)
+    | Oreg r when t = reg16_t -> (bits2reg16e mode r, t)
     | Oreg r when t = reg8_t -> (bits2reg8e mode ~has_rex r, t)
     | Oreg _ -> unimplemented mode "unknown register"
     | Oseg r when t = r64 -> Exp.(Cast (Cast.UNSIGNED, !!r64, bits2segrege r), t)
     (* There is no 32-bit extension of segment selectors; this is not a bug *)
-    | Oseg r when t = r16 -> (bits2segrege r, t)
+    | Oseg r when t = reg16_t -> (bits2segrege r, t)
     | Oseg _ -> (disfailwith mode "Segment register when t is not r16", t)
     | Oaddr e -> (load_s mode ss (size_of_typ t) e, t)
     | Oimm i -> Exp.(Int (litz i (Strip.bits_of_width t)), t)
@@ -69,12 +69,12 @@ module ToIR = struct
       disfailwith mode ("invalid SIMD register size for op2e"^i)
     | Oreg r when t = r64 -> bits2reg64e mode r
     | Oreg r when t = r32 -> bits2reg32e mode r
-    | Oreg r when t = r16 -> bits2reg16e mode r
+    | Oreg r when t = reg16_t -> bits2reg16e mode r
     | Oreg r when t = reg8_t -> bits2reg8e mode ~has_rex r
     | Oreg _ -> unimplemented mode "unknown register"
     | Oseg r when t = r64 -> Exp.(Cast (Cast.UNSIGNED, !!r64, bits2segrege r))
     (* There is no 32-bit extension of segment selectors; this is not a bug *)
-    | Oseg r when t = r16 -> bits2segrege r
+    | Oseg r when t = reg16_t -> bits2segrege r
     | Oseg _ -> disfailwith mode "Segment register when t is not r16"
     | Oaddr e -> load_s mode ss (size_of_typ t) e
     | Oimm i -> Exp.Int (litz i (!!t))
@@ -125,7 +125,7 @@ module ToIR = struct
       let v = gv mode (bits2genreg (r land 3)) in
       sub_assn ~off:8 t v e
     | Oreg _, _ -> unimplemented mode "assignment to sub registers"
-    | Oseg r, _ when t = r16 ->
+    | Oseg r, _ when t = reg16_t ->
       let v = bits2segreg r in
       Stmt.Move (v, e)
     | Oseg _, _ -> disfailwith mode "Can't assign to non 16 bit segment register"
@@ -137,8 +137,8 @@ module ToIR = struct
   let op_dbl t =
     let open Type in
     match t with
-    | Imm 8 -> [r16, o_rax]
-    | Imm 16 -> [r16, o_rdx; r16, o_rax]
+    | Imm 8 -> [reg16_t, o_rax]
+    | Imm 16 -> [reg16_t, o_rdx; reg16_t, o_rax]
     | Imm 32 -> [r32, o_rdx; r32, o_rax]
     | Imm 64 -> [r64, o_rdx; r64, o_rax]
     | _ -> disfailwith X86 "op_dbl only defined for Reg 8, 16, 32, and 64"
@@ -697,8 +697,8 @@ module ToIR = struct
       in
       let bits = List.map ~f:get_intres1_bit (List.range ~stride:(-1) ~stop:`inclusive (nelem-1) 0) in
       let res_e = build_valid_xmm1 (build_valid_xmm2 (Util.concat_explist bits)) in
-      let int_res_1 = Var.create ~tmp:true "IntRes1" r16 in
-      let int_res_2 = Var.create ~tmp:true "IntRes2" r16 in
+      let int_res_1 = Var.create ~tmp:true "IntRes1" reg16_t in
+      let int_res_2 = Var.create ~tmp:true "IntRes2" reg16_t in
 
       let contains_null e =
         List.fold_left ~f:(fun acc i ->
@@ -730,7 +730,7 @@ module ToIR = struct
       (*comment
         ::*)
       let open Stmt in
-      Move (int_res_1, Exp.(Cast (Cast.UNSIGNED, !!r16, res_e)))
+      Move (int_res_1, Exp.(Cast (Cast.UNSIGNED, !!reg16_t, res_e)))
       :: (match imm8cb with
           | {negintres1=false; _} ->
             Move (int_res_2, Exp.Var int_res_1)
@@ -748,7 +748,7 @@ module ToIR = struct
                valid. *)
             let validvector =
               let bits = List.map ~f:is_valid_xmm2_e (List.range ~stride:(-1) ~start:`exclusive ~stop:`inclusive nelem 0) in
-              build_valid_xmm2 (Exp.(Cast (Cast.UNSIGNED, !!r16, Util.concat_explist bits)))
+              build_valid_xmm2 (Exp.(Cast (Cast.UNSIGNED, !!reg16_t, Util.concat_explist bits)))
             in
             Move (int_res_2, Exp.(validvector lxor Var int_res_1)))
       :: (match pcmpinfo with
@@ -851,7 +851,7 @@ module ToIR = struct
       [assn t o1 Exp.(Cast (Cast.UNSIGNED, !!t, c))]
     | Shift(st, s, dst, shift) ->
       let open Exp.Binop in
-      assert (List.mem [reg8_t; r16; r32; r64] s);
+      assert (List.mem [reg8_t; reg16_t; r32; r64] s);
       let origCOUNT, origDEST = Var.create ~tmp:true "origCOUNT" s,
                                 Var.create ~tmp:true "origDEST" s in
       let s' = Strip.bits_of_width s in
@@ -1049,13 +1049,13 @@ module ToIR = struct
         | Oaddr addr -> addr
         | _ -> disfailwith "fnstcw argument cannot be non-memory"
       in
-      [store r16 dst (Exp.Var fpu_ctrl); ]
+      [store reg16_t dst (Exp.Var fpu_ctrl); ]
     | Fldcw (src) ->
       let src = match src with
         | Oaddr addr -> addr
         | _ -> disfailwith "fldcw argument cannot be non-memory"
       in
-      [ Stmt.Move (fpu_ctrl, load (size_of_typ r16) src); ]
+      [ Stmt.Move (fpu_ctrl, load (size_of_typ reg16_t) src); ]
     | Fld _src ->
       unimplemented "unsupported FPU register stack"
     | Fst (_dst,_pop) ->
