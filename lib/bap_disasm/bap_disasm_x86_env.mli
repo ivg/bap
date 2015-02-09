@@ -2,7 +2,6 @@ open Bap_types.Std
 open Bap_disasm_x86_types
 
 (** register widths *)
-val r1    : Type.t
 val r4    : Type.t
 val r8    : Type.t
 val r16   : Type.t

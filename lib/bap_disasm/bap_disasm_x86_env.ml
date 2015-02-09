@@ -38,13 +38,13 @@ let rdx = nmv "R_EDX_32" r32 "R_RDX" r64
 let rflags = nmv "R_EFLAGS" r32 "R_RFLAGS" r64 (* XXX why is eflags here? *)
 
 (* condition flag bits *)
-let cf = Var.create "R_CF" r1
-let pf = Var.create "R_PF" r1
-let af = Var.create "R_AF" r1
-let zf = Var.create "R_ZF" r1
-let sf = Var.create "R_SF" r1
-let oF = Var.create "R_OF" r1
-let df = Var.create "R_DF" r1
+let cf = Var.create "R_CF" bool_t
+let pf = Var.create "R_PF" bool_t
+let af = Var.create "R_AF" bool_t
+let zf = Var.create "R_ZF" bool_t
+let sf = Var.create "R_SF" bool_t
+let oF = Var.create "R_OF" bool_t
+let df = Var.create "R_DF" bool_t
 
 (* segment registers let bases *)
 let fs_base = nmv "R_FS_BASE_32" r32 "R_FS_BASE_64" r64

@@ -213,8 +213,8 @@ let df_to_offset mode e =
     ite (e = exp_false) (it 1 t) (it (-1) t)
 
 let bap_to_rflags =
-  let undefined d = Exp.unknown (Printf.sprintf "Undefined RFLAGS bit %d" d) r1 in
-  let unmodeled s = Exp.unknown ("Unmodeled RFLAGS bit " ^ s) r1 in
+  let undefined d = Exp.unknown (Printf.sprintf "Undefined RFLAGS bit %d" d) bool_t in
+  let unmodeled s = Exp.unknown ("Unmodeled RFLAGS bit " ^ s) bool_t in
   (List.map ~f:undefined (List.range ~stride:(-1) ~stop:`inclusive 64 32))
   @  undefined 31                  (* 31 *)
      :: undefined 30               (* 30 *)

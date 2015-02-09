@@ -204,7 +204,7 @@ module ToIR = struct
       :: [(If (Exp.(rcx_e = (Int (bi (bi0)))), [Jmp (Exp.Int (bi next))], []))]
     @ [endstmt]
 
-  let compute_sf result = Exp.(Cast (Cast.HIGH, !!r1, result))
+  let compute_sf result = Exp.(Cast (Cast.HIGH, !!bool_t, result))
 
   let compute_zf t result =
     let bi0 = lit 0 t in
@@ -217,7 +217,7 @@ module ToIR = struct
     (* extra parens do not change semantics but do make it pretty
     print nicer *)
     let open Exp in
-    exp_not (Cast (Cast.LOW, !!r1,
+    exp_not (Cast (Cast.LOW, !!bool_t,
                    ((Let(acc, (r lsr (it 4 t')) lxor r, Let(acc, (var_acc lsr (it 2 t')) lxor var_acc, (var_acc lsr (it 1 t')) lxor var_acc))))))
 
   let set_sf r = Stmt.Move (sf, compute_sf r)
@@ -250,9 +250,9 @@ module ToIR = struct
   (* Helper functions to set flags for adding *)
   let set_aopszf_add t s1 s2 r =
     (* Move (oF, Bop.(Cast (CAST_HIGH, r1, (s1 = s2) land (s1 lxor r)))) *)
-    let s1_high = Exp.(Cast (Cast.HIGH, !!r1, s1)) in
-    let s2_high = Exp.(Cast (Cast.HIGH, !!r1, s2)) in
-    let r_high  = Exp.(Cast (Cast.HIGH, !!r1, r)) in
+    let s1_high = Exp.(Cast (Cast.HIGH, !!bool_t, s1)) in
+    let s2_high = Exp.(Cast (Cast.HIGH, !!bool_t, s2)) in
+    let r_high  = Exp.(Cast (Cast.HIGH, !!bool_t, r)) in
     Stmt.Move (oF, Exp.((s1_high = s2_high) land (s1_high lxor r_high)))
     ::set_apszf t s1 s2 r
 
@@ -264,7 +264,7 @@ module ToIR = struct
   let set_apszf_sub t s1 s2 r = set_apszf t s1 s2 r
 
   let set_aopszf_sub t s1 s2 r =
-    Stmt.Move (oF, Exp.(Cast (Cast.HIGH, !!r1, (s1 lxor s2) land (s1 lxor r))))
+    Stmt.Move (oF, Exp.(Cast (Cast.HIGH, !!bool_t, (s1 lxor s2) land (s1 lxor r))))
     ::set_apszf_sub t s1 s2 r
 
   let set_flags_sub t s1 s2 r =
@@ -611,7 +611,7 @@ module ToIR = struct
         (fun xmmnum index -> match Hashtbl.find vh (xmmnum,index) with
            | Some v -> v
            | None ->
-             let v = Var.create ~tmp:true ("is_valid_xmm"^string_of_int xmmnum^"_ele"^string_of_int index) r1 in
+             let v = Var.create ~tmp:true ("is_valid_xmm"^string_of_int xmmnum^"_ele"^string_of_int index) bool_t in
              Hashtbl.add_exn vh ~key:(xmmnum,index) ~data:v;
              v)
       in
@@ -864,19 +864,19 @@ module ToIR = struct
       let count = Exp.((op2e s shift) land count_mask) in
       let ifzero t e = Exp.(Ite ((Var origCOUNT = it 0 s'), t, e)) in
       let new_of = match st with
-        | LSHIFT -> Exp.((Cast (Cast.HIGH, !!r1, dste)) lxor cf_e)
-        | RSHIFT -> Exp.(Cast (Cast.HIGH, !!r1, Var origDEST))
+        | LSHIFT -> Exp.((Cast (Cast.HIGH, !!bool_t, dste)) lxor cf_e)
+        | RSHIFT -> Exp.(Cast (Cast.HIGH, !!bool_t, Var origDEST))
         | ARSHIFT -> exp_false
         | _ -> disfailwith "impossible"
       in
-      let unk_of = Exp.Unknown ("OF undefined after shift", r1) in
+      let unk_of = Exp.Unknown ("OF undefined after shift", bool_t) in
       let new_cf =
         (* undefined for SHL and SHR instructions where the count is greater than
            or equal to the size (in bits) of the destination operand *)
         match st with
-        | LSHIFT -> Exp.(Cast (Cast.LOW, !!r1, Var origDEST lsr (size - Var origCOUNT)))
+        | LSHIFT -> Exp.(Cast (Cast.LOW, !!bool_t, Var origDEST lsr (size - Var origCOUNT)))
         | RSHIFT | ARSHIFT ->
-          Exp.(Cast (Cast.HIGH, !!r1, Var origDEST lsl (size - Var origCOUNT)))
+          Exp.(Cast (Cast.HIGH, !!bool_t, Var origDEST lsl (size - Var origCOUNT)))
         | _ -> failwith "impossible"
       in
       [Stmt.Move (origDEST, dste);
@@ -887,7 +887,7 @@ module ToIR = struct
        Stmt.Move (sf, ifzero sf_e (compute_sf dste));
        Stmt.Move (zf, ifzero zf_e (compute_zf s' dste));
        Stmt.Move (pf, ifzero pf_e (compute_pf s dste));
-       Stmt.Move (af, ifzero af_e (Exp.Unknown ("AF undefined after shift", r1)))
+       Stmt.Move (af, ifzero af_e (Exp.Unknown ("AF undefined after shift", bool_t)))
       ]
     | Shiftd(st, s, dst, fill, count) ->
       let open Exp.Binop in
@@ -901,13 +901,13 @@ module ToIR = struct
       let count_mask = Exp.(size - it 1 s') in
       let e_count = Exp.((op2e s count) land count_mask) in
       let new_cf =  match st with
-        | LSHIFT -> Exp.(Cast (Cast.LOW, !!r1, Var origDEST lsr (size - Var origCOUNT)))
-        | RSHIFT -> Exp.(Cast (Cast.HIGH, !!r1, Var origDEST lsl (size - Var origCOUNT)))
+        | LSHIFT -> Exp.(Cast (Cast.LOW, !!bool_t, Var origDEST lsr (size - Var origCOUNT)))
+        | RSHIFT -> Exp.(Cast (Cast.HIGH, !!bool_t, Var origDEST lsl (size - Var origCOUNT)))
         | _ -> disfailwith "impossible" in
       let ifzero t e = Exp.(Ite ((Var origCOUNT = it 0 s'), t, e)) in
-      let new_of = Exp.(Cast (Cast.HIGH, !!r1, (Var origDEST lxor e_dst))) in
+      let new_of = Exp.(Cast (Cast.HIGH, !!bool_t, (Var origDEST lxor e_dst))) in
       let unk_of =
-        Exp.Unknown ("OF undefined after shiftd of more then 1 bit", r1) in
+        Exp.Unknown ("OF undefined after shiftd of more then 1 bit", bool_t) in
       let ret1 = match st with
         | LSHIFT -> Exp.(e_fill lsr (size - Var origCOUNT))
         | RSHIFT -> Exp.(e_fill lsl (size - Var origCOUNT))
@@ -930,7 +930,7 @@ module ToIR = struct
         Stmt.Move (sf, ifzero sf_e (compute_sf e_dst));
         Stmt.Move (zf, ifzero zf_e (compute_zf s' e_dst));
         Stmt.Move (pf, ifzero pf_e (compute_pf s e_dst));
-        Stmt.Move (af, ifzero af_e (Exp.Unknown ("AF undefined after shiftd", r1)))
+        Stmt.Move (af, ifzero af_e (Exp.Unknown ("AF undefined after shiftd", bool_t)))
       ]
     | Rotate(rt, s, dst, shift, use_cf) ->
       let open Exp.Binop in
@@ -946,15 +946,15 @@ module ToIR = struct
       let e_shift = Exp.(op2e s shift land it shift_val s') in
       let size = it (Strip.bits_of_width s) s' in
       let new_cf = match rt with
-        | LSHIFT -> Exp.(Cast (Cast.LOW, !!r1, e_dst))
-        | RSHIFT -> Exp.(Cast (Cast.HIGH, !!r1, e_dst))
+        | LSHIFT -> Exp.(Cast (Cast.LOW, !!bool_t, e_dst))
+        | RSHIFT -> Exp.(Cast (Cast.HIGH, !!bool_t, e_dst))
         | _ -> disfailwith "impossible" in
       let new_of = match rt with
-        | LSHIFT -> Exp.(cf_e lxor Cast (Cast.HIGH, !!r1, e_dst))
-        | RSHIFT -> Exp.(Cast (Cast.HIGH, !!r1, e_dst) lxor Cast (Cast.HIGH, !!r1, e_dst lsl it 1 s'))
+        | LSHIFT -> Exp.(cf_e lxor Cast (Cast.HIGH, !!bool_t, e_dst))
+        | RSHIFT -> Exp.(Cast (Cast.HIGH, !!bool_t, e_dst) lxor Cast (Cast.HIGH, !!bool_t, e_dst lsl it 1 s'))
         | _ -> disfailwith "impossible" in
       let unk_of =
-        Exp.Unknown ("OF undefined after rotate of more then 1 bit", r1) in
+        Exp.Unknown ("OF undefined after rotate of more then 1 bit", bool_t) in
       (* this is repeated often enough in the cases perhaps
        * we should bind it at the top of the function... *)
       let ifzero t e = Exp.(Ite (Var origCOUNT = it 0 s', t, e)) in
@@ -989,15 +989,15 @@ module ToIR = struct
         | Ovec _ | Oseg _ | Oimm _ -> disfailwith "Invalid bt operand"
       in
       [
-        Stmt.Move (cf, Exp.(Cast (Cast.LOW, !!r1, value lsr shift)));
-        Stmt.Move (oF, Exp.Unknown ("OF undefined after bt", r1));
-        Stmt.Move (sf, Exp.Unknown ("SF undefined after bt", r1));
-        Stmt.Move (af, Exp.Unknown ("AF undefined after bt", r1));
-        Stmt.Move (pf, Exp.Unknown ("PF undefined after bt", r1))
+        Stmt.Move (cf, Exp.(Cast (Cast.LOW, !!bool_t, value lsr shift)));
+        Stmt.Move (oF, Exp.Unknown ("OF undefined after bt", bool_t));
+        Stmt.Move (sf, Exp.Unknown ("SF undefined after bt", bool_t));
+        Stmt.Move (af, Exp.Unknown ("AF undefined after bt", bool_t));
+        Stmt.Move (pf, Exp.Unknown ("PF undefined after bt", bool_t))
       ]
     | Bs(t, dst, src, dir) ->
       let t' = Strip.bits_of_width t in
-      let source_is_zero = Var.create ~tmp:true "t" r1 in
+      let source_is_zero = Var.create ~tmp:true "t" bool_t in
       let source_is_zero_v = Exp.Var source_is_zero in
       let src_e = op2e t src in
       let bits = Strip.bits_of_width t in
@@ -1228,7 +1228,7 @@ module ToIR = struct
       Stmt.Move (tmp_s, s1)
       :: Stmt.Move (tmp_d, d)
       :: assn t o1 Exp.(orig_d - sube)
-      :: Stmt.Move (oF, Exp.(Cast (Cast.HIGH, !!r1, (orig_s lxor orig_d) land (orig_d lxor d))))
+      :: Stmt.Move (oF, Exp.(Cast (Cast.HIGH, !!bool_t, (orig_s lxor orig_d) land (orig_d lxor d))))
       (* When src = 0xffffffff and cf=1, the processor sets CF=1.
 
          Note that we compute dest = dest - (0xffffffff + 1) = 0, so the
@@ -1266,7 +1266,7 @@ module ToIR = struct
       let dst_hi_e = Exp.Extract(31, 0, dst_e) in
       let eax_e = op2e r32 o_rax in
       let edx_e = op2e r32 o_rdx in
-      let equal = Var.create ~tmp:true "t" r1 in
+      let equal = Var.create ~tmp:true "t" bool_t in
       let equal_v = Exp.Var equal in
       [
         Stmt.Move (equal, Exp.(accumulator = dst_e));
@@ -1291,31 +1291,31 @@ module ToIR = struct
       assn t o1 Exp.(op2e t o1 land op2e t o2)
       :: Stmt.Move (oF, exp_false)
       :: Stmt.Move (cf, exp_false)
-      :: Stmt.Move (af, Exp.Unknown ("AF is undefined after and", r1))
+      :: Stmt.Move (af, Exp.Unknown ("AF is undefined after and", bool_t))
       :: set_pszf t (op2e t o1)
     | Or(t, o1, o2) ->
       assn t o1 Exp.(op2e t o1 lor op2e t o2)
       :: Stmt.Move (oF, exp_false)
       :: Stmt.Move (cf, exp_false)
-      :: Stmt.Move (af, Exp.Unknown ("AF is undefined after or", r1))
+      :: Stmt.Move (af, Exp.Unknown ("AF is undefined after or", bool_t))
       :: set_pszf t (op2e t o1)
     | Xor(t, o1, o2) when o1 = o2 ->
       assn t o1 Exp.(Int (lit 0 (Strip.bits_of_width t)))
-      :: Stmt.Move (af, Exp.Unknown ("AF is undefined after xor", r1))
+      :: Stmt.Move (af, Exp.Unknown ("AF is undefined after xor", bool_t))
       :: List.map ~f:(fun v -> Stmt.Move (v, exp_true)) [zf; pf]
       @  List.map ~f:(fun v -> Stmt.Move (v, exp_false)) [oF; cf; sf]
     | Xor(t, o1, o2) ->
       assn t o1 Exp.(op2e t o1 lxor op2e t o2)
       :: Stmt.Move (oF, exp_false)
       :: Stmt.Move (cf, exp_false)
-      :: Stmt.Move (af, Exp.Unknown ("AF is undefined after xor", r1))
+      :: Stmt.Move (af, Exp.Unknown ("AF is undefined after xor", bool_t))
       :: set_pszf t (op2e t o1)
     | Test(t, o1, o2) ->
       let tmp = Var.create ~tmp:true "t" t in
       Stmt.Move (tmp, Exp.(op2e t o1 land op2e t o2))
       :: Stmt.Move (oF, exp_false)
       :: Stmt.Move (cf, exp_false)
-      :: Stmt.Move (af, Exp.Unknown ("AF is undefined after and", r1))
+      :: Stmt.Move (af, Exp.Unknown ("AF is undefined after and", bool_t))
       :: set_pszf t (Exp.Var tmp)
     | Ptest(t, o1, o2) ->
       let open Stmt in
@@ -1362,10 +1362,10 @@ module ToIR = struct
       [
         Stmt.Move (oF, flag);
         Stmt.Move (cf, flag);
-        Stmt.Move (sf, Exp.Unknown ("SF is undefined after Mul", r1));
-        Stmt.Move (zf, Exp.Unknown ("ZF is undefined after Mul", r1));
-        Stmt.Move (af, Exp.Unknown ("AF is undefined after Mul", r1));
-        Stmt.Move (pf, Exp.Unknown ("PF is undefined after Mul", r1))
+        Stmt.Move (sf, Exp.Unknown ("SF is undefined after Mul", bool_t));
+        Stmt.Move (zf, Exp.Unknown ("ZF is undefined after Mul", bool_t));
+        Stmt.Move (af, Exp.Unknown ("AF is undefined after Mul", bool_t));
+        Stmt.Move (pf, Exp.Unknown ("PF is undefined after Mul", bool_t))
       ]
     | Imul (t, (oneopform, dst), src1, src2) ->
       let new_t = Type.Imm ((Strip.bits_of_width t)*2) in
@@ -1396,10 +1396,10 @@ module ToIR = struct
             Stmt.Move (cf, flag)] )
       in
       mul_stmts@[
-        Stmt.Move (pf, Exp.Unknown ("PF is undefined after imul", r1));
-        Stmt.Move (sf, Exp.Unknown ("SF is undefined after imul", r1));
-        Stmt.Move (zf, Exp.Unknown ("ZF is undefined after imul", r1));
-        Stmt.Move (af, Exp.Unknown ("AF is undefined after imul", r1));]
+        Stmt.Move (pf, Exp.Unknown ("PF is undefined after imul", bool_t));
+        Stmt.Move (sf, Exp.Unknown ("SF is undefined after imul", bool_t));
+        Stmt.Move (zf, Exp.Unknown ("ZF is undefined after imul", bool_t));
+        Stmt.Move (af, Exp.Unknown ("AF is undefined after imul", bool_t));]
     | Div(t, src) ->
       let dt' = Strip.bits_of_width t * 2 in
       let dt = Type.Imm dt' in
