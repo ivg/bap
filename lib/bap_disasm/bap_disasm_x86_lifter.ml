@@ -9,10 +9,15 @@ open Bap_disasm_x86_env
 
 module ToIR = struct
 
-  (* stmt helpers *)
+  let cf_e = Exp.var cf
+  let pf_e = Exp.var pf
+  let af_e = Exp.var af
+  let zf_e = Exp.var zf
+  let sf_e = Exp.var sf
+  let of_e = Exp.var oF
+  let df_e = Exp.var df
 
-  (*let move v e =*)
-  (*Move(v, e)*)
+  (* stmt helpers *)
 
   let size_of_typ s = Size.of_int_exn (!!s) (** doubts here  *)
   let litz = bitvector_of_z
@@ -749,7 +754,7 @@ module ToIR = struct
       :: (match pcmpinfo with
           | {out=Index; _} -> Move (rcx, sb (Exp.Var int_res_2))
           (* FIXME: ymms should be used instead of xmms here *)
-          | {out=Mask; _} -> Move (ymm0, mask (Exp.Var int_res_2)))
+          | {out=Mask; _} -> Move (ymms.(0), mask (Exp.Var int_res_2)))
       :: Move (cf, Exp.(Var int_res_2 <> it 0 16))
       :: Move (zf ,contains_null xmm2m128_e)
       :: Move (sf, contains_null xmm1_e)

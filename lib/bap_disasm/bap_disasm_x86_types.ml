@@ -69,7 +69,7 @@ module Pcmpstr = struct
     agg : agg;
     negintres1 : bool;
     maskintres1 : bool;
-     outselectsig : outselectsig;
+    outselectsig : outselectsig;
     outselectmask : outselectmask;
   }
 

@@ -10,14 +10,14 @@ open Bap_disasm_x86_env
    for 70 to 7f and 0f 80 to 8f *)
 let cc_to_exp i =
   let cc = match i land 0xe with
-    | 0x0 -> of_e
-    | 0x2 -> cf_e
-    | 0x4 -> zf_e
-    | 0x6 -> Exp.(cf_e lor zf_e)
-    | 0x8 -> sf_e
-    | 0xa -> pf_e
-    | 0xc -> Exp.(sf_e lxor of_e)
-    | 0xe -> Exp.(zf_e lor (sf_e lxor of_e))
+    | 0x0 -> Exp.var oF
+    | 0x2 -> Exp.var cf
+    | 0x4 -> Exp.var zf
+    | 0x6 -> Exp.(var cf lor var zf)
+    | 0x8 -> Exp.var sf
+    | 0xa -> Exp.var pf
+    | 0xc -> Exp.(var sf lxor var oF)
+    | 0xe -> Exp.(var zf lor (var sf lxor var oF))
     | _ -> disfailwith X86 "impossible condition code"
   in
   if (i land 1) = 0 then cc else exp_not cc
