@@ -76,3 +76,10 @@ val pref_addrsize : int
 
 (** Prefixes that we can usually handle automatically *)
 val standard_prefs : int list
+
+val seg_ss : multimodereg option
+val seg_es : multimodereg option
+val seg_cs : multimodereg option
+val seg_ds : multimodereg option
+val seg_fs : multimodereg option
+val seg_gs : multimodereg option

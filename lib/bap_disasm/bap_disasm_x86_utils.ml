@@ -196,14 +196,6 @@ let unimplemented a s  = disfailwith a ("disasm_i386: unimplemented feature: "^s
 
 let ge mode mv = gv mode mv |> Exp.var
 
-let seg_ss = None (* this two terrible variables are used in different ways: *)
-let seg_es = None (* as var option and as multimodereg option. to be refactored *)
-
-let seg_cs = None
-let seg_ds = None
-let seg_fs = Some fs_base
-let seg_gs = Some gs_base
-
 (* eflags *)
 let df_to_offset mode e =
   match type_of_mode mode with

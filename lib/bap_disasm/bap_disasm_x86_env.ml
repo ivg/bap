@@ -92,3 +92,10 @@ let pref_addrsize = 0x67
 
 (* Prefixes that we can usually handle automatically *)
 let standard_prefs = [pref_opsize; pref_addrsize; hint_bnt; hint_bt; pref_cs; pref_ss; pref_ds; pref_es; pref_fs; pref_gs]
+
+let seg_ss = None
+let seg_es = None
+let seg_cs = None
+let seg_ds = None
+let seg_fs = Some fs_base
+let seg_gs = Some gs_base
