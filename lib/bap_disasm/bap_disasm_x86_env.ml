@@ -3,6 +3,36 @@ open Bap_types.Std
 
 open Bap_disasm_x86_types
 
+type multimodereg = { v32: var; v64: var }
+
+let gv mode { v32; v64 } = match mode with
+  | X86 -> v32
+  | X8664 -> v64
+
+(* new multi-mode variable *)
+let nmv n32 t32 n64 t64 = { v32=Var.create n32 t32; v64=Var.create n64 t64; }
+
+(* registers *)
+let rbp = nmv "R_EBP_32" reg32_t "R_RBP" reg64_t
+let rsp = nmv "R_ESP_32" reg32_t "R_RSP" reg64_t
+let rsi = nmv "R_ESI_32" reg32_t "R_RSI" reg64_t
+let rdi = nmv "R_EDI_32" reg32_t "R_RDI" reg64_t
+let rip = nmv "R_EIP" reg32_t "R_RIP" reg64_t (* XXX why is eip here? *)
+let rax = nmv "R_EAX_32" reg32_t "R_RAX" reg64_t
+let rbx = nmv "R_EBX_32" reg32_t "R_RBX" reg64_t
+let rcx = nmv "R_ECX_32" reg32_t "R_RCX" reg64_t
+let rdx = nmv "R_EDX_32" reg32_t "R_RDX" reg64_t
+let rflags = nmv "R_EFLAGS" reg32_t "R_RFLAGS" reg64_t (* XXX why is eflags here? *)
+
+(* segment registers let bases *)
+let fs_base = nmv "R_FS_BASE_32" reg32_t "R_FS_BASE_64" reg64_t
+let gs_base = nmv "R_GS_BASE_32" reg32_t "R_GS_BASE_64" reg64_t
+
+let gdt = nmv "R_GDTR" reg32_t "R_GDTR" reg64_t
+let ldt = nmv "R_LDTR" reg32_t "R_LDTR" reg64_t
+
+let mem = nmv "mem32" (Type.mem `r32 `r8) "mem64" (Type.mem `r64 `r8)
+
 (* condition flag bits *)
 let cf = Var.create "R_CF" bool_t
 let pf = Var.create "R_PF" bool_t
@@ -94,25 +124,22 @@ module type ModeVars = sig
 end
 
 module R32 = struct
-
   (** registers *)
-  let rbp = Var.create "R_EBP_32" reg32_t
-  let rsp = Var.create "R_ESP_32" reg32_t
-  let rsi = Var.create "R_ESI_32" reg32_t
-  let rdi = Var.create "R_EDI_32" reg32_t
-  let rip = Var.create "R_EIP" reg32_t   (* XXX why is eip here? *)
-  let rax = Var.create "R_EAX_32" reg32_t
-  let rbx = Var.create "R_EBX_32" reg32_t
-  let rcx = Var.create "R_ECX_32" reg32_t
-  let rdx = Var.create "R_EDX_32" reg32_t
-  let rflags = Var.create "R_EFLAGS" reg32_t  (* XXX why is eflags here? *)
-
-  let gdt = Var.create "R_GDTR" reg32_t
-  let ldt = Var.create "R_LDTR" reg32_t
-
+  let rbp = rbp.v32
+  let rsp = rsp.v32
+  let rsi = rsi.v32
+  let rdi = rdi.v32
+  let rip = rip.v32
+  let rax = rax.v32
+  let rbx = rbx.v32
+  let rcx = rcx.v32
+  let rdx = rdx.v32
+  let rflags = rflags.v32
+  let gdt = gdt.v32
+  let ldt = ldt.v32
   (** segment registers let bases *)
-  let fs_base = Var.create "R_FS_BASE_32" reg32_t
-  let gs_base = Var.create "R_GS_BASE_32" reg32_t
+  let fs_base = fs_base.v32
+  let gs_base = gs_base.v32
 
   let seg_ss = None
   let seg_es = None
@@ -121,31 +148,29 @@ module R32 = struct
   let seg_fs = Some fs_base
   let seg_gs = Some gs_base
 
-  let mem = Var.create "mem32" (Type.mem `r32 `r8)
+  let mem = mem.v32
 
   (* r8 -> r15 *)
-  let nums = Array.init 8 ~f:(fun i -> Var.create "ERROR" (Type.imm 0))
+  let nums = Array.init 8 ~f:(fun i -> Var.create "ERROR" (Type.imm 0) )
 end
 
 module R64 = struct
-
   (** registers *)
-  let rbp = Var.create "R_RBP" reg64_t
-  let rsp = Var.create "R_RSP" reg64_t
-  let rsi = Var.create "R_RSI" reg64_t
-  let rdi = Var.create "R_RDI" reg64_t
-  let rip = Var.create "R_RIP" reg64_t
-  let rax = Var.create "R_RAX" reg64_t
-  let rbx = Var.create "R_RBX" reg64_t
-  let rcx = Var.create "R_RCX" reg64_t
-  let rdx = Var.create "R_RDX" reg64_t
-  let rflags = Var.create "R_RFLAGS" reg64_t
-  let gdt = Var.create "R_GDTR" reg64_t
-  let ldt = Var.create "R_LDTR" reg64_t
-
+  let rbp = rbp.v64
+  let rsp = rsp.v64
+  let rsi = rsi.v64
+  let rdi = rdi.v64
+  let rip = rip.v64
+  let rax = rax.v64
+  let rbx = rbx.v64
+  let rcx = rcx.v64
+  let rdx = rdx.v64
+  let rflags = rflags.v64
+  let gdt = gdt.v64
+  let ldt = ldt.v64
   (** segment registers let bases *)
-  let fs_base = Var.create "R_FS_BASE_64" reg64_t
-  let gs_base = Var.create "R_GS_BASE_64" reg64_t
+  let fs_base = fs_base.v64
+  let gs_base = gs_base.v64
 
   let seg_ss = None
   let seg_es = None
@@ -154,7 +179,7 @@ module R64 = struct
   let seg_fs = Some fs_base
   let seg_gs = Some gs_base
 
-  let mem = Var.create "mem64" (Type.mem `r64 `r8)
+  let mem = mem.v64
 
   (* r8 -> r15 *)
   let nums = Array.init 8 ~f:(fun i -> Var.create (Printf.sprintf "R_R%d" (i+8)) reg64_t)
