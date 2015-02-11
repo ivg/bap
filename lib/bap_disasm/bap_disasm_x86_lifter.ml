@@ -17,10 +17,6 @@ module ToIR = struct
   let of_e = Exp.var oF
   let df_e = Exp.var df
 
-  let gv_opt mode = function
-    | None -> None
-    | Some m -> Some (gv mode m)
-
   (* stmt helpers *)
 
   let size_of_typ s = Size.of_int_exn (!!s) (** doubts here  *)
@@ -28,7 +24,9 @@ module ToIR = struct
   let lit: int -> int -> BV.t = fun n w -> BV.of_int ~width:w n
 
   let store_s mode s t a e =
-    let mem = gv mode mem in
+    let mem = match mode with
+      | X86 -> R32.mem
+      | X8664 -> R64.mem in
     let sz = size_of_typ t in
     match s with
     | None -> Stmt.Move (mem, Exp.(Store (Var mem, a, e, LittleEndian, sz)))
@@ -117,16 +115,16 @@ module ToIR = struct
     | Ovec _, _ -> disfailwith mode "invalid SIMD register size for assignment"
     (* Zero-extend 32-bit assignments to 64-bit registers. *)
     | Oreg r, Type.Imm 32 when is8664 ->
-      let v = gv mode (bits2genreg r) in
+      let v = bits2genreg mode r in
       sub_assn reg64_t v Exp.(Cast (Cast.UNSIGNED, !!reg64_t, e))
     | Oreg r, Type.Imm (64|32|16) ->
-      let v = gv mode (bits2genreg r) in
+      let v = bits2genreg mode r in
       sub_assn t v e
     | Oreg r, Type.Imm 8 when r < 4 || (mode = X8664 && has_rex) ->
-      let v = gv mode (bits2genreg r) in
+      let v = bits2genreg mode r in
       sub_assn t v e
     | Oreg r, Type.Imm 8 ->
-      let v = gv mode (bits2genreg (r land 3)) in
+      let v = bits2genreg mode (r land 3) in
       sub_assn ~off:8 t v e
     | Oreg _, _ -> unimplemented mode "assignment to sub registers"
     | Oseg r, _ when t = reg16_t ->
@@ -198,7 +196,9 @@ module ToIR = struct
         Stmt.If (zf_e, [], [Stmt.Jmp (Exp.Int (bi addr))])
       | _ -> failwith "invalid value for ?check_zf"
     in
-    let rcx = gv mode rcx in
+    let rcx = match mode with
+      | X86 -> R32.rcx
+      | X8664 -> R64.rcx in
     let rcx_e = Exp.Var rcx in
     let open Stmt in
     (* a conditional jump was replaced with the new If statement here *)
@@ -276,6 +276,8 @@ module ToIR = struct
     ::set_aopszf_sub t s1 s2 r
 
   let rec to_ir mode addr next ss pref has_rex has_vex =
+    let module R = (val (vars_of_mode mode)) in
+    let open R in
     let load = load_s mode ss in (* Need to change this if we want seg_ds <> None *)
     let op2e = op2e_s mode ss has_rex in
     let op2e_keep_width = op2e_s_keep_width mode ss has_rex in
@@ -285,19 +287,12 @@ module ToIR = struct
     let assn_dbl = assn_dbl_s mode ss has_rex has_vex in
     let mi = int_of_mode mode in
     let mt = type_of_mode mode in
-    let fs_base = gv mode fs_base in
-    let gs_base = gv mode gs_base in
-    let rbp_e = ge mode rbp in
-    let rsp_e = ge mode rsp in
-    let rsp = gv mode rsp in
-    let rsi_e = ge mode rsi in
-    let rsi = gv mode rsi in
-    let rdi_e = ge mode rdi in
-    let rdi = gv mode rdi in
-    let rax_e = ge mode rax in
-    let rax = gv mode rax in
-    let rcx = gv mode rcx in
-    let rdx_e = ge mode rdx in
+    let rbp_e = Exp.var rbp in
+    let rsp_e = Exp.var rsp in
+    let rsi_e = Exp.var rsi in
+    let rdi_e = Exp.var rdi in
+    let rax_e = Exp.var rax in
+    let rdx_e = Exp.var rdx in
     let ah_e = ah_e mode in
     let disfailwith = disfailwith mode in
     let unimplemented = unimplemented mode in function
@@ -314,7 +309,7 @@ module ToIR = struct
       let load_stmt = if far_ret
         then (* TODO Mess with segment selectors here *)
           unimplemented "long retn not supported"
-        else Stmt.Move (temp, load_s mode (gv_opt mode seg_ss) (size_of_typ mt) rsp_e)
+        else Stmt.Move (temp, load_s mode seg_ss (size_of_typ mt) rsp_e)
       in
       let rsp_stmts =
         Stmt.Move (rsp, Exp.(rsp_e + (Int (mi (Strip.bytes_of_width mt)))))::
@@ -335,7 +330,7 @@ module ToIR = struct
       let base_e e =
         (* 0 = GDT, 1 = LDT *)
         let ti = Exp.Extract (3, 3, e) in
-        let base = Exp.Ite (ti, ge mode ldt, ge mode gdt) in
+        let base = Exp.Ite (ti, Exp.var ldt, Exp.var gdt) in
         (* Extract index into table *)
         let entry_size, entry_shift = match mode with
           | X86 -> reg64_t, 6  (* "1<<6 = 64" *)
@@ -362,9 +357,8 @@ module ToIR = struct
       in
       assn t dst c_src :: bs
     | Movs(Type.Imm _bits as t) ->
-      let seg_es' = gv_opt mode seg_es in
       let stmts =
-        store_s mode seg_es' t rdi_e (load_s mode seg_es' (size_of_typ t) rsi_e)
+        store_s mode seg_es t rdi_e (load_s mode seg_es (size_of_typ t) rsi_e)
         :: string_incr mode t rsi
         :: string_incr mode t rdi
         :: []
@@ -1061,7 +1055,7 @@ module ToIR = struct
       let tmpres = Var.create ~tmp:true "tmp" t in
       let stmts =
         Stmt.Move (src1, op2e t (Oaddr rsi_e))
-        :: Stmt.Move (src2, op2e_s mode (gv_opt mode seg_es) has_rex t (Oaddr rdi_e))
+        :: Stmt.Move (src2, op2e_s mode seg_es has_rex t (Oaddr rdi_e))
         :: Stmt.Move (tmpres, Exp.(Var src1 - Var src2))
         :: string_incr mode t rsi
         :: string_incr mode t rdi
@@ -1080,7 +1074,7 @@ module ToIR = struct
       let stmts =
         let open Stmt in
         Move (src1, Exp.(Cast (Cast.LOW, !!t, Var rax)))
-        :: Move (src2, op2e_s mode (gv_opt mode seg_es) has_rex t (Oaddr rdi_e))
+        :: Move (src2, op2e_s mode seg_es has_rex t (Oaddr rdi_e))
         :: Move (tmpres, Exp.(Var src1 - Var src2))
         :: string_incr mode t rdi
         :: set_flags_sub t' (Exp.Var src1) (Exp.Var src2) (Exp.Var tmpres)
@@ -1091,7 +1085,7 @@ module ToIR = struct
           rep_wrap ~mode ~check_zf:single ~addr ~next stmts
         | _ -> unimplemented "unsupported flags in scas" end
     | Stos(Type.Imm _bits as t) ->
-      let stmts = [store_s mode (gv_opt mode seg_es) t rdi_e (op2e t o_rax);
+      let stmts = [store_s mode seg_es t rdi_e (op2e t o_rax);
                    string_incr mode t rdi]
       in
       begin match pref with
@@ -1102,7 +1096,7 @@ module ToIR = struct
       let tmp = Var.create ~tmp:true "t" t in (* only really needed when o involves esp *)
       Stmt.Move (tmp, op2e t o)
       :: Stmt.Move (rsp, Exp.(rsp_e - Int (mi (Strip.bytes_of_width t))))
-      :: store_s mode (gv_opt mode seg_ss) t rsp_e (Exp.Var tmp) (* FIXME: can ss be overridden? *)
+      :: store_s mode seg_ss t rsp_e (Exp.Var tmp) (* FIXME: can ss be overridden? *)
       :: []
     | Pop(t, o) ->
       (* From the manual:
@@ -1113,7 +1107,7 @@ module ToIR = struct
 
          So, effectively there is no incrementation.
       *)
-      assn t o (load_s mode (gv_opt mode seg_ss) (size_of_typ t) rsp_e)
+      assn t o (load_s mode seg_ss (size_of_typ t) rsp_e)
       :: if o = o_rsp then []
       else [Stmt.Move (rsp, Exp.(rsp_e + Int (mi (Strip.bytes_of_width t))))]
     | Pushf(t) ->
@@ -1129,7 +1123,7 @@ module ToIR = struct
         | _ -> failwith "impossible"
       in
       Stmt.Move (rsp, Exp.(rsp_e - Int (mi (Strip.bytes_of_width t))))
-      :: store_s mode (gv_opt mode seg_ss) t rsp_e flags_e
+      :: store_s mode seg_ss t rsp_e flags_e
       :: []
     | Popf t ->
       let assnsf = match t with
@@ -1145,7 +1139,7 @@ module ToIR = struct
               Exp.(Extract (i, i, Var tmp)))
           (List.range ~stride:(-1) ~start:`exclusive ~stop:`inclusive (Strip.bits_of_width t) 0)
       in
-      Stmt.Move (tmp, load_s mode (gv_opt mode seg_ss) (size_of_typ t) rsp_e)
+      Stmt.Move (tmp, load_s mode seg_ss (size_of_typ t) rsp_e)
       :: Stmt.Move (rsp, Exp.(rsp_e + Int (mi (Strip.bytes_of_width t))))
       :: List.concat (List.map2_exn ~f:(fun f e -> f e) assnsf
       extractlist)

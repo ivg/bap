@@ -23,6 +23,7 @@ let cc_to_exp i =
   if (i land 1) = 0 then cc else exp_not cc
 
 let parse_instr mode g addr =
+  let module R = (val (vars_of_mode mode)) in
   let s = BZ.succ_big_int in
   let bm = big_int_of_mode mode in
   let im = int_of_mode mode in
@@ -666,7 +667,7 @@ let parse_instr mode g addr =
       )
     | 0xe3 ->
       let t = Strip.bits_of_width addrsize in
-      let rcx_e = ge mode rcx in
+      let rcx_e = Exp.var R.rcx in
       let (i,na) = parse_disp8 na in
       (* (Jcc (Jrel (BV.litz na t, BV.litz i t), Bop.(rcx_e = Int (mi 0))), na) *)
       (Jcc (Jrel (bitvector_of_z na t, bitvector_of_z i t), Exp.(rcx_e = (mi 0 |> int))), na)
@@ -1236,10 +1237,12 @@ let parse_instr mode g addr =
   (pref, prefix, op, a)
 
 let parse_prefixes mode pref _ =
+  let module R = (val (vars_of_mode mode)) in
+  let open R in
   (* FIXME: how to deal with conflicting prefixes? *)
   let rec f s r = function
     | [] -> ((match s with
-        | Some v -> Some ((gv mode) v)
+        | Some v -> Some v
         | None   -> None), List.rev r)
     | 0x2e::p -> f seg_cs r p
     | 0x36::p -> f seg_ss r p
