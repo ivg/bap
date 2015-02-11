@@ -194,16 +194,6 @@ let disfailwith m s =
 
 let unimplemented a s  = disfailwith a ("disasm_i386: unimplemented feature: "^s)
 
-let ge mode mv = gv mode mv |> Exp.var
-
-let seg_ss = None (* this two terrible variables are used in different ways: *)
-let seg_es = None (* as var option and as multimodereg option. to be refactored *)
-
-let seg_cs = None
-let seg_ds = None
-let seg_fs = Some fs_base
-let seg_gs = Some gs_base
-
 (* eflags *)
 let df_to_offset mode e =
   match type_of_mode mode with
@@ -314,7 +304,10 @@ let assns_lflags_to_bap = List.drop assns_flags_to_bap 8
 (* exp helpers *)
 
 let load_s mode s t a =
-  let mem_e = ge mode mem in
+  let mem = match mode with
+    | X86 -> R32.mem
+    | X8664 -> R64.mem in
+  let mem_e = Exp.var mem in
   match s with
   | None -> Exp.load mem_e a LittleEndian t
   | Some v -> Exp.(load mem_e (var v + a) LittleEndian t)
@@ -365,7 +358,9 @@ let lowbits2elemt b =
   | _ -> disfailwith X86 "invalid"
 
 (* converts a register number to the corresponding register variable *)
-let bits2genreg = function
+let bits2genreg mode =
+  let module R = (val (vars_of_mode mode)) in
+  let open R in function
   | 0 -> rax
   | 1 -> rcx
   | 2 -> rdx
@@ -377,7 +372,9 @@ let bits2genreg = function
   | i when i >= 8 && i <= 15 -> nums.(i-8)
   | _ -> failwith "bits2genreg takes 4 bits"
 
-let reg2bits r =
+let reg2bits mode r =
+  let module R = (val (vars_of_mode mode)) in
+  let open R in
   Util.index_ofq r [rax; rcx; rdx; rbx; rsp; rbp; rsi; rdi]
 
 let bits2segreg = function
@@ -415,10 +412,10 @@ let bits2xmm64e = bits2ymm64e
 let bits2xmm32e = bits2ymm32e
 
 let bits2reg64e mode b =
-  ge mode (bits2genreg b)
+  Exp.var (bits2genreg mode b)
 
 let bits2reg32e mode b =
-  bits2genreg b |> ge mode |> Exp.(cast Cast.low (!!reg32_t))
+  bits2genreg mode b |> Exp.var |> Exp.(cast Cast.low (!!reg32_t))
 
 let bits2reg16e mode b =
   bits2reg32e mode b |> Exp.(cast Cast.low (!!reg16_t))
@@ -430,12 +427,14 @@ let bits2reg8e mode ?(has_rex=false) b =
     b land 3 |> bits2reg32e mode |>
     Exp.(cast Cast.low (!!reg16_t)) |>  Exp.(cast Cast.high (!!reg8_t))
 
-let reg2xmm r =  reg2bits r |> bits2xmm
+let reg2xmm mode r = reg2bits mode r |> bits2xmm
 
 (* effective addresses for 16-bit addressing *)
 let eaddr16 mode =
-  let e v = ge mode v |> Exp.(cast Cast.low (!!reg16_t)) in
   let open Exp in
+  let module R = (val (vars_of_mode mode)) in
+  let open R in
+  let e v = Exp.var v |> Exp.(cast Cast.low (!!reg16_t)) in
   function
   (* R/M byte *)
   | 0 -> e rbx + e rsi

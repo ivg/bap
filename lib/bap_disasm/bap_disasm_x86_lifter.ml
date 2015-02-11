@@ -24,7 +24,9 @@ module ToIR = struct
   let lit: int -> int -> BV.t = fun n w -> BV.of_int ~width:w n
 
   let store_s mode s t a e =
-    let mem = gv mode mem in
+    let mem = match mode with
+      | X86 -> R32.mem
+      | X8664 -> R64.mem in
     let sz = size_of_typ t in
     match s with
     | None -> Stmt.Move (mem, Exp.(Store (Var mem, a, e, LittleEndian, sz)))
@@ -113,16 +115,16 @@ module ToIR = struct
     | Ovec _, _ -> disfailwith mode "invalid SIMD register size for assignment"
     (* Zero-extend 32-bit assignments to 64-bit registers. *)
     | Oreg r, Type.Imm 32 when is8664 ->
-      let v = gv mode (bits2genreg r) in
+      let v = bits2genreg mode r in
       sub_assn reg64_t v Exp.(Cast (Cast.UNSIGNED, !!reg64_t, e))
     | Oreg r, Type.Imm (64|32|16) ->
-      let v = gv mode (bits2genreg r) in
+      let v = bits2genreg mode r in
       sub_assn t v e
     | Oreg r, Type.Imm 8 when r < 4 || (mode = X8664 && has_rex) ->
-      let v = gv mode (bits2genreg r) in
+      let v = bits2genreg mode r in
       sub_assn t v e
     | Oreg r, Type.Imm 8 ->
-      let v = gv mode (bits2genreg (r land 3)) in
+      let v = bits2genreg mode (r land 3) in
       sub_assn ~off:8 t v e
     | Oreg _, _ -> unimplemented mode "assignment to sub registers"
     | Oseg r, _ when t = reg16_t ->
@@ -194,7 +196,9 @@ module ToIR = struct
         Stmt.If (zf_e, [], [Stmt.Jmp (Exp.Int (bi addr))])
       | _ -> failwith "invalid value for ?check_zf"
     in
-    let rcx = gv mode rcx in
+    let rcx = match mode with
+      | X86 -> R32.rcx
+      | X8664 -> R64.rcx in
     let rcx_e = Exp.Var rcx in
     let open Stmt in
     (* a conditional jump was replaced with the new If statement here *)
@@ -272,6 +276,8 @@ module ToIR = struct
     ::set_aopszf_sub t s1 s2 r
 
   let rec to_ir mode addr next ss pref has_rex has_vex =
+    let module R = (val (vars_of_mode mode)) in
+    let open R in
     let load = load_s mode ss in (* Need to change this if we want seg_ds <> None *)
     let op2e = op2e_s mode ss has_rex in
     let op2e_keep_width = op2e_s_keep_width mode ss has_rex in
@@ -280,32 +286,14 @@ module ToIR = struct
     let assn = assn_s mode ss has_rex has_vex in
     let assn_dbl = assn_dbl_s mode ss has_rex has_vex in
     let mi = int_of_mode mode in
-    (* let mi64 = int64_of_mode mode *) (* unused *)
     let mt = type_of_mode mode in
-    let _fs_base_e = ge mode fs_base in
-    let fs_base = gv mode fs_base in
-    let _gs_base_e = ge mode gs_base in
-    let gs_base = gv mode gs_base in
-    let _rbp = gv mode rbp in
-    let rbp_e = ge mode rbp in
-    let rsp_e = ge mode rsp in
-    let rsp = gv mode rsp in
-    let rsi_e = ge mode rsi in
-    let rsi = gv mode rsi in
-    let rdi_e = ge mode rdi in
-    let rdi = gv mode rdi in
-    let rax_e = ge mode rax in
-    let rax = gv mode rax in
-    let _rbx = gv mode rbx in
-    let _rbx_e = ge mode rbx in
-    let _rcx_e = ge mode rcx in
-    let rcx = gv mode rcx in
-    let _rdx = gv mode rdx in
-    let rdx_e = ge mode rdx in
+    let rbp_e = Exp.var rbp in
+    let rsp_e = Exp.var rsp in
+    let rsi_e = Exp.var rsi in
+    let rdi_e = Exp.var rdi in
+    let rax_e = Exp.var rax in
+    let rdx_e = Exp.var rdx in
     let ah_e = ah_e mode in
-    let _ch_e = ch_e mode in
-    let _dh_e = dh_e mode in
-    let _bh_e = bh_e mode in
     let disfailwith = disfailwith mode in
     let unimplemented = unimplemented mode in function
     | Nop -> []
@@ -342,7 +330,7 @@ module ToIR = struct
       let base_e e =
         (* 0 = GDT, 1 = LDT *)
         let ti = Exp.Extract (3, 3, e) in
-        let base = Exp.Ite (ti, ge mode ldt, ge mode gdt) in
+        let base = Exp.Ite (ti, Exp.var ldt, Exp.var gdt) in
         (* Extract index into table *)
         let entry_size, entry_shift = match mode with
           | X86 -> reg64_t, 6  (* "1<<6 = 64" *)

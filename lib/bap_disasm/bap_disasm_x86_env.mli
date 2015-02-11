@@ -1,23 +1,6 @@
 open Bap_types.Std
 open Bap_disasm_x86_types
 
-(** new multi-mode variable *)
-type multimodereg
-
-val gv: mode -> multimodereg -> var
-
-(** registers *)
-val rbp : multimodereg
-val rsp : multimodereg
-val rsi : multimodereg
-val rdi : multimodereg
-val rip : multimodereg
-val rax : multimodereg
-val rbx : multimodereg
-val rcx : multimodereg
-val rdx : multimodereg
-val rflags : multimodereg
-
 (** condition flag bits *)
 val cf : var
 val pf : var
@@ -27,10 +10,6 @@ val sf : var
 val oF : var
 val df : var
 
-(** segment registers let bases *)
-val fs_base : multimodereg
-val gs_base : multimodereg
-
 val cs : var
 val ds : var
 val es : var
@@ -38,14 +17,9 @@ val fs : var
 val gs : var
 val ss : var
 
-val gdt : multimodereg
-val ldt : multimodereg
-
 val fpu_ctrl : var
 val mxcsr    : var
 
-(** r8 -> r15 *)
-val nums: multimodereg array
 val ymms: var array
 
 val o_rax : operand
@@ -56,8 +30,6 @@ val o_rsp : operand
 val o_rbp : operand
 val o_fs  : operand
 val o_gs  : operand
-
-val mem : multimodereg
 
 (** prefix names *)
 val pref_lock : int
@@ -76,3 +48,40 @@ val pref_addrsize : int
 
 (** Prefixes that we can usually handle automatically *)
 val standard_prefs : int list
+
+module type ModeVars = sig
+  (** registers *)
+  val rbp : var
+  val rsp : var
+  val rsi : var
+  val rdi : var
+  val rip : var
+  val rax : var
+  val rbx : var
+  val rcx : var
+  val rdx : var
+  val rflags  : var
+
+  val gdt : var
+  val ldt : var
+
+  (** segment registers let bases *)
+  val fs_base : var
+  val gs_base : var
+
+  val seg_ss : var option
+  val seg_es : var option
+  val seg_cs : var option
+  val seg_ds : var option
+  val seg_fs : var option
+  val seg_gs : var option
+
+  val mem : var
+  (* r8 -> r15 *)
+  val nums : var array
+end
+
+module R32 : ModeVars
+module R64 : ModeVars
+
+val vars_of_mode : mode -> (module ModeVars)
