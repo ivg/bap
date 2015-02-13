@@ -1,6 +1,6 @@
 OASISFormat: 0.4
 Name:        bap
-Version:     0.9.1
+Version:     0.9.3
 Synopsis:    BAP Core Library
 Authors:     BAP Team
 Maintainers: Ivan Gotovchits <ivg@ieee.org>
@@ -33,10 +33,17 @@ Document bap
   Type: ocamlbuild (0.4)
   BuildTools: ocamlbuild, ocamldoc
   Title:      API documentation for bap
-  XOCamlbuildPath: lib/bap/
+  XOCamlbuildPath: .
   XOCamlbuildExtraArgs:
     "-docflags '-colorize-code -short-functors -charset utf-8'"
-  XOCamlbuildLibraries: bap
+  XOCamlbuildLibraries: bap,
+                        bap.types,
+                        bap.image,
+                        bap.disasm,
+                        bap.dwarf,
+                        bap.elf,
+                        bap.llvm
+
 
 Flag serialization
   Description: Build serialization library
@@ -111,6 +118,7 @@ Library types
                    Bap_bitvector,
                    Bap_common,
                    Bap_exp,
+                   Bap_helpers,
                    Bap_int_conversions,
                    Bap_integer,
                    Bap_integer_intf,
@@ -119,7 +127,8 @@ Library types
                    Bap_size,
                    Bap_stmt,
                    Bap_type,
-                   Bap_var
+                   Bap_var,
+                   Bap_visitor
 
 Library conceval
   Path: lib/bap_types
@@ -213,7 +222,11 @@ Library disasm
                  Bap_disasm_arm_utils,
                  Bap_disasm_x86_lifter,
                  Bap_disasm_basic,
+                 Bap_disasm_block,
+                 Bap_disasm_insn,
                  Bap_disasm_prim,
+                 Bap_disasm_rec,
+                 Bap_disasm_types,
                  Bap_insn_kind
 
   CCOpt:         $cc_optimization
@@ -307,12 +320,12 @@ Executable "bap-server"
   Install:        true
   MainIs:         start_server.ml
 
-Executable readbin
+Executable "bap-objdump"
   Path:           src/readbin
   MainIs:         readbin.ml
   Install:        true
   CompiledObject: best
-  BuildDepends:   bap, bap.disasm
+  BuildDepends:   bap, bap.disasm, ocamlgraph, ezjsonm, cmdliner
 
 Executable "bap-mc"
   Path:           src/bap_mc
@@ -324,11 +337,11 @@ Executable "bap-mc"
 Executable byteweight
   Path:           src/byteweight
   MainIs:         byteweight.ml
-  Install:        true
+  Install:        false
   CompiledObject: best
   BuildDepends:   bap
 
-Executable train
+Executable "bap-bw-train"
   Path:           src/byteweight
   MainIs:         train.ml
   Install:        true
@@ -338,7 +351,7 @@ Executable train
 Executable fbi
   Path:           src/fbi
   MainIs:         fbi.ml
-  Install:        true
+  Install:        false
   CompiledObject: best
   BuildDepends:   bap
 
