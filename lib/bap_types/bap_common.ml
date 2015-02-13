@@ -12,10 +12,12 @@ open Core_kernel.Std
 module Bitvector = Bap_bitvector
 module Integer   = Bap_integer
 module Regular   = Bap_regular
+module Printable = Regular.Printable
 
 (** {2 Basic Interfaces}  *)
-module type Integer = Integer.S
-module type Regular = Regular.S
+module type Integer   = Integer.S
+module type Regular   = Regular.S
+module type Printable = Regular.Printable
 
 type endian = Bitvector.endian =
     LittleEndian | BigEndian
@@ -62,58 +64,6 @@ end
 type typ = Type.t
 with bin_io, compare, sexp
 
-(** Different forms of casting *)
-module Cast = struct
-  type t =
-    | UNSIGNED (** 0-padding widening cast. *)
-    | SIGNED   (** Sign-extending widening cast. *)
-    | HIGH     (** Narrowning cast. Keeps the high bits. *)
-    | LOW      (** Narrowing cast. Keeps the low bits. *)
-  with bin_io, compare, sexp, variants
-end
-
-type cast = Cast.t
-with bin_io, compare, sexp
-
-(** Binary operations implemented in the IR *)
-module Binop = struct
-  type t =
-    | PLUS    (** Integer addition. (commutative, associative) *)
-    | MINUS   (** Subtract second integer from first. *)
-    | TIMES   (** Integer multiplication. (commutative, associative) *)
-    | DIVIDE  (** Unsigned integer division. *)
-    | SDIVIDE (** Signed integer division. *)
-    | MOD     (** Unsigned modulus. *)
-    | SMOD    (** Signed modulus. *)
-    | LSHIFT  (** Left shift. *)
-    | RSHIFT  (** Right shift, fill with 0. *)
-    | ARSHIFT (** Right shift, sign extend. *)
-    | AND     (** Bitwise and. (commutative, associative) *)
-    | OR      (** Bitwise or. (commutative, associative) *)
-    | XOR     (** Bitwise xor. (commutative, associative) *)
-    | EQ      (** Equals. (commutative) (associative on booleans) *)
-    | NEQ     (** Not equals. (commutative) (associative on booleans) *)
-    | LT      (** Unsigned less than. *)
-    | LE      (** Unsigned less than or equal to. *)
-    | SLT     (** Signed less than. *)
-    | SLE     (** Signed less than or equal to. *)
-  with bin_io, compare, sexp, variants
-end
-
-type binop = Binop.t
-with bin_io, compare, sexp
-
-
-(** Unary operations implemented in the IR *)
-module Unop = struct
-  type t =
-    | NEG (** Negate. (2's complement) *)
-    | NOT (** Bitwise not. *)
-  with bin_io, compare, sexp, variants
-end
-
-type unop = Unop.t
-with bin_io, compare, sexp
 
 (** Supported architectures  *)
 module Arch = struct
