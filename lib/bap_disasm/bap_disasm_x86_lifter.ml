@@ -478,7 +478,7 @@ module ToIR = struct
         let byte1 = Exp.Extract(i*elebits-1, (i-1)*elebits, src) in
         let byte2 = Exp.Extract(i*elebits-1, (i-1)*elebits, op2e t vsrc) in
         let tmp = Var.create ~tmp:true ("t" ^ string_of_int i) elet in
-        Exp.Var tmp, Stmt.Move (tmp, Exp.(Ite (BinOp (bop, byte1, byte2), lt (-1L) (Strip.bits_of_width elet), lt 0L (Strip.bits_of_width elet))))
+        Exp.Var tmp, Stmt.Move (tmp, Exp.(Ite (BinOp (bop, byte1, byte2), ltw (-1L) (Strip.bits_of_width elet), ltw 0L (Strip.bits_of_width elet))))
       in
       let indices = List.init ~f:(fun i -> i + 1) ncmps in (* list 1-nbytes *)
       let comparisons = List.map ~f:compare_region indices in
@@ -625,9 +625,9 @@ module ToIR = struct
         | {agg=EqualAny; _} ->
           (* Is xmm2[index] at xmm1[j]? *)
           let check_char acc j =
-            let eq = Exp.((get_xmm2 index) = (get_xmm1 j)) in
+            let eql = Exp.((get_xmm2 index) = (get_xmm1 j)) in
             let valid = is_valid_xmm1_e j in
-            Exp.(Ite ((eq land valid), exp_true, acc))
+            Exp.(Ite ((eql land valid), exp_true, acc))
           in
           Exp.BinOp (AND, is_valid_xmm2_e index,
                  (* Is xmm2[index] included in xmm1[j] for any j? *)
@@ -756,9 +756,9 @@ module ToIR = struct
       (* XXX: This would be more straight-forward if implemented using
          map, instead of fold *)
       let get_dword ndword =
-        let high = 2 * (ndword mod 4) + 1 in
-        let low = 2 * (ndword mod 4) in
-        let index = Exp.(Cast (Cast.UNSIGNED, !!t, Extract (high, low, imm_e))) in
+        let high_b = 2 * (ndword mod 4) + 1 in
+        let low_b = 2 * (ndword mod 4) in
+        let index = Exp.(Cast (Cast.UNSIGNED, !!t, Extract (high_b, low_b, imm_e))) in
         let t' = Strip.bits_of_width t in
         (* Use the same pattern for the top half of a ymm register *)
         (* had to stop using extract_element_symbolic, since that calls

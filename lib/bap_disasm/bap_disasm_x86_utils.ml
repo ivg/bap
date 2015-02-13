@@ -59,7 +59,7 @@ module Big_int_temp = struct
   let extract_element_symbolic_with_width t e n et =
     let open Exp in
     let t = Strip.bits_of_width t in
-    cast Cast.low t (e lsl (n * (it t et)))
+    cast low t (e lsl (n * (it t et)))
   let extract_byte_symbolic_with_width e n et =
     extract_element_symbolic_with_width (Type.imm 8) e n et
   (* the following functions were used in Big_int_Z stuff
@@ -75,15 +75,15 @@ module Big_int_temp = struct
     List.reduce_exn
       ~f:(fun bige e -> Exp.(bige ^ e))
       (List.map ~f:get_byte (List.init ~f:Util.id bytes))
-  let min_symbolic ~signed e1 e2 =
+  let min_symbolic ~is_signed e1 e2 =
     let open Exp in
-    let cond = match signed with
+    let cond = match is_signed with
       | true -> e1 <$ e2
       | false -> e1 < e2 in
     ite cond e1 e2
-  let max_symbolic ~signed e1 e2 =
+  let max_symbolic ~is_signed e1 e2 =
     let open Exp in
-    let cond = match signed with
+    let cond = match is_signed with
       | true -> e1 <$ e2
       | false -> e1 < e2 in
     ite (lnot cond) e1 e2
@@ -318,10 +318,10 @@ let bitvector_of_bil = function
   | Exp.Int bv -> bv
   | _ -> failwith "not a BIL int"
 
-let lt n t = (BV.of_int64 n ~width:t) |> Exp.int
-let l64 i = lt i 64
-let l32 i = lt i 32
-let l16 i = lt i 16
+let ltw n t = (BV.of_int64 n ~width:t) |> Exp.int
+let l64 i = ltw i 64
+let l32 i = ltw i 32
+let l16 i = ltw i 16
 
 let int64_of_mode m i = match m with
   | X86 -> bitvector_of_bil (l32 i)
@@ -397,13 +397,13 @@ let bits2ymme b = bits2ymm b |> Exp.var
 let (!!) = function Type.Imm v -> v | _ -> failwith "internal error"
 
 let bits2ymm128e b =
-  bits2ymme b |> Exp.(cast Cast.low (!!reg128_t))
+  bits2ymme b |> Exp.(cast low (!!reg128_t))
 
 let bits2ymm64e b =
-  bits2ymme b |> Exp.(cast Cast.low (!!reg64_t))
+  bits2ymme b |> Exp.(cast low (!!reg64_t))
 
 let bits2ymm32e b =
-  bits2ymme b |> Exp.(cast Cast.low (!!reg32_t))
+  bits2ymme b |> Exp.(cast low (!!reg32_t))
 
 let bits2xmm = bits2ymm128e
 
@@ -415,17 +415,17 @@ let bits2reg64e mode b =
   Exp.var (bits2genreg mode b)
 
 let bits2reg32e mode b =
-  bits2genreg mode b |> Exp.var |> Exp.(cast Cast.low (!!reg32_t))
+  bits2genreg mode b |> Exp.var |> Exp.(cast low (!!reg32_t))
 
 let bits2reg16e mode b =
-  bits2reg32e mode b |> Exp.(cast Cast.low (!!reg16_t))
+  bits2reg32e mode b |> Exp.(cast low (!!reg16_t))
 
 let bits2reg8e mode ?(has_rex=false) b =
   if b < 4 || has_rex then
-    bits2reg32e mode b |> Exp.(cast Cast.low (!!reg8_t))
+    bits2reg32e mode b |> Exp.(cast low (!!reg8_t))
   else
     b land 3 |> bits2reg32e mode |>
-    Exp.(cast Cast.low (!!reg16_t)) |>  Exp.(cast Cast.high (!!reg8_t))
+    Exp.(cast low (!!reg16_t)) |>  Exp.(cast high (!!reg8_t))
 
 let reg2xmm mode r = reg2bits mode r |> bits2xmm
 
@@ -434,7 +434,7 @@ let eaddr16 mode =
   let open Exp in
   let module R = (val (vars_of_mode mode)) in
   let open R in
-  let e v = Exp.var v |> Exp.(cast Cast.low (!!reg16_t)) in
+  let e v = Exp.var v |> Exp.(cast low (!!reg16_t)) in
   function
   (* R/M byte *)
   | 0 -> e rbx + e rsi
