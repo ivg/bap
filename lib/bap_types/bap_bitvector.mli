@@ -1,6 +1,6 @@
 (** Bitvector -- a type for representing binary values.
 
-    { 2 Overview }
+    {2 Overview }
 
     A numeric value with a 2-complement binary representation. It is
     good for representing addresses, offsets and other numeric values.
@@ -14,7 +14,7 @@
     them, if you know what kind of operands you're expecting.
 
 
-    { 3 Clarifications endianness and bit-ordering }
+    {3 Clarifications endianness and bit-ordering }
 
     Bitvector should be considered as an number with an arbitrary
     width. That means, that as with all numbers it is subject to
@@ -33,7 +33,7 @@
     index equal to [width - 1]. That means, they're endianness
     agnostic.
 
-    { 3 Clarification on size-morphism }
+    {3 Clarification on size-morphism }
 
     Size-monomorphic operations (as opposed to size-polymorphic
     comparison) doesn't allow to compare two operands with different
@@ -56,7 +56,7 @@
     Note, [Mono] submodule doesn't provide [Table], since we cannot
     guarantee that all keys in a hash-table have equal size.
 
-    { 3 Clarification on signs}
+    {3 Clarification on signs}
 
     By default all numbers represented by a bitvector are considered
     unsigned. This includes comparisons, e.g., [of_int (-1) ~width:32]
@@ -80,7 +80,7 @@
       let q = signed x < zero   (* p = true *)
     ]}
 
-    { 3 Clarification on string representation }
+    {3 Clarification on string representation }
 
     As a part of [Identifiable] interface bitvector provides a pair of
     complement functions: [to_string] and [of_string], that provides
@@ -130,8 +130,9 @@ type endian =
   | BigEndian    (** most  significant byte comes first  *)
 with bin_io, compare, sexp
 
-include Identifiable with type t := t
+include Bap_regular.S with type t := t
 include Comparable.With_zero with type t := t
+include Bap_integer.S with type t := t
 (** {2 Container interfaces}
 
     Bitvector is also a container for bytes and bits. You can access
@@ -147,12 +148,13 @@ module Mono : Comparable with type t := t
     not forget about [of_string] function, exposed via [Identifiable]
     interface.
 *)
+val of_string : string -> t
 val of_bool  : bool -> t
 val of_int   : width:int -> int -> t
 val of_int32 : ?width:int -> int32 -> t
 val of_int64 : ?width:int -> int64 -> t
 
-(** { 3 Some predefined constant constructors }  *)
+(** {3 Some predefined constant constructors }  *)
 
 
 (** [b0 = of_bool false] - a zero bit  *)
@@ -160,7 +162,7 @@ val b0 : t
 (** [b1 = of_bool true] - a one bit  *)
 val b1 : t
 
-(** { 3 Helpful shortcuts }  *)
+(** {3 Helpful shortcuts }  *)
 
 (** [one width] number one with a specified [width], is a shortcut for
     [of_int 1 ~width]*)
@@ -184,9 +186,9 @@ val ones : int -> t
 *)
 val of_binary : ?width:int -> endian -> string -> t
 
-(** { 2 Conversions to integers }  *)
+(** {2 Conversions to integers }  *)
 
-(** { 3 Signed conversions }  *)
+(** {3 Signed conversions }  *)
 val to_int   : t -> int   Or_error.t
 val to_int32 : t -> int32 Or_error.t
 val to_int64 : t -> int64 Or_error.t
@@ -199,32 +201,33 @@ val signed : t -> t
 (** [is_zero bv] is true iff all bits are set to zero. *)
 val is_zero : t -> bool
 
+(** [is_ones bv] is true if the least significant bit is equal to one  *)
+val is_one : t -> bool
+
 (** [bitwidth bv] return a bit-width, i.e., the amount of bits *)
 val bitwidth : t -> int
 
-(** [bitsub bv ~signed ~hi ~lo] extracts a subvector from [bv], starting
+(** [extract bv ~signed ~hi ~lo] extracts a subvector from [bv], starting
     from bit [hi] and ending with [lo]. Bits are enumerated from
     right to left (from least significant to most), starting from
-    zero.
+    zero. [hi] maybe greater then [size].
 
-    [hi] defaults to [width bv]
+    [hi] defaults to [width bv - 1]
     [lo] defaults to [0].
-    [signed] defaults to [false]
 
     Example:
 
-    [bitsub (of_int 17 ~width:8) ~hi:4 ~lo:3]
-
+    [extract (of_int 17 ~width:8) ~hi:4 ~lo:3]
     will result in a two bit vector consisting of the forth and
     third bits, i.e., equal to a number [2].
 
-    [lo] and [hi] should be non-negative numbers less then a
-    [width bv] and  [hi > lo]. *)
-val bitsub : ?hi:int -> ?lo:int -> t -> t Or_error.t
+    [lo] and [hi] should be non-negative numbers. [lo] must be less
+    then a [width bv] and [hi >= lo]. *)
+val extract : ?hi:int -> ?lo:int -> t -> t Or_error.t
 
-(** [bitsub_exn bv ~hi ~lo] is the same as [bitsub], but will raise
+(** [extract_exn bv ~hi ~lo] is the same as [extract], but will raise
     an exception on error.  *)
-val bitsub_exn : ?hi:int -> ?lo:int -> t -> t
+val extract_exn : ?hi:int -> ?lo:int -> t -> t
 
 (** [concat b1 b2] concatenates two bitvectors  *)
 val concat : t -> t -> t
@@ -253,7 +256,7 @@ val (++) : t -> int -> t
 (** [a -- n] is [npred a n]  *)
 val (--) : t -> int -> t
 
-(** { 2 Iteration over bitvector components }  *)
+(** {2 Iteration over bitvector components }  *)
 
 (** [to_bytes x order] returns bytes of [x] in a specified [order].
     Each byte is represented as a [bitvector] itself. *)
@@ -285,7 +288,7 @@ val to_bits  : t -> endian -> bool Sequence.t
        [Z.(!$v1 + !$v2 / !$v3)].
 *)
 
-module Int : sig
+module Int_err : sig
   (** [!$v] lifts [v] to an Or_error monad. It is, essentially, the
       same as [Ok v] *)
   val (!$): t -> t Or_error.t
