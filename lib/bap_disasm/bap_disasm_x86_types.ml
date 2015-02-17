@@ -4,7 +4,7 @@ open Bap_types.Std
 module BZ = Big_int_Z
 module BV = Bitvector
 
-type binopf = Exp.binop
+type binopf = Exp.t -> Exp.t -> Exp.t
 
 type mode = X86 | X8664
 

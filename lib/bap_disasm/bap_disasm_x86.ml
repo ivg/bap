@@ -224,7 +224,7 @@ let parse_instr mode g addr =
     match modb land 7 with (* MOD *)
     | 0 -> (match rm land 7 with
         | 6 -> let (disp, na) = parse_disp16 na in (r, Oaddr(Exp.Int (bm disp)), na)
-        | n when n < 8 -> (r, Oaddr (Exp.(cast Cast.unsigned (!!tm) (eaddr16 mode rm))), na)
+        | n when n < 8 -> (r, Oaddr (Exp.(cast unsigned (!!tm) (eaddr16 mode rm))), na)
         | _ -> disfailwith "Impossible"
       )
     | 1 | 2 ->
@@ -232,7 +232,7 @@ let parse_instr mode g addr =
       let (disp, na) =
         if (modb land 7) = 1 then parse_disp8 na else (*2*) parse_disp16 na
       in
-      (r, Oaddr (Exp.(cast Cast.unsigned (!!tm) (base + b16 disp))), na)
+      (r, Oaddr (Exp.(cast unsigned (!!tm) (base + b16 disp))), na)
     | 3 -> (r, Oreg rm, na)
     | _ -> disfailwith "Impossible"
   in
@@ -276,7 +276,7 @@ let parse_instr mode g addr =
     let bits2rege =
       let open Type in
       match at with
-      | Imm 32 -> fun b -> Exp.(cast Cast.unsigned (!!(type_of_mode mode)) (bits2reg32e mode b))
+      | Imm 32 -> fun b -> Exp.(cast unsigned (!!(type_of_mode mode)) (bits2reg32e mode b))
       | Imm 64 -> bits2reg64e mode
       | _ -> failwith "parse_modrm3264int: invalid address type"
     in
@@ -405,7 +405,7 @@ let parse_instr mode g addr =
   let sign_ext ot op size = (match op with
       | Oimm d ->
         let (v,_) =
-          BITEMP.cast Exp.Cast.signed (d, ot) size
+          BITEMP.cast Exp.signed (d, ot) size
         in
         Oimm v
       | _ -> disfailwith "sign_ext only handles Oimm"
@@ -903,8 +903,8 @@ let parse_instr mode g addr =
              let r, rm, _, na = parse_modrm_vec None na in
              (* determine sign/zero extension *)
              let ext, name = match (b3 land 0xf0) with
-               | 0x20 -> Exp.Cast.signed, "pmovsx"
-               | 0x30 -> Exp.Cast.unsigned, "pmovzx"
+               | 0x20 -> Exp.signed, "pmovsx"
+               | 0x30 -> Exp.unsigned, "pmovzx"
                | _ -> disfailwith "impossible"
              in
              (* determine dest/src element size *)
@@ -927,14 +927,14 @@ let parse_instr mode g addr =
                | 0x38 -> Type.imm 8 | 0x39 -> Type.imm 32
                | _ -> disfailwith "invalid"
              in
-             (Ppackedbinop(prefix.mopsize, et, BITEMP.min_symbolic ~signed:true, "pmins", r, rm, rv), na)
+             (Ppackedbinop(prefix.mopsize, et, BITEMP.min_symbolic ~is_signed:true, "pmins", r, rm, rv), na)
            | 0x3a | 0x3b when prefix.opsize_override ->
              let r, rm, rv, na = parse_modrm_vec None na in
              let et = match b3 with
                | 0x3a -> Type.imm 16 | 0x3b -> Type.imm 32
                | _ -> disfailwith "invalid"
              in
-             (Ppackedbinop(prefix.mopsize, et, BITEMP.min_symbolic ~signed:false, "pminu", r, rm, rv), na)
+             (Ppackedbinop(prefix.mopsize, et, BITEMP.min_symbolic ~is_signed:false, "pminu", r, rm, rv), na)
            | _ -> disfailwith (Printf.sprintf "opcode unsupported: 0f 38 %02x" b3))
         | 0x3a ->
           let b3 = Char.to_int (g na) and na = s na in
@@ -1110,7 +1110,7 @@ let parse_instr mode g addr =
           (Ppackedbinop(t, et, fbop, str, r, rm, rv), na)
         | 0xda ->
           let r, rm, rv, na = parse_modrm_vec None na in
-          (Ppackedbinop(prefix.mopsize, Type.imm 8, BITEMP.min_symbolic ~signed:false, "pminub", r, rm, rv), na)
+          (Ppackedbinop(prefix.mopsize, Type.imm 8, BITEMP.min_symbolic ~is_signed:false, "pminub", r, rm, rv), na)
         | 0xdb ->
           let r, rm, rv, na = parse_modrm_vec None na in
           (Pbinop(prefix.mopsize, Exp.(land), "pand", r, rm, rv), na)
@@ -1120,7 +1120,7 @@ let parse_instr mode g addr =
           (Pmovmskb(prefix.mopsize, r, rm), na)
         | 0xde ->
           let r, rm, rv, na = parse_modrm_vec None na in
-          (Ppackedbinop(prefix.mopsize, Type.imm 8, BITEMP.max_symbolic ~signed:false, "pmaxub", r, rm, rv), na)
+          (Ppackedbinop(prefix.mopsize, Type.imm 8, BITEMP.max_symbolic ~is_signed:false, "pmaxub", r, rm, rv), na)
         | 0xdf ->
           let r, rm, rv, na = parse_modrm_vec None na in
           let andn x y = Exp.(lnot x land y) in
@@ -1139,7 +1139,7 @@ let parse_instr mode g addr =
           (Ppackedbinop(prefix.mopsize, et, average, "pavg", r, rm, rv), na)
         | 0xea ->
           let r, rm, rv, na = parse_modrm_vec None na in
-          (Ppackedbinop(prefix.mopsize, Type.imm 16, BITEMP.min_symbolic ~signed:true, "pmins", r, rm, rv), na)
+          (Ppackedbinop(prefix.mopsize, Type.imm 16, BITEMP.min_symbolic ~is_signed:true, "pmins", r, rm, rv), na)
         | 0xeb ->
           let r, rm, rv, na = parse_modrm_vec None na in
           (Pbinop(prefix.mopsize, Exp.(lor), "por", r, rm, rv), na)

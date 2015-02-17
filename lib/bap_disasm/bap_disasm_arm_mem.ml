@@ -14,15 +14,14 @@ module Env = Bap_disasm_arm_env
 (* Single-register memory access *)
 let lift_r  ~(dst1 : Var.t) ?(dst2 : Var.t option) ~(base : Var.t)
     ~(offset : exp) mode sign size operation =
-  let o_base   = Env.new_var "orig_base" in
-  let o_offset = Env.new_var "orig_offset" in
+  let o_base   = Env.new_tmp "orig_base" in
   (* If this load is a jump (only valid for 4-byte load)
    * We need to do the write_back before the load so we
    * Use the originals
    **)
   let address = match mode, operation, size, dst1 with
     | PostIndex, Ld, W, d when d = Env.pc -> Exp.var o_base
-    | PreIndex, Ld, W, d when d = Env.pc  -> Exp.(var o_base + var o_offset)
+    | PreIndex, Ld, W, d when d = Env.pc  -> Exp.(var o_base + offset)
     | PostIndex, _,  _, _               -> Exp.var base
     | PreIndex, _, _, _ | Offset, _, _, _ -> Exp.(var base + offset) in
 
@@ -34,7 +33,6 @@ let lift_r  ~(dst1 : Var.t) ?(dst2 : Var.t option) ~(base : Var.t)
       ]
     | PostIndex, Ld, W, d when d = Env.pc -> [
         Stmt.move o_base  Exp.(var base);
-        Stmt.move o_offset offset;
         Stmt.move base Exp.(var base + offset)
       ]
     | Offset, _, _, _ -> []
@@ -85,7 +83,7 @@ let lift_r  ~(dst1 : Var.t) ?(dst2 : Var.t option) ~(base : Var.t)
     let trunc = match size with
       | B | H ->
         let n = if size = B then 8 else 16 in
-        [Stmt.move temp Exp.(cast Cast.low n (var dst1))]
+        [Stmt.move temp Exp.(cast low n (var dst1))]
       | W | D -> [] in
     let stores =
       let m1,m2 = Env.(new_mem "m1", new_mem "m2") in
@@ -130,8 +128,16 @@ let lift_m dest_list base mode update operation =
     | Ld -> assn dest Exp.(load mem addr LittleEndian `r32)
     | St -> Stmt.move (Env.new_mem "mem")
               Exp.(store mem addr (var dest) LittleEndian `r32) in
-  List.concat [
-    [Stmt.move o_base Exp.(var base)];
-    List.mapi ~f:create_access dest_list;
-    writeback
-  ]
+  (* Jmps should always be the last statement *)
+  let rec move_jump_to_end l =
+    match l with
+      [] -> []
+    | (stmt :: stmts) ->
+      match stmt with
+      | (Stmt.Jmp exp) -> stmts @ [Stmt.Jmp exp]
+      |   _  -> stmt :: move_jump_to_end stmts in
+  move_jump_to_end (List.concat [
+      [Stmt.move o_base Exp.(var base)];
+      List.mapi ~f:create_access dest_list;
+      writeback
+    ])
