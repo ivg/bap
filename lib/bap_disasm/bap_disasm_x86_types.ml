@@ -1,7 +1,6 @@
 open Core_kernel.Std
 open Bap_types.Std
 
-module BZ = Big_int_Z
 module BV = Bitvector
 
 type binopf = Exp.t -> Exp.t -> Exp.t
@@ -17,7 +16,7 @@ type operand =
   | Ovec of int
   | Oseg of int
   | Oaddr of Exp.t
-  | Oimm of BZ.big_int
+  | Oimm of addr
 
 type jumptarget =
   | Jabs of operand

@@ -185,8 +185,8 @@ module ToIR = struct
 
   let rep_wrap ?check_zf ~mode ~addr ~next stmts =
     let bi = big_int_of_mode mode in
-    let bi0 = Z.(~$0) in
-    let bi1 = Z.(~$1) in
+    let bi0 = Word.b0 in
+    let bi1 = Word.b1 in
     let endstmt = match check_zf with
       | None -> Stmt.Jmp(Exp.Int (bi addr))
       | Some x when x = repz ->
@@ -1437,7 +1437,7 @@ module ToIR = struct
     | Interrupt3 -> [Stmt.Special "int3"]
     | Interrupt(Oimm i) ->
       (** use [BV.string_of_value ~hex:true] here *)
-      [Stmt.Special (Printf.sprintf "int 0x%x" (BZ.int_of_big_int i))]
+      [Stmt.Special ("int " ^ Addr.string_of_value i)]
     | Sysenter | Syscall -> [Stmt.Special "syscall"]
     (* Match everything exhaustively *)
     | Leave _ ->  unimplemented "to_ir: Leave"

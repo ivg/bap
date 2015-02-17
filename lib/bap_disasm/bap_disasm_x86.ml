@@ -6,6 +6,7 @@ open Bap_disasm_x86_types
 open Bap_disasm_x86_utils
 open Bap_disasm_x86_env
 
+module Memory = Bap_memory
 (* extract the condition to jump on from the opcode bits
    for 70 to 7f and 0f 80 to 8f *)
 let cc_to_exp i =
@@ -22,9 +23,13 @@ let cc_to_exp i =
   in
   if (i land 1) = 0 then cc else exp_not cc
 
-let parse_instr mode g addr =
+let parse_instr mode mem addr =
+  let g a =
+    let open Or_error in
+    Memory.get ~addr:a mem >>= Word.to_int |>
+    ok_exn |> Char.of_int_exn in
   let module R = (val (vars_of_mode mode)) in
-  let s = BZ.succ_big_int in
+  let s = Word.succ in
   let bm = big_int_of_mode mode in
   let im = int_of_mode mode in
   let tm = type_of_mode mode in
@@ -115,26 +120,21 @@ let parse_instr mode g addr =
       | 0x67 -> Some Address_size
       | _ -> None
       in*)
-  let parse_int nbits a =
-    let open BITEMP in
-    let r a n =  (Z.(~$) (Char.to_int (g (a +$ (BZ.big_int_of_int n))))) <<$ (8*n) in
-    let nbytes = nbits/8 in
-    let bytes = List.map ~f:(fun n -> r a n) (List.range ~stride:(-1) ~start:`exclusive ~stop:`inclusive nbytes 0) in
-    let i = List.reduce_exn ~f:BZ.or_big_int bytes in
-    (i, a +$ (BZ.big_int_of_int nbytes))
+  let parse_int scale a =
+    Memory.get ~scale ~addr:a mem |> Or_error.ok_exn,
+    Addr.memref ~scale a in
+  let parse_int8 = parse_int `r8 in
+  let parse_int16 = parse_int `r16 in
+  let parse_int32 = parse_int `r32 in
+  let parse_int64 = parse_int `r64 in
+  let parse_sint scale a =
+    let i, na = parse_int scale a in
+    Word.signed i, na
   in
-  let parse_int8 = parse_int 8 in
-  let parse_int16 = parse_int 16 in
-  let parse_int32 = parse_int 32 in
-  let parse_int64 = parse_int 64 in
-  let parse_sint nbits a =
-    let (i, na) = parse_int nbits a in
-    (BITEMP.to_signed i (Type.imm nbits), na)
-  in
-  let parse_sint8 = parse_sint 8 in
-  let parse_sint16 = parse_sint 16 in
-  let parse_sint32 = parse_sint 32 in
-  let parse_sint64 = parse_sint 64 in
+  let parse_sint8 = parse_sint `r8 in
+  let parse_sint16 = parse_sint `r16 in
+  let parse_sint32 = parse_sint `r32 in
+  let parse_sint64 = parse_sint `r64 in
   let parse_disp8 = parse_sint8 in
   let parse_disp16 = parse_sint16 in
   let parse_disp32 = parse_sint32 in
@@ -151,21 +151,24 @@ let parse_instr mode g addr =
     | _ -> disfailwith "unsupported displacement size"
   in
   let parse_imm8cb b =
-    let b = Big_int_Z.int64_of_big_int b in
     let open Pcmpstr in
-    let (&) = Int64.bit_and in
-    let ssize = if (b & 1L) = 0L then Bytes else Words in
-    let ssign = if (b & 2L) = 0L then Unsigned else Signed in
-    let agg = match b & 12L with
-      | 0L -> EqualAny
-      | 4L -> Ranges
-      | 8L -> EqualEach
-      | 12L -> EqualOrdered
+    let is_zero n = Word.(extract_exn ~hi:n ~lo:n b |> is_zero) in
+    let is_one n = Word.(extract_exn ~hi:n ~lo:n b |> is_one) in
+    let ssize = if is_zero 0 then Bytes else Words in
+    let ssign = if is_zero 1 then Unsigned else Signed in
+    let agg =
+      let open Or_error in
+      let code = Word.extract ~hi:3 ~lo:2 b >>= Word.to_int |> ok_exn in
+      match  code with
+      | 0 -> EqualAny
+      | 1 -> Ranges
+      | 2 -> EqualEach
+      | 3 -> EqualOrdered
       | _ -> failwith "impossible"
     in
-    let negintres1 = if (b & 16L) = 0L then false else true in
-    let maskintres1 = if (b & 32L) = 0L then false else true in
-    let outselectsig = if (b & 64L) = 0L then LSB else MSB in
+    let negintres1 = is_one 4 in
+    let maskintres1 = is_one 5 in
+    let outselectsig = if is_zero 6 then LSB else MSB in
     let outselectmask = sig_to_mask outselectsig in
     (* XXX commented out because we currently have no debugging module *)
     (*if (b & 128L) <> 0L then wprintf "Most significant bit of Imm8 control byte should be set to 0";*)
@@ -468,8 +471,7 @@ let parse_instr mode g addr =
     | 0x70 | 0x71 | 0x72 | 0x73 | 0x74 | 0x75 | 0x76 | 0x77 | 0x78 | 0x79
     | 0x7a | 0x7b | 0x7c | 0x7d | 0x7e | 0x7f ->
       let (i,na) = parse_disp8 na in
-      let open BITEMP in
-      (Jcc(Jabs(Oimm(i +$ na)), cc_to_exp b1), na)
+      (Jcc(Jabs(Oimm(Addr.(i + na))), cc_to_exp b1), na)
     | 0x80 | 0x81 | 0x82 | 0x83 ->
       let it = match b1 with
         | 0x81 -> if prefix.opsize = reg64_t then reg32_t else prefix.opsize
@@ -621,21 +623,21 @@ let parse_instr mode g addr =
        | _, Oaddr _ ->
          unimplemented (Printf.sprintf "unsupported opcode: %02x/%d" b1 r)
        | _, _ ->
-         unimplemented (Printf.sprintf "unsupported opcode: %02x %s" b1 (Z.format "0x%x" b2))
+         unimplemented (Printf.sprintf "unsupported opcode: %02x %s" b1 (Word.string_of_value b2))
       )
 
     | 0xe8 -> let t = expanded_jump_type prefix.opsize in
       let (i,na) = parse_disp t na in
       let open BITEMP in
       (* I suppose the width of the return address should be addrsize *)
-      (Call (Oimm (i +$ na), bitvector_of_z na (Strip.bits_of_width addrsize)), na)
+      (Call (Oimm (Addr.(i + na)), bitvector_of_z na (Strip.bits_of_width addrsize)), na)
     | 0xe9 -> let t = expanded_jump_type prefix.opsize in
       let (i,na) = parse_disp t na in
       let open BITEMP in
-      (Jump (Jabs (Oimm (i +$ na))), na)
+      (Jump (Jabs (Oimm (Addr.(i + na)))), na)
     | 0xeb -> let (i,na) = parse_disp8 na in
       let open BITEMP in
-      (Jump (Jabs (Oimm (i +$ na))), na)
+      (Jump (Jabs (Oimm (Addr.(i + na)))), na)
     | 0xc0 | 0xc1
     | 0xd0 | 0xd1 | 0xd2
     | 0xd3 -> let immoff = if (b1 land 0xfe) = 0xc0 then Some reg8_t else None in
@@ -643,7 +645,7 @@ let parse_instr mode g addr =
       let opsize = if (b1 land 1) = 0 then reg8_t else prefix.opsize in
       let (amt, na) = match b1 land 0xfe with
         | 0xc0 -> parse_imm8 na
-        | 0xd0 -> (Oimm BITEMP.bi1, na)
+        | 0xd0 -> (Oimm Addr.b1, na)
         | 0xd2 -> (o_rcx, na)
         | _ ->
           disfailwith (Printf.sprintf "impossible opcode: %02x/%d" b1 r)
@@ -1004,8 +1006,7 @@ let parse_instr mode g addr =
           let t = prefix.mopsize in
           let r, rm, rv, na = parse_modrm_vec (Some reg8_t) na in
           let i, na = parse_imm8 na in
-          let ( *% ) = BZ.mult_big_int in
-          let bi8 = BZ.big_int_of_int 0x8 in
+          let bi8 = Word.of_int ~width:8 0x8 in
           let fbop, str, et, i =
             let open Exp.Binop in
             match b2, r, i with
@@ -1013,8 +1014,8 @@ let parse_instr mode g addr =
             | _, Ovec 6, _ -> Exp.binop LSHIFT, "psll", lowbits2elemt b2, i
             | _, Ovec 4, _ -> Exp.binop ARSHIFT, "psra", lowbits2elemt b2, i
             (* The shift amount of next two elements are multipled by eight *)
-            | 0x73, Ovec 3, Oimm i when prefix.opsize_override -> Exp.binop RSHIFT, "psrldq", t, Oimm (i *% bi8)
-            | 0x73, Ovec 7, Oimm i when prefix.opsize_override -> Exp.binop LSHIFT, "pslldq", t, Oimm (i *% bi8)
+            | 0x73, Ovec 3, Oimm i when prefix.opsize_override -> Exp.binop RSHIFT, "psrldq", t, Oimm (Addr.(i * bi8))
+            | 0x73, Ovec 7, Oimm i when prefix.opsize_override -> Exp.binop LSHIFT, "pslldq", t, Oimm (Addr.(i * bi8))
             | _, Oreg i, _ -> disfailwith (Printf.sprintf "invalid psrl/psll encoding b2=%#x r=%#x" b2 i)
             | _ -> disfailwith "impossible"
           in
@@ -1024,7 +1025,7 @@ let parse_instr mode g addr =
           let t = expanded_jump_type prefix.opsize in
           let (i,na) = parse_disp t na in
           let open BITEMP in
-          (Jcc(Jabs(Oimm(i +$ na)), cc_to_exp b2), na)
+          (Jcc(Jabs(Oimm(Addr.(i + na))), cc_to_exp b2), na)
         (* add other opcodes for setcc here *)
         | 0x90 | 0x91 | 0x92 | 0x93 | 0x94 | 0x95 | 0x96 | 0x97 | 0x98 | 0x99
         | 0x9a | 0x9b | 0x9c | 0x9d | 0x9e | 0x9f ->

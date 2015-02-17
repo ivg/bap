@@ -4,14 +4,6 @@ open Bap_types.Std
 open Bap_disasm_x86_types
 open Bap_disasm_x86_env
 
-(* open Bil *)
-module BZ = Big_int_Z
-(* open Type *)
-(* open Arch *)
-(* open Var *)
-
-module BV = Bitvector
-
 module Util = struct
   let id x = x (* useful for tabulating lists, for instance. *)
 
@@ -88,39 +80,9 @@ module Big_int_temp = struct
       | false -> e1 < e2 in
     ite (lnot cond) e1 e2
 
-  let ( <<$ ) = BZ.shift_left_big_int
-  let ( +$ ) = BZ.add_big_int
-  let bi1 = BZ.big_int_of_int 0x1
-  let power_of_two = BZ.shift_left_big_int bi1
-  let bitmask = let (-%) = BZ.sub_big_int in
-    (fun i -> power_of_two i -% bi1)
-  let to_big_int (i,t) =
-    let bits = Strip.bits_of_width t in
-    BZ.and_big_int i (bitmask bits)
-  (* sign extend to type t *)
-  let to_sbig_int (i,t) =
-    let (>>%) = BZ.shift_right_big_int in
-    let (-%) = BZ.sub_big_int in
-    let bi_is_zero bi = BZ.(big_int_of_int 0x0 |> eq_big_int bi) in
-    let bits = Strip.bits_of_width t in
-    let final = to_big_int (i, Type.imm (bits-1)) in
-    (* mod always returns a positive number *)
-    let sign = i >>% (bits-1) in
-    if bi_is_zero sign then
-      (* positive *) final
-    else (* negative *) BZ.minus_big_int ((power_of_two (bits-1) -% final))
-  let to_signed i t = to_sbig_int (i, t)
-  let to_val t i =
-    (to_big_int (i,t), t)
-  let cast ct ((_,t) as v) t2 =
-    let bits1 = Strip.bits_of_width t in
+  let cast _ (w, _) t2 =
     let bits = Strip.bits_of_width t2 in
-    let open Exp.Cast in
-    match ct with
-    | UNSIGNED -> to_val t2 (to_big_int v)
-    | SIGNED -> to_val t2 (to_sbig_int v)
-    | HIGH -> to_val t2 (BZ.shift_right_big_int (to_big_int v) (bits1-bits))
-    | LOW -> to_val t2 (to_big_int v)
+    Word.extract_exn ~hi:(bits-1) w, t2
 end
 
 module BITEMP = Big_int_temp
@@ -337,16 +299,29 @@ let int_of_mode m i = match m with
   | X86 -> bitvector_of_bil (i32 i)
   | X8664 -> bitvector_of_bil (i64 i)
 
-let bitvector_of_z z width = Z.to_bits z |> BV.of_binary ~width LittleEndian
+let bitvector_of_z z width =
+  if width = Word.bitwidth z then z
+  else failwith "bitvector width changes"
+
 (* exp from big int *)
 let bt n t = bitvector_of_z n t |> Exp.int
 let b64 i = bt i 64
 let b32 i = bt i 32
 let b16 i = bt i 16
 
-let big_int_of_mode m i = match m with
-  | X86 -> bitvector_of_bil (b32 i)
-  | X8664 -> bitvector_of_bil (b64 i)
+
+let big_int_of_mode m i =
+  let module W = Word in
+  match m with
+  | X86 when W.bitwidth i = 32 -> i
+  | X86 when W.bitwidth i < 32 -> W.to_int32 i |>
+                               Or_error.ok_exn |>
+                               W.of_int32
+  | X8664 when W.bitwidth i = 64 -> i
+  | X8664 when W.bitwidth i < 64 -> W.to_int64 i |>
+                                 Or_error.ok_exn |>
+                                 W.of_int64
+  | _ -> failwith "big_int_of_mode failure"
 
 (* Get elemt from low opcode bits *)
 let lowbits2elemt b =
