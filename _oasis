@@ -202,8 +202,9 @@ Library llvm_loader
                    Llvm_binary_section
   CCOpt:           $cc_optimization
   CCLib:           $llvm_lib $cxxlibs $llvm_ldflags
-  CSources:        llvm_binary_stubs.c,
-                   llvm_binary_stubs.h
+  CSources:        llvm_binary_stubs.c, 
+                   llvm_binary.c,
+                   llvm_binary.h
 
 Library llvm_loader_backend
   Path:            lib/bap_image/

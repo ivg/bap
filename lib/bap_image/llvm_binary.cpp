@@ -1,16 +1,7 @@
-#include <string>
 
-#include "llvm_binary_stubs.h"
-#include "llvm_binary_stubs.hpp"
+#include "llvm_binary.h"
+#include "llvm_binary.hpp"
 
-extern "C" {
-#include <caml/mlvalues.h>
-#include <caml/memory.h>
-#include <caml/fail.h>
-#include <caml/alloc.h>
-#include <caml/custom.h>
-#include <caml/bigarray.h>
-}
 
 void llvm_binary_fail [[ noreturn ]](const char* message) {
     ::caml_failwith(message);
@@ -101,8 +92,8 @@ template <typename T>
     CAMLreturn(result);
 }
 
-
 } //namespace impl
+
 
 CAMLprim value llvm_binary_create_stub(value arg) {
     CAMLparam1(arg);
@@ -139,4 +130,3 @@ CAMLprim value llvm_binary_sections_stub(value arg) {
     CAMLparam1(arg);
     CAMLreturn(impl::to_value(impl::from_value(arg)->sections()));
 }
-
