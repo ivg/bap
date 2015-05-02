@@ -1,5 +1,5 @@
-#ifndef BAP_LLVM_BINARY_HPP
-#define BAP_LLVM_BINARY_HPP
+#ifndef BAP_BINARY_HPP
+#define BAP_BINARY_HPP
 
 #include <memory>
 #include <numeric>
@@ -13,11 +13,9 @@
 #include <llvm/Object/MachO.h>
 #include <llvm/Object/Archive.h>
 
-#include "llvm_binary.h"
+extern "C" void llvm_binary_fail(const char*);
 
-void llvm_binary_fail [[ noreturn ]](const char*);
-
-void llvm_binary_fail [[ noreturn ]](const llvm::error_code& ec) {
+void fail(llvm::error_code& ec) {
     llvm_binary_fail(ec.message().c_str());
 }
 
@@ -27,7 +25,7 @@ template <typename T>
 content_iterator<T>& operator++(content_iterator<T>& a) {
     error_code ec;
     a.increment(ec);
-    if(ec) llvm_binary_fail(ec);
+    if(ec) fail(ec);
     return a;
 }
 
@@ -44,8 +42,7 @@ int distance(content_iterator<T> begin, content_iterator<T> end) {
     while (begin != end) {
         ++n;
         begin.increment(ec);
-        if (ec)
-            llvm_binary_fail(ec);
+        if (ec) fail(ec);
     }
     return n;
 }
@@ -189,17 +186,17 @@ struct symbol {
     explicit symbol(const SymbolRef& sym) {
         StringRef name;
         if(error_code err = sym.getName(name))
-            llvm_binary_fail(err);
+            fail(err);
         this->name_ = name.str();
         
         if (error_code err = sym.getType(this->kind_))
-            llvm_binary_fail(err);
+            fail(err);
         
         if (error_code err = sym.getAddress(this->addr_))
-            llvm_binary_fail(err);
+            fail(err);
         
         if (error_code err = sym.getSize(this->size_))
-            llvm_binary_fail(err);
+            fail(err);
     }
 
     const std::string& name() const { return name_; }
@@ -264,13 +261,13 @@ struct section {
     explicit section(const SectionRef& sec) {
         StringRef name;
         if(error_code err = sec.getName(name))
-            llvm_binary_fail(err);
+            fail(err);
         this->name_ = name.str();
         if (error_code err = sec.getAddress(this->addr_))
-            llvm_binary_fail(err);
+            fail(err);
         
         if (error_code err = sec.getSize(this->size_))
-            llvm_binary_fail(err);
+            fail(err);
     }
     const std::string& name() const { return name_; }
     uint64_t addr() const { return addr_; }
@@ -309,6 +306,9 @@ struct image {
     virtual ~image() {}
 };
 
+template <typename T>
+uint64_t count_elements(const std::vector<T>& v) {return v.size();}
+
 Triple::ArchType image_arch(const ObjectFile* obj) {
     return static_cast<Triple::ArchType>(obj->getArch());
 }
@@ -338,6 +338,7 @@ uint64_t image_entry(const MachOObjectFile* obj) {
 }
 
 uint64_t image_entry(const COFFObjectFile* obj) {
+<<<<<<< HEAD
     if (obj->getBytesInAddress() == 4) {
         const pe32_header* hdr = 0;
         if (error_code ec = obj -> getPE32Header(hdr))
@@ -372,6 +373,14 @@ uint64_t image_entry(const COFFObjectFile* obj) {
             llvm_binary_fail("PEplus header not found");
         }
     }
+=======
+    const pe32_header* hdr = 0;
+    if (error_code ec = obj -> getPE32Header(hdr))
+        llvm_binary_fail(ec.message().c_str());
+    if (!hdr)
+        llvm_binary_fail("PE header not found");
+    return hdr->AddressOfEntryPoint;
+>>>>>>> 4b416aa... separation of flies from cutlets
 };
 
 template <typename T>
@@ -445,40 +454,10 @@ image* create(const char* data, std::size_t size) {
     MemoryBuffer* buff(MemoryBuffer::getMemBufferCopy(data_ref, "binary"));
     OwningPtr<object::Binary> binary;
     if (error_code ec = createBinary(buff, binary))
-        llvm_binary_fail(ec);
+        fail(ec);
     return create_image(binary.get());
 }
 
 } //namespace img
 
-
-extern "C" {
-
-    uint64_t c_entry(struct img::image* m) {
-        return m->entry();
-    }
-
-    const char* c_arch(struct img::image* m) {
-        return (llvm::Triple::getArchTypeName(m->arch()));
-    }
-
-    const segment* c_segments(struct img::image* m) {
-        return ((const segment*) &(m->segments())[0]);
-    }
-
-    const symbol* c_symbols(struct img::image* m) {
-        return ((const symbol*) &(m->symbols())[0]);
-    }
-
-    const section* c_sections(struct img::image* m) {
-        return ((const section*) &(m->sections())[0]);
-    }
-
-    image* c_create(const char* data, size_t size) {
-        return (image*) img::create(data, size);
-    }
-
-    
-}
-
-#endif //BAP_LLVM_BINARY_HPP
+#endif //BAP_BINARY_HPP
