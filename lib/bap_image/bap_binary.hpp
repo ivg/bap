@@ -1,19 +1,21 @@
-#ifndef BAP_LLVM_BINARY_STUBS_HPP
-#define BAP_LLVM_BINARY_STUBS_HPP
+#ifndef BAP_BINARY_HPP
+#define BAP_BINARY_HPP
 
 #include <memory>
 #include <numeric>
 #include <vector>
 #include <algorithm>
+#include <iomanip>
+#include <sstream>
 
 #include <llvm/Object/ELFObjectFile.h>
 #include <llvm/Object/COFF.h>
 #include <llvm/Object/MachO.h>
 #include <llvm/Object/Archive.h>
 
-void llvm_binary_fail [[ noreturn ]](const char*);
+extern "C" void llvm_binary_fail(const char*);
 
-void llvm_binary_fail [[ noreturn ]](const llvm::error_code& ec) {
+void fail(llvm::error_code& ec) {
     llvm_binary_fail(ec.message().c_str());
 }
 
@@ -23,7 +25,7 @@ template <typename T>
 content_iterator<T>& operator++(content_iterator<T>& a) {
     error_code ec;
     a.increment(ec);
-    if(ec) llvm_binary_fail(ec);
+    if(ec) fail(ec);
     return a;
 }
 
@@ -40,8 +42,7 @@ int distance(content_iterator<T> begin, content_iterator<T> end) {
     while (begin != end) {
         ++n;
         begin.increment(ec);
-        if (ec)
-            llvm_binary_fail(ec);
+        if (ec) fail(ec);
     }
     return n;
 }
@@ -69,14 +70,17 @@ using namespace llvm::object;
 
 struct segment {
     template <typename T>
-    segment(const Elf_Phdr_Impl<T>& hdr)
-        : name_("not applicable")
-        , offset_(hdr.p_offset)
+    segment(const Elf_Phdr_Impl<T>& hdr, int pos)
+        : offset_(hdr.p_offset)
         , addr_(hdr.p_vaddr)
         , size_(hdr.p_filesz)
         , is_readable_(hdr.p_flags & ELF::PF_R)
         , is_writable_(hdr.p_flags & ELF::PF_W)
-        , is_executable_(hdr.p_flags & ELF::PF_X) { }
+        , is_executable_(hdr.p_flags & ELF::PF_X) { 
+        std::ostringstream oss;
+        oss << std::setfill('0') << std::setw(2) << pos;
+        name_ = oss.str(); 
+    }
 
     segment(const MachO::segment_command &s) {
         init_macho_segment(s);
@@ -136,10 +140,10 @@ std::vector<segment> read(const ELFObjectFile<T>* obj) {
     auto end = obj->getELFFile()->end_program_headers();
     std::vector<segment> segments;
     segments.reserve(std::distance(begin, end));
-    std::copy_if(begin,
-                 end,
-                 std::back_inserter(segments),
-                 [](const Elf_Phdr_Impl<T>& hdr){ return hdr.p_type == ELF::PT_LOAD;});
+    for (int i = 0; begin != end; ++i, ++begin) {
+        if (begin->p_type == ELF::PT_LOAD)
+            segments.push_back(segment(*begin, i));
+    }
     return segments;
 }
 
@@ -182,17 +186,17 @@ struct symbol {
     explicit symbol(const SymbolRef& sym) {
         StringRef name;
         if(error_code err = sym.getName(name))
-            llvm_binary_fail(err);
+            fail(err);
         this->name_ = name.str();
         
         if (error_code err = sym.getType(this->kind_))
-            llvm_binary_fail(err);
+            fail(err);
         
         if (error_code err = sym.getAddress(this->addr_))
-            llvm_binary_fail(err);
+            fail(err);
         
         if (error_code err = sym.getSize(this->size_))
-            llvm_binary_fail(err);
+            fail(err);
     }
 
     const std::string& name() const { return name_; }
@@ -257,13 +261,13 @@ struct section {
     explicit section(const SectionRef& sec) {
         StringRef name;
         if(error_code err = sec.getName(name))
-            llvm_binary_fail(err);
+            fail(err);
         this->name_ = name.str();
         if (error_code err = sec.getAddress(this->addr_))
-            llvm_binary_fail(err);
+            fail(err);
         
         if (error_code err = sec.getSize(this->size_))
-            llvm_binary_fail(err);
+            fail(err);
     }
     const std::string& name() const { return name_; }
     uint64_t addr() const { return addr_; }
@@ -302,6 +306,9 @@ struct image {
     virtual ~image() {}
 };
 
+template <typename T>
+uint64_t count_elements(const std::vector<T>& v) {return v.size();}
+
 Triple::ArchType image_arch(const ObjectFile* obj) {
     return static_cast<Triple::ArchType>(obj->getArch());
 }
@@ -331,6 +338,7 @@ uint64_t image_entry(const MachOObjectFile* obj) {
 }
 
 uint64_t image_entry(const COFFObjectFile* obj) {
+<<<<<<< HEAD
     if (obj->getBytesInAddress() == 4) {
         const pe32_header* hdr = 0;
         if (error_code ec = obj -> getPE32Header(hdr))
@@ -365,6 +373,14 @@ uint64_t image_entry(const COFFObjectFile* obj) {
             llvm_binary_fail("PEplus header not found");
         }
     }
+=======
+    const pe32_header* hdr = 0;
+    if (error_code ec = obj -> getPE32Header(hdr))
+        llvm_binary_fail(ec.message().c_str());
+    if (!hdr)
+        llvm_binary_fail("PE header not found");
+    return hdr->AddressOfEntryPoint;
+>>>>>>> 4b416aa... separation of flies from cutlets
 };
 
 template <typename T>
@@ -438,10 +454,10 @@ image* create(const char* data, std::size_t size) {
     MemoryBuffer* buff(MemoryBuffer::getMemBufferCopy(data_ref, "binary"));
     OwningPtr<object::Binary> binary;
     if (error_code ec = createBinary(buff, binary))
-        llvm_binary_fail(ec);
+        fail(ec);
     return create_image(binary.get());
 }
 
 } //namespace img
 
-#endif //BAP_LLVM_BINARY_STUBS_HPP
+#endif //BAP_BINARY_HPP
