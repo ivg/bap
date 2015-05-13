@@ -13,7 +13,7 @@
 
 extern "C" void llvm_binary_fail(const char*);
 
-void llvm_binary_fail [[ noreturn ]](const llvm::error_code& ec) {
+void llvm_binary_fail (const llvm::error_code& ec) {
     llvm_binary_fail(ec.message().c_str());
 }
 
