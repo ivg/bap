@@ -16,15 +16,15 @@ module Std = struct
       mutable waiters : ('a -> unit) list
     }
 
-    type state =  [`full | `wait | `link]
-    type direct = [`full | `wait ]
+    type direct = [`full   | `wait ]
+    type linked = [ direct | `link ]
 
-    type ('a,_) cell =
-      | Full : 'a                -> ('a,[> `full]) cell
-      | Wait : 'a waiters        -> ('a,[> `wait]) cell
-      | Link : ('a,state) future -> ('a,[> `link]) cell
+    type 'a t = ('a,linked) future
     and ('a,'s) future = { mutable cell : ('a,'s) cell }
-    and 'a t = ('a,state) future
+    and ('a,_) cell =
+      | Full : 'a         -> ('a,[> `full]) cell
+      | Wait : 'a waiters -> ('a,[> `wait]) cell
+      | Link : 'a t       -> ('a,[> `link]) cell
 
     let full x = {cell = Full x}
 
@@ -88,20 +88,16 @@ module Std = struct
       | Full x -> x
       | Wait _ -> invalid_arg "peek_exn: empty future"
 
-    include Monad.Make(struct
+    module Monad = Monad.Make(struct
         type nonrec 'a t = 'a t
         let bind = bind
         let map = `Custom map
         let return = full
       end)
 
-    module App = Applicative.Make(struct
+    module App = Applicative.Of_monad(struct
         type nonrec 'a t = 'a t
-        let return = full
-        let apply ff xf =
-          bind ff (fun f ->
-              bind xf (fun x -> return (f x)))
-        let map = `Custom map
+        include Monad
       end)
 
     module Args = Applicative.Make_args(struct
@@ -109,6 +105,7 @@ module Std = struct
         include App
       end)
     include App
+    include Monad
   end
 
   type 'a future = 'a Future.t
