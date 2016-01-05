@@ -230,10 +230,18 @@ module Std : sig
         associated signal handler. *)
     val unfold : init:'b -> f:('b -> ('a * 'b)) -> 'a t * unit signal
 
+    (** [unfold_until ~init ~f] returns [(stream,signal,future)] is the
+        same as [unfold], except that function [f] is called until it
+        returns a [None] value. Once this happens, the [future]
+        becomes determined.  *)
+    val unfold_until : init:'b -> f:('b -> ('a * 'b) option) ->
+      'a t * unit signal * unit future
+
     (** [unfold' ~init ~f] is a batched version of the [unfold]
         function. A new value is produced by a stream, every time it
         is signaled with associated signal handler. *)
     val unfold' : init:'b -> f:('b -> ('a Queue.t * 'b)) -> 'a t * unit signal
+
 
     (** [repeat x] returns a stream [xs] and a signal [s]. Every time
         [s] is signaled stream [xs] will produce a value [x] *)
@@ -303,11 +311,11 @@ module Std : sig
 
     (** [on_subscribe s f] will call a function [f] every time someone
         is subscribed to a stream [s] *)
-    val on_subscribe : 'a t -> (unit -> unit) -> unit
+    val on_subscribe : 'a t -> (id -> unit) -> unit
 
     (** [on_unsubscribe s f] will call a function [f] every time
         someone has canceled subscription to a stream [s] *)
-    val on_unsubscribe : 'a t -> (unit -> unit) -> unit
+    val on_unsubscribe : 'a t -> (id -> unit) -> unit
 
     (** [on_wait s f] will be called every time someone, watching a
         stream [s], will call [wait s] to ask a producer to slow down.*)

@@ -185,6 +185,16 @@ Library bap_image
                  Image_common,
                  Image_internal_std
 
+
+Library bap_future
+  Path:            lib/bap_future/
+  FindlibParent:   bap
+  FindlibName:     future
+  CompiledObject:  best
+  BuildDepends:    core_kernel
+  InternalModules: Bap_future_std
+
+
 Library elf_backend
   Path:            lib/bap_image/
   FindlibParent:   bap
