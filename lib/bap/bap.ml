@@ -15,6 +15,7 @@ module Std = struct
   module Byteweight = Bap_byteweight
   include Graphlib.Std
   include Bap_trace_std
+  include Bap_future.Std
 end
 
 (* load internal plugins *)
