@@ -58,6 +58,7 @@ Library bap
                    bap.dwarf,
                    bap.elf,
                    bap.elf_backend,
+                   bap.future,
                    bap.image,
                    bap.llvm,
                    bap.llvm_loader,
@@ -175,6 +176,16 @@ Library bap_image
                  Image_backend,
                  Image_common,
                  Image_internal_std
+
+
+Library bap_future
+  Path:            lib/bap_future/
+  FindlibParent:   bap
+  FindlibName:     future
+  CompiledObject:  best
+  BuildDepends:    core_kernel
+  InternalModules: Bap_future
+
 
 Library elf_backend
   Path:            lib/bap_image/
@@ -341,6 +352,14 @@ Library project_test
   Install:        false
   Modules:        Test_project
 
+Library future_test
+  Path:           lib_test/bap_future
+  Build$:         flag(tests)
+  CompiledObject: best
+  BuildDepends:   bap, oUnit
+  Install:        false
+  Modules:        Test_future_std, Test_future, Test_stream
+
 Library dwarf_test
   Path:           lib_test/bap_dwarf
   Build$:         flag(tests)
@@ -447,6 +466,7 @@ Executable run_tests
   BuildDepends: bap.plugins,
                 disasm_test,
                 dwarf_test,
+                future_test,
                 image_test,
                 oUnit,
                 sema_test,
