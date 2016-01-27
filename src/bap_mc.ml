@@ -3,9 +3,7 @@ open Or_error
 open Format
 open Bap.Std
 open Bap_plugins.Std
-open Options
-
-module Bil_piqi = Bap_piqi.Bil
+open Mc_options
 
 exception Bad_user_input
 exception Bad_insn of mem * int * int
@@ -15,7 +13,7 @@ exception No_input
 exception Unknown_arch
 exception Trailing_data of int
 
-module Program(Conf : Options.Provider) = struct
+module Program(Conf : Mc_options.Provider) = struct
   open Conf
   module Dis = Disasm_expert.Basic
 
@@ -98,14 +96,13 @@ module Program(Conf : Options.Provider) = struct
         pp_print_newline str_formatter ());
     flush_str_formatter ()
 
+
   let string_of_bil = function
-    | `pb -> Bil_piqi.pb_of_stmts
-    | `json -> Bil_piqi.json_of_stmts
-    | `xml -> Bil_piqi.xml_of_stmts
     | `bil -> asprintf "%a" Bil.pp
     | `adt -> string_of_list Stmt.pp_adt
     | `sexp -> asprintf "%a" pp_sexp
     | `binprot -> Binable.to_string (module Bil)
+    | #Bil_piqi.fmt as fmt -> Bil_piqi.string_of_bil fmt
 
   let print_bil lift mem insn =
     let bil = bil_of_insn lift mem in
@@ -249,7 +246,7 @@ module Cmdline = struct
 
 
   let create a b c d e f g h i =
-    Options.Fields.create a b c d e f g h i
+    Mc_options.Fields.create a b c d e f g h i
 
   let src =
     let doc = "String to disassemble. If not specified read stdin" in
@@ -281,8 +278,8 @@ module Cmdline = struct
   let exitf n =
     kfprintf (fun ppf -> pp_print_newline ppf (); exit n) err_formatter
 
-  let parse () =
-    match Term.eval program ~catch:false with
+  let parse argv =
+    match Term.eval ~argv program ~catch:false with
     | `Ok opts -> Ok opts
     | `Error `Parse -> exit 64
     | `Error _ -> exit 2
@@ -300,7 +297,8 @@ let start options =
 
 let _main : unit =
   Plugins.load ();
-  try match Cmdline.parse () >>= start with
+  let argv = Bap_plugin_loader.run Sys.argv in
+  try match Cmdline.parse argv >>= start with
     | Ok _ -> exit 0
     | Error err -> exitf 64 "%s\n" Error.(to_string_hum err)
   with
