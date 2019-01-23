@@ -6,15 +6,20 @@ type t
 
 val compare : t -> t -> int
 
-
 val bitwidth : t -> int
 
-val to_bits : t -> string
+val to_binary : t -> string
+val of_binary : string -> t
+
+val to_string : t -> string
 val of_string : string -> t
+
 val of_bool  : bool -> t
+val of_char  : ?width:int -> char -> t
 val of_int   : width:int -> int -> t
 val of_int32 : ?width:int -> int32 -> t
 val of_int64 : ?width:int -> int64 -> t
+
 val b0 : t
 val b1 : t
 val one: int -> t

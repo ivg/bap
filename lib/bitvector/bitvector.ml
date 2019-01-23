@@ -1,70 +1,130 @@
 open Format
 (*
-   We store the bitwidth and sign in the bitvector itself.
-   Thus, bitvector is Z.t. We will use several bits of the word
-   for meta data. To be able to store 32 bit words on a 64 bit platform we need to
-   leave enough space in a 63 bit word for the payload. Ideally, we
-   would like to have a support for an arbitrary bitwidth, but we can
-   limit it to 2^14=32 (2 kB), spend one bit for sign (that can be
-   removed later), thus we will have 48 bits for the payload.
+   Since Z.t is able to store itself in OCaml's int when the stored
+   value fits into the OCaml representation (i.e., into 63 bits on
+   a 64 bit system), we're going to store our meta information (the
+   size or modulo of the word) directly in the Z.t representation.
+   In order to maximize the used size we will use a prefixed notation,
+   which will store the most common sizes (1,8,32,64) more
+   efficiently, than an arbitrary size. If the prefix (aka tag) is 0
+   then the bitvector has one of the ordinary types (1,8,32,64),
+   denoted by the next 2 bits. Otherwise, if the tag is one, then it
+   has an arbitrary size encoded in the next 14 bits. However, this
+   14 bits of size may contain 5 anomalies:
+   - the zero size
+   - one of the four ordinary types.
+
+   This five values of the first 15 bits (tag=1,size={0,1,8,32,64}),
+   are reserved for special values, denoted as special(0), special(1),
+   special(32), and special(64), and they use a different format, with
+   the size field moved to the payload, and the payload itself made
+   optional.
 
 
-     small:
-     +-----------+------+---+
-     |  payload  | size | s |
-     +-----------+------+---+
-      size+15  15 14       0
+     ordinary:
+     +---------------+----+-+
+     |  payload      |type|0|
+     +---------------+----+-+
+      size+4        3 2  1 0
 
 
-    Given this scheme, all values smaller than 0x100_000_000_0000 will
-    have the same representation as OCaml int.
+     arbitrary:
+     +-----------+--------+-+
+     |  payload  |  size  |1|
+     +-----------+--------+-+
+      size+15  15 14     1 0
 
-    The performance overhead is minimal, especially since no
-    allocations are done anymore.
 
-    Speaking of the sign. I would propose to remove it from the
-    bitvector, as sign is not a property of a bitvector, it is its
-    interpretation.
+     special(x):
+     +-----------+--------+-+
+     |   size    |    x   |1|
+     +-----------+--------+-+
+      28       15 14     1 0
 
-    Removing the sign will get us extra memory and CPU efficiency.
+
+   where the [type] field has the following encoding:
+     - 00: bool (1-bit vector)
+     - 01: int8 (8-bit vector)
+     - 10: int32 (32-bit vector)
+     - 11: int64 (64-bit vector)
+
+   and x = {0,1,8,32,64}
+
+   The detailed semanitcs of [x] in special(x) is yet to be defined,
+   but it is guaranteed that any operation on a special value will
+   produce a special value.
+
+
+   Note: this representation has a notable feature - the [false]
+   value is denoted by all zeros.
 *)
 module Bignum = Z
 type t = Bignum.t
 
-type endian = LittleEndian | BigEndian
+let maxlen = (1 lsl 14) - 1
 
-let metasize = 15
-let lenoff   = 1
-let lensize  = metasize - 1
-let maxlen   = 1 lsl lensize
+let is_ordinary = Z.is_even
 
-let meta x = Z.extract x 0 (metasize - 1)
-let is_signed = Z.is_odd
-let bitwidth x = Z.extract x lenoff lensize |> Z.to_int
+let is_ordinary_size = function
+  | 1 | 8 | 32 | 64 -> true
+  | _ -> false
 
-let z x =
+let is_special x =
+  Z.is_odd x &&
+  let s = Z.to_int (Z.extract x 1 14) in
+  s = 0 || is_ordinary_size s
+
+let metasize x =
+  if is_ordinary x then 4
+  else if is_special x then 29 else 15
+
+let bitwidth x =
+  if is_ordinary x then match Z.to_int (Z.extract x 1 2) with
+    | 0b00 -> 1
+    | 0b01 -> 8
+    | 0b10 -> 32
+    | 0b11 -> 64
+    | _ -> assert false
+  else
+    let s = Z.to_int (Z.extract x 1 14) in
+    if s = 0 || is_ordinary_size s
+    then Z.to_int (Z.extract x 15 14)
+    else s
+
+let meta x = Z.extract x 0 (metasize x)
+
+let payload ?(signed=false) x =
   let w = bitwidth x in
-  if is_signed x
-  then Z.signed_extract x metasize w
-  else Z.extract x metasize w
+  let meta = metasize x in
+  if signed
+  then Z.signed_extract x meta w
+  else Z.extract x meta w
 
-let signed x = Z.(x lor one)
-
-let with_z x v =
+let with_payload x v =
   let w = bitwidth x in
-  let v = Z.(extract v 0 w lsl metasize) in
+  let v = Z.(extract v 0 w lsl metasize x) in
   Z.(v lor meta x)
 
-let create z w =
-  if w > maxlen
+let z = payload
+let with_z = with_payload
+
+let pack data dbits meta mbits  =
+  let data = Z.extract data 0 dbits in
+  Z.((data lsl mbits) lor meta)
+
+let create data width =
+  if width > maxlen
   then invalid_arg @@
     "Bitvector.create: Overflow, the maximum number of bits is "
     ^ string_of_int maxlen ;
-  if w <= 0
+  if width <= 0
   then invalid_arg "A nonpositive width is specified (%s,%d)";
-  let meta = Z.(of_int w lsl 1) in
-  let z = Z.(extract z 0 w lsl metasize) in
-  Z.(z lor meta)
+  match width with
+  | 01 -> pack data width (Z.of_int 0b00) 3
+  | 08 -> pack data width (Z.of_int 0b01) 3
+  | 32 -> pack data width (Z.of_int 0b10) 3
+  | 64 -> pack data width (Z.of_int 0b11) 3
+  | _ ->  pack data width (Z.of_int width) 15
 
 let unsigned x = create (z x) (bitwidth x)
 let hash x = Z.hash (z x)
@@ -198,10 +258,9 @@ let reversed_string s = match String.length s with
   | 0 | 1 -> s
   | n -> String.init n (fun p -> s.[n - p - 1])
 
-let of_binary ?width endian num  =
-  let num = match endian with
-    | LittleEndian -> num
-    | BigEndian -> reversed_string num in
+let of_binary ?width ?(reversed=false) num  =
+  (* Zarith's of_bits always interpret bytes in little endian *)
+  let num = if reversed then num else reversed_string num in
   let w = match width with
     | Some w -> w
     | None -> String.length num * 8 in
