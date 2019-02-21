@@ -111,6 +111,16 @@ module Simpl = struct
     run
 end
 
+
+let vars = Semantics.declare
+    ~name:"exps"
+    (module Domain.Map.Make(Exp)(Bap.Std.Var))
+
+let available_exps = Knowledge.declare
+    ~name:"available-expressions"
+    vars
+
+
 module Basic : Theory.Basic = struct
   open Knowledge.Syntax
 
@@ -126,16 +136,22 @@ module Basic : Theory.Basic = struct
     let (%:) e s = v s e
 
 
-    let exp s x = ret @@ Some x %: s
-    let bit x = ret @@ Some (simpl 1 x) %: bool
-    let mem s v = ret @@ Some v %: s
-    let vec s v = ret @@ Some (simpl (Bits.size s) v) %: s
+    let opt s x =
+      Knowledge.collect available_exps Label.root >>= fun exps ->
+      match Map.find exps x with
+      | Some v -> ret @@ Some (Var v) %: s
+      | None -> ret @@ Some x %: s
 
-    let gen s v = ret @@ match Bool.cast s with
-      | Some _ -> Some (simpl 1 v) %: s
+    let exp s x = opt s x
+    let bit x = opt bool (simpl 1 x)
+    let mem s v = opt s v
+    let vec s v = opt s (simpl (Bits.size s) v)
+
+    let gen s v = match Bool.cast s with
+      | Some _ -> opt s (simpl 1 v)
       | None -> match Bits.cast s with
-        | None -> Some v %:s
-        | Some b -> Some (simpl (Bits.size b) v) %: s
+        | None -> opt s v
+        | Some b -> opt s (simpl (Bits.size b) v)
 
     let unk s = ret @@ match Bool.cast s with
       | Some _ -> Some (Bil.unknown "bits" bool_t) %: s
@@ -446,17 +462,40 @@ module Basic : Theory.Basic = struct
 
     let recursive_simpl = Exp.simpl ~ignore:Bap.Std.Eff.[load;store;read]
 
+    let with_nontrivial exp f = match exp with
+      | Some (Bil.Int _) | None -> Knowledge.return ()
+      | Some exp -> f exp
+
+    let make_available v rhs = with_nontrivial rhs @@ fun rhs ->
+      Knowledge.collect available_exps Label.root >>= fun map ->
+      Knowledge.provide available_exps Label.root @@
+      Map.set map ~key:rhs ~data:v
+
+    let make_unavailable rhs = with_nontrivial rhs @@ fun rhs ->
+      Knowledge.collect available_exps Label.root >>= fun map ->
+      Knowledge.provide available_exps Label.root @@
+      Map.remove map rhs
+
+    (* invariant: each non-trivial expression is bound only once *)
     let let_ var rhs body =
       match reify_to_var var with
       | None -> body >>-> fun sort _ -> unk sort
       | Some v ->
         rhs >>-> fun _ rhs ->
+        Knowledge.collect available_exps Label.root >>= fun exps ->
+        make_available v rhs >>= fun () ->
         body >>-> fun bs body ->
+        make_unavailable rhs >>= fun () ->
         match rhs, body with
         | Some ((Int _) as rhs), Some body ->
           exp bs @@ recursive_simpl @@ Let (v,rhs,body)
-        | Some rhs, Some body -> gen bs @@ Let (v,rhs,body)
-        | _,_ -> unk bs
+        | None,_ | _,None -> unk bs
+        | Some rhs, Some body ->
+          match Map.find exps rhs with
+          | None -> gen bs @@ Let (v,rhs,body)
+          | Some v' when V.equal v v' -> gen bs @@ body
+          | Some v' ->
+            gen bs @@ Exp.substitute (Var v) (Var v') body
 
     let set var rhs =
       rhs >>-> fun _ rhs ->
