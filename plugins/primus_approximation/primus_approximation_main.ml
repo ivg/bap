@@ -193,6 +193,7 @@ module Horner
     sum (rank-1) coefs.(rank)
 
   let build func var coefs =
+    printf "inside build";
     let size = size_of_var var in
     let fsort = IEEE754.Sort.define (IEEE754.binary size |> Option.value_exn) in
     let float_create = make_float_value fsort in
@@ -218,6 +219,7 @@ module Approximate(Machine : Primus.Machine.S) = struct
 
   [@@@warning "-P"]
   let run [name; size; x;] =
+    info "Running approximation";
     let open Machine.Syntax in
     let size = int_of_value size in
     Value.Symbol.of_value name >>= fun name ->
@@ -249,6 +251,7 @@ module Main(Machine : Primus.Machine.S) = struct
     Lisp.define ~types name closure
 
   let init () =
+    info "Initialize approximation";
     Machine.sequence [
       def "approximate" (tuple [sym; int; int] @-> int) (module Approximate);
     ]
