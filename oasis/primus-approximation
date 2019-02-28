@@ -2,7 +2,6 @@ Flag primus_approximation
   Description: Build Primus Math Approximation Framework
   Default: false
 
-
 Library primus_approximation_library_plugin
   Build$:       flag(everything) || flag(primus_approximation)
   Path:         plugins/primus_approximation
