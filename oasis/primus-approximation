@@ -1,0 +1,15 @@
+Flag primus_approximation
+  Description: Build Primus Math Approximation Framework
+  Default: false
+
+
+Library primus_approximation_library_plugin
+  Build$:       flag(everything) || flag(primus_approximation)
+  Path:         plugins/primus_approximation
+  BuildDepends: bap-core-theory, monads, bap-knowledge, core_kernel, bap, bap-primus
+  FindlibName:     bap-plugin-primus_approximation
+  CompiledObject:  best
+  InternalModules: Primus_approximation_main
+  XMETADescription: Primus Math Approximation
+  DataFiles:        lisp/*.lisp ($primus_approximation_lisp_path)
+  XMETAExtraLines:  tags="primus, lisp"
