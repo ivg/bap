@@ -407,3 +407,10 @@ int posix_spawnp(pid_t *pid, const char *file,
                  const void *file_actions,
                  const void *attrp,
                  char *const argv[], char *const envp[]);
+
+// math
+
+double sin(double x);
+double cos(double x);
+double sqrt(double x);
+
