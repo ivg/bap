@@ -18,6 +18,18 @@ type dsts = {
   resolved : Set.M(Addr).t;
 }
 
+let trace_leave,trace_enter =
+  let points = Hashtbl.create (module String) in
+  let leave point =
+    let time = Hashtbl.find_exn points point in
+    let time_elapsed = Unix.gettimeofday () -. time in
+    Format.eprintf "%8g: %s@\n"
+      (Float.round (time_elapsed *. 1e3)) point in
+  let enter point =
+    Hashtbl.add_exn points point (Unix.gettimeofday ()) in
+  leave,enter
+
+
 module Machine : sig
   type task = private
     | Dest of {dst : addr; parent : task option}
@@ -26,17 +38,16 @@ module Machine : sig
   and slot = private
     | Ready of task option
     | Delay
-
   type state = private {
     stop : bool;
     work : task list;           (* work list*)
     curr : task;
     addr : addr;                (* current address *)
-    begs : Set.M(Addr).t;       (* begins of basic blocks *)
-    jmps : dsts Map.M(Addr).t;  (* jumps  *)
-    code : Set.M(Addr).t;       (* all valid instructions *)
-    data : Set.M(Addr).t;       (* all non-instructions *)
-    usat : Set.M(Addr).t;       (* unsatisfied constraints *)
+    begs : Hash_set.M(Addr).t;       (* begins of basic blocks *)
+    jmps : dsts Hashtbl.M(Addr).t;  (* jumps  *)
+    code : Hash_set.M(Addr).t;       (* all valid instructions *)
+    data : Hash_set.M(Addr).t;       (* all non-instructions *)
+    usat : Hash_set.M(Addr).t;       (* unsatisfied constraints *)
   }
 
   val start :
@@ -57,7 +68,6 @@ module Machine : sig
   val moved  : state -> mem -> state
   val is_ready : state -> bool
 end = struct
-
   type task =
     | Dest of {dst : addr; parent : task option}
     | Fall of {dst : addr; parent : task; delay : slot}
@@ -77,36 +87,35 @@ end = struct
     work : task list;           (* work list*)
     curr : task;
     addr : addr;                (* current address *)
-    begs : Set.M(Addr).t;       (* begins of basic blocks *)
-    jmps : dsts Map.M(Addr).t;  (* jumps  *)
-    code : Set.M(Addr).t;       (* all valid instructions *)
-    data : Set.M(Addr).t;       (* all non-instructions *)
-    usat : Set.M(Addr).t;       (* unsatisfied constraints *)
+    begs : Hash_set.M(Addr).t;       (* begins of basic blocks *)
+    jmps : dsts Hashtbl.M(Addr).t;  (* jumps  *)
+    code : Hash_set.M(Addr).t;       (* all valid instructions *)
+    data : Hash_set.M(Addr).t;       (* all non-instructions *)
+    usat : Hash_set.M(Addr).t;       (* unsatisfied constraints *)
   }
 
-  let is_code s addr = Set.mem s.code addr
-  let is_data s addr = Set.mem s.data addr
+  let is_code s addr = Hash_set.mem s.code addr
+  let is_data s addr = Hash_set.mem s.data addr
   let is_visited s addr = is_code s addr || is_data s addr
   let is_ready s = s.stop
 
-
-  let mark_data s addr = {
-    s with
-    data = Set.add s.data addr;
-    begs = Set.remove s.begs addr;
-    usat = Set.remove s.usat addr;
-    code = Set.remove s.code addr;
-    jmps = Map.filter_map (Map.remove s.jmps addr) ~f:(fun dsts ->
+  let mark_data s addr =
+    Hash_set.add s.data addr;
+    Hash_set.remove s.begs addr;
+    Hash_set.remove s.usat addr;
+    Hash_set.remove s.code addr;
+    Hashtbl.remove s.jmps addr;
+    Hashtbl.filter_map_inplace s.jmps ~f:(fun dsts ->
         let resolved = Set.remove dsts.resolved addr in
         if Set.is_empty resolved && not dsts.indirect
         then None
         else Some {dsts with resolved});
-  }
+    s
 
   let has_valid s dsts =
     dsts.indirect ||
     Set.exists dsts.resolved ~f:(fun dst ->
-        not (Set.mem s.data dst))
+        not (Hash_set.mem s.data dst))
 
   let pp_task ppf = function
     | Dest {dst; parent=None} ->
@@ -130,31 +139,43 @@ end = struct
         | Fall _ | Dest _ -> cancel parent (mark_data s src)
         | Jump _ -> assert false
 
+  let min_elt_exn xs =
+    match Hash_set.min_elt xs ~compare:Addr.compare with
+    | None -> assert false
+    | Some x -> x
+
   let rec step s = match s.work with
     | [] ->
-      if Set.is_empty s.usat then {s with stop = true}
+      if Hash_set.is_empty s.usat then {s with stop = true}
       else step {s with work = [
-          Dest {dst=Set.min_elt_exn s.usat; parent=None}
+          Dest {dst=min_elt_exn s.usat; parent=None}
         ]}
     | Dest {dst=next} as curr :: work ->
       let s = if is_data s next
         then step @@ cancel curr {s with work}
-        else {s with begs = Set.add s.begs next} in
+        else begin
+          Hash_set.add s.begs next;
+          s
+        end in
       if is_visited s next then step {s with work}
       else {s with work; addr=next; curr}
     | Fall {dst=next} as curr :: work ->
       if is_code s next
-      then step {s with begs = Set.add s.begs next; work}
+      then step begin
+          Hash_set.add s.begs next;
+          {s with work}
+        end
       else if is_data s next then step @@ cancel curr {s with work}
       else {s with work; addr=next; curr}
     | (Jump {src; dsts} as jump) :: ([] as work)
     | (Jump {src; dsts; age=0} as jump) :: work ->
-      if Set.mem s.data src then step @@ cancel jump {s with work}
+      if Hash_set.mem s.data src then step @@ cancel jump {s with work}
       else
         let resolved = Set.filter dsts.resolved ~f:(fun dst ->
-            not (Set.mem s.data dst)) in
+            not (Hash_set.mem s.data dst)) in
         let dsts = {dsts with resolved} in
-        let init = {s with jmps = Map.add_exn s.jmps src dsts; work} in
+        let () = Hashtbl.add_exn s.jmps src dsts in
+        let init = {s with work} in
         step @@
         Set.fold resolved ~init ~f:(fun s next ->
             if not (is_visited s next)
@@ -174,10 +195,10 @@ end = struct
       }
 
   let decoded s mem =
-    let addr = Memory.min_addr mem in {
-      s with code = Set.add s.code addr;
-             usat = Set.remove s.usat addr
-    }
+    let addr = Memory.min_addr mem in
+    Hash_set.add s.code addr;
+    Hash_set.remove s.usat addr;
+    s
 
   let jumped s mem dsts delay =
     let s = decoded s mem in
@@ -225,19 +246,23 @@ end = struct
       | [] -> empty (step s)
       | _  -> view (step s) base ~empty ~ready
 
+  let hash_of_set s =
+    Set.to_list s |>
+    Hash_set.of_list (module Addr)
+
   let start mem ~code ~data ~init =
     let work = init_work init in
     let start = match Set.min_elt init with
       | Some start -> start
       | None -> Memory.min_addr mem in
     view {
-      work; data; usat=code;
+      work; data = hash_of_set data; usat=hash_of_set code;
       addr = start;
       curr = Dest {dst = start; parent = None};
       stop = false;
-      begs = Set.empty (module Addr);
-      jmps = Map.empty (module Addr);
-      code = Set.empty (module Addr);
+      begs = Hash_set.create (module Addr) ();
+      jmps = Hashtbl.create (module Addr);
+      code = Hash_set.create (module Addr) ();
     } mem
 end
 
@@ -298,7 +323,9 @@ let classify_mem mem =
         | _ -> (code,data,root))
 
 let scan_mem arch disasm base : Machine.state KB.t =
+  trace_enter "classify-mem";
   classify_mem base >>= fun (code,data,init) ->
+  trace_leave "classify-mem";
   let step d s =
     if Machine.is_ready s then KB.return s
     else Machine.view s base ~ready:(fun s mem -> Dis.jump d mem s)
@@ -339,6 +366,14 @@ let query_arch addr =
   KB.provide Theory.Label.addr obj (Some addr) >>= fun () ->
   KB.collect Arch.slot obj
 
+let set_of_hash s =
+  Hash_set.to_list s |>
+  Set.of_list (module Addr)
+
+let map_of_hash s =
+  Hashtbl.to_alist s |>
+  Map.of_alist_exn (module Addr)
+
 let scan mem s =
   let open KB.Syntax in
   let start = Word.to_bitvec (Memory.min_addr mem) in
@@ -348,6 +383,9 @@ let scan mem s =
     | Error _ -> KB.return s
     | Ok dis ->
       scan_mem arch dis mem >>| fun {Machine.begs; jmps; data} ->
+      let begs = set_of_hash begs
+      and data = set_of_hash data
+      and jmps = map_of_hash jmps in
       let jmps = Map.merge s.jmps jmps ~f:(fun ~key:_ -> function
           | `Left dsts | `Right dsts | `Both (_,dsts) -> Some dsts) in
       let begs = Set.union s.begs begs in
