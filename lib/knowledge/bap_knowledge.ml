@@ -1,6 +1,22 @@
 open Core_kernel
 open Monads.Std
 
+
+let trace_leave,trace_enter =
+  let points = Hashtbl.create (module String) in
+  let leave point =
+    let time,total = Hashtbl.find_exn points point in
+    let time_elapsed = Unix.gettimeofday () -. time in
+    Hashtbl.set points point (0.0, total +. time_elapsed);
+    Format.eprintf "%8g: %s@\n"
+      (Float.round (total *. 1e3)) point in
+  let enter point =
+    let time = Unix.gettimeofday () in
+    Hashtbl.update points point ~f:(function
+        | None -> (time,0.)
+        | Some (_,total) -> (time,total)) in
+  leave,enter
+
 module Order = struct
   type partial = LT | EQ | GT | NC
   module type S = sig
@@ -369,10 +385,14 @@ module Domain = struct
 
   exception Join of string * Sexp.t * Sexp.t [@@deriving sexp_of]
 
-  let make_join name inspect order x y = match order x y with
-    | Order.GT -> Ok x
-    | EQ | LT -> Ok y
-    | NC -> Error (Join (name, inspect x, inspect y))
+  let make_join name inspect order x y =
+    trace_enter ("domain-order/"^name);
+    let res = match order x y with
+      | Order.GT -> Ok x
+      | EQ | LT -> Ok y
+      | NC -> Error (Join (name, inspect x, inspect y)) in
+    trace_leave("domain-order/"^name);
+    res
 
 
   let define ?(inspect=sexp_of_opaque) ?join ~empty ~order name = {
@@ -698,19 +718,15 @@ module Class = struct
 end
 
 module Record = struct
-  module Dict = Univ_map
-  type  t = Dict.t
-  module Repr = struct
-    type entry = {
-      name : string;
-      data : string;
-    } [@@deriving bin_io]
+  type 'a key = 'a Univ_map.Key.t
+  type univ = Univ_map.Packed.t = T : 'a key * 'a -> univ
+  type data = univ Array.t
+  type record = {
+    cname : string;
+    slots : data;
+  }
 
-    type t = entry list [@@deriving bin_io]
-  end
-
-  type univ = Dict.Packed.t
-
+  type t = record
 
   type slot_io = {
     reader : string -> univ;
@@ -722,7 +738,11 @@ module Record = struct
     order : univ -> univ -> Order.partial;
     join : univ -> univ -> (univ,conflict) result;
     empty  : univ;
+    pos : int;
   }
+
+  let default : data Hashtbl.M(String).t =
+    Hashtbl.create (module String)
 
   let io : slot_io Hashtbl.M(String).t =
     Hashtbl.create (module String)
@@ -730,139 +750,220 @@ module Record = struct
   let domains : slot_domain Hashtbl.M(String).t =
     Hashtbl.create (module String)
 
-  let empty = Dict.empty
 
-  let (<:=) x y =
-    Dict.to_alist x |> List.for_all ~f:(fun (Dict.Packed.T (k,_) as x) ->
-        match Dict.find y k with
-        | None -> false
-        | Some y ->
-          let dom = Hashtbl.find_exn domains (Dict.Key.name k) in
-          match dom.order x (Dict.Packed.T (k,y)) with
-          | LT | EQ -> true
-          | GT | NC -> false)
-
-  let order : t -> t -> Order.partial = fun x y ->
-    match x <:= y, y <:= x with
-    | true,false  -> LT
-    | true,true   -> EQ
-    | false,true  -> GT
-    | false,false -> NC
-
+  let pack k v = Univ_map.Packed.T (k,v)
   let eq = Type_equal.Id.same_witness_exn
 
-  let commit (type p) (key : p Dict.Key.t) v x =
-    match Dict.find v key with
-    | None -> Ok (Dict.set v key x)
-    | Some y ->
-      let dom = Hashtbl.find_exn domains (Dict.Key.name key) in
-      let pack v = Dict.Packed.T (key,v) in
-      match dom.join (pack y) (pack x) with
-      | Ok (Dict.Packed.T (k,x)) ->
-        let Type_equal.T = eq key k in
-        Ok (Dict.set v key x)
-      | Error err -> Error err
+  let register_slot
+    : string -> 'p key -> 'p Domain.t -> unit =
+    fun cls key dom ->
+    let empty = pack key dom.empty in
+    Hashtbl.update default cls ~f:(function
+        | None -> Array.init 1 (fun _ -> empty)
+        | Some base ->
+          let n = Array.length base in
+          Array.init (n + 1) ~f:(fun i ->
+              if i < n then base.(i)
+              else empty))
 
-  let put key v x = Dict.set v key x
-  let get key {Domain.empty} data = match Dict.find data key with
-    | None -> empty
-    | Some x -> x
+  let slots_in_record name =
+    Hashtbl.find_and_call default name
+      ~if_found:Array.length
+      ~if_not_found:(fun _ -> 0)
 
-  let find key v = Dict.find v key
+  let key_name = Univ_map.Key.name
+  let slot_name (T (k,_)) = key_name k
+  let domain v =
+    Hashtbl.find_exn domains (slot_name v)
 
+  let empty cname = {cname; slots=[||]}
+
+  let fold =
+    let rec loop x m i acc f =
+      if i < m then loop x m (i+1) (f acc x.(i)) f
+      else acc in
+    fun x ~init ~f -> loop x (Array.length x) 0 init f
+
+  let fold2 =
+    let rec loop2 x y m n i acc f =
+      let x_ok = i < m and y_ok = i < n in
+      if x_ok && y_ok
+      then loop2 x y m n (i+1) (f acc x.(i) y.(i)) f
+      else if x_ok
+      then loop2 x y m n (i+1) (f acc x.(i) (domain x.(i)).empty) f
+      else if y_ok
+      then loop2 x y m n (i+1) (f acc (domain y.(i)).empty y.(i)) f
+      else acc in
+    fun x y ~init ~f ->
+      loop2 x y (Array.length x) (Array.length y) 0 init f
+
+  let order x y : Order.partial =
+    let open Order in
+    fold2 x.slots y.slots ~init:EQ ~f:(fun eq x y ->
+        match eq with
+        | NC -> NC
+        | _ -> match eq, (domain x).order x y with
+          | LT,GT | GT,LT -> NC
+          | _,x -> x)
+
+  let put pos v x =
+    let m = Array.length v.slots in
+    let init = empty v.cname in
+    {
+      v with
+      slots = Array.init (Array.length init.slots) ~f:(fun i ->
+          if i = pos then x
+          else if i < m then v.slots.(i)
+          else init.slots.(i))
+    }
+
+  let commit (type p) pos (key : p key) v x =
+    let dom = Hashtbl.find_exn domains (key_name key) in
+    let old = if pos < Array.length v.slots then v.slots.(pos)
+      else dom.empty in
+    match dom.join old (pack key x) with
+    | Ok x -> Ok (put pos v x)
+    | Error err -> Error err
+
+  let commit p k v x =
+    trace_enter ("record-commit/"^key_name k);
+    let r = commit p k v x in
+    trace_leave ("record-commit/"^key_name k);
+    r
+
+  let put pos key v x = put pos v (pack key x)
+  let get (type a) pos (key : a key) (dom : a Domain.t) v : a =
+    if pos < Array.length v.slots
+    then
+      let T (k,x) = v.slots.(pos) in
+      let Type_equal.T = eq k key in
+      x
+    else dom.empty
 
   exception Merge_conflict of conflict
 
   let merge ~on_conflict x y =
-    Dict.to_alist x |>
-    List.fold ~init:y ~f:(fun v (Dict.Packed.T (k,x)) ->
-        Dict.change v k ~f:(function
-            | None -> Some x
-            | Some y ->
-              let name = Dict.Key.name k in
-              let pack v = Dict.Packed.T (k,v) in
-              let dom = Hashtbl.find_exn domains name in
-              match dom.join (pack x) (pack y) with
-              | Ok (Dict.Packed.T (k',x)) ->
-                let Type_equal.T = eq k k' in
-                Some x
-              | Error err -> match on_conflict with
-                | `drop_both -> None
-                | `drop_left -> Some y
-                | `drop_right -> Some x
-                | `fail ->
-                  raise (Merge_conflict err)))
+    let empty = empty x.cname
+    and m = Array.length x.slots
+    and n = Array.length y.slots in
+    {
+      x with
+      slots =
+        Array.init (Array.length empty.slots) ~f:(fun i ->
+            let dom = domain empty.slots.(i) in
+            let x = if i < m then x.slots.(i) else empty.slots.(i)
+            and y = if i < n then y.slots.(i) else empty.slots.(i) in
+            match dom.join x y with
+            | Ok x -> x
+            | Error err -> match on_conflict with
+              | `drop_both -> dom.empty
+              | `drop_left -> y
+              | `drop_right -> x
+              | `fail ->
+                raise (Merge_conflict err))
+    }
+
+
+  let merge ~on_conflict x y =
+    trace_enter "record-merge";
+    let r = merge ~on_conflict x y in
+    trace_leave "record-merge";
+    r
 
   let join x y =
     try Ok (merge ~on_conflict:`fail x y)
     with Merge_conflict err -> Error err
 
   let register_persistent (type p)
-      (key : p Dict.Key.t)
+      (key : p key)
       (p : p Persistent.t) =
-    let slot = Dict.Key.name key in
-    let writer (Dict.Packed.T (k,x)) =
+    let slot = key_name key in
+    let writer (T (k,x)) =
       match Type_equal.Id.same_witness k key with
       | Some Type_equal.T -> Persistent.to_string p x
       | None -> assert false in
     let reader s =
-      Dict.Packed.T (key,Persistent.of_string p s) in
+      T (key,Persistent.of_string p s) in
     Hashtbl.add_exn io ~key:slot ~data:{reader;writer}
 
-  include Binable.Of_binable(Repr)(struct
-      type t = Dict.t
-      let to_binable s =
-        Dict.to_alist s |>
-        List.rev_filter_map ~f:(fun (Dict.Packed.T(k,_) as x) ->
-            let name = Dict.Key.name k in
-            match Hashtbl.find io name with
-            | None -> None
-            | Some {writer=to_string} ->
-              Some Repr.{name; data = to_string x;})
+  module Repr = struct
+    type entry = {
+      name : string;
+      data : string;
+    } [@@deriving bin_io]
 
-      let of_binable entries =
-        List.fold entries ~init:Dict.empty ~f:(fun s {Repr.name; data} ->
-            match Hashtbl.find io name with
-            | None -> s
-            | Some {reader=parse} ->
-              let Dict.Packed.T (key,data) = parse data in
-              Dict.set s key data)
+    type t = {
+      cname : string;
+      slots : entry list
+    } [@@deriving bin_io]
+  end
+
+  exception Missing_class of string
+
+  include Binable.Of_binable(Repr)(struct
+      type t = record
+      let to_binable : record -> Repr.t = fun {cname; slots} -> {
+          cname;
+          slots = fold slots ~init:[] ~f:(fun xs x ->
+              let name = slot_name x in
+              match Hashtbl.find io name with
+              | None -> xs
+              | Some {writer=to_string} ->
+                Repr.{name; data = to_string x} :: xs)
+        }
+
+      let of_binable : Repr.t -> record = fun {cname; slots} ->
+        match Hashtbl.find default cname with
+        | None -> raise (Missing_class cname)
+        | Some xs ->
+          let xs = Array.copy xs in
+          List.iter slots ~f:(fun {Repr.name; data} ->
+              match Hashtbl.find domains name with
+              | None -> ()
+              | Some {pos} -> match Hashtbl.find io name with
+                | None -> ()
+                | Some {reader=parse} ->
+                  xs.(pos) <- parse data);
+          {cname; slots=xs}
     end)
 
   let register_domain
-    : type p. p Dict.Key.t -> p Domain.t -> unit =
-    fun key dom ->
-    let name = Dict.Key.name key in
-    let order (Dict.Packed.T (kx,x)) (Dict.Packed.T (ky,y)) =
+    : type p. string -> p key -> p Domain.t -> unit =
+    fun cls key dom ->
+    let name = key_name key in
+    let order (T (kx,x)) (T (ky,y)) =
       let Type_equal.T = eq kx ky in
       let Type_equal.T = eq kx key in
       dom.order x y in
-    let empty = Dict.Packed.T(key, dom.empty) in
-    let inspect (Dict.Packed.T(kx,x)) =
+    let empty = T (key, dom.empty) in
+    let inspect (T (kx,x)) =
       let Type_equal.T = eq kx key in
       dom.inspect x in
-    let join (Dict.Packed.T (kx,x)) (Dict.Packed.T (ky,y)) =
+    let join (T (kx,x)) (T (ky,y)) =
       let Type_equal.T = eq kx key in
       let Type_equal.T = eq ky key in
       match dom.join x y with
-      | Ok x -> Ok (Dict.Packed.T (key, x))
+      | Ok x -> Ok (T (key, x))
       | Error err -> Error err in
+    register_slot cls key dom;
+    let pos = slots_in_record cls - 1 in
     Hashtbl.add_exn domains ~key:name ~data:{
       inspect;
       empty;
       order;
       join;
+      pos;
     }
 
-  let sexp_of_t x =
-    Sexp.List (Dict.to_alist x |> List.map ~f:(function
-          Dict.Packed.T (k,x) ->
-          let name = Dict.Key.name k in
-          let dom = Hashtbl.find_exn domains name in
-          Sexp.List [
-            Atom name;
-            dom.inspect (Dict.Packed.T(k,x));
-          ]))
+  let sexp_of_slots =
+    sexp_of_array @@ fun x ->
+    (domain x).inspect x
+
+  let sexp_of_t {cname} =
+    Sexp.List [
+      Sexp.Atom cname;
+      (* sexp_of_slots slots; *)
+    ]
 
   let t_of_sexp = opaque_of_sexp
 
@@ -968,10 +1069,13 @@ module Knowledge = struct
       pid : pid;
     }
 
+    type 'p key = 'p Type_equal.Id.t
+
     type (+'a,'p) t = {
       cls : 'a Class.t;
       dom : 'p Domain.t;
-      key : 'p Type_equal.Id.t;
+      key : 'p key;
+      pos : int;
       name : string;
       desc : string option;
       promises : (pid, 'p promise) Hashtbl.t;
@@ -985,16 +1089,20 @@ module Knowledge = struct
           | None -> [Pack slot]
           | Some xs -> Pack slot :: xs)
 
+
+
     let enum {Class.id} = Hashtbl.find_multi repository id
 
     let declare ?desc ?persistent ?package cls name (dom : 'a Domain.t) =
       let slot = Registry.add_slot ?desc ?package name in
       let name = string_of_fname slot in
+      let cname = Class.fullname cls in
       let key = Type_equal.Id.create ~name dom.inspect in
       Option.iter persistent (Record.register_persistent key);
-      Record.register_domain key dom;
+      Record.register_domain cname key dom;
+      let slots = Record.slots_in_record cname in
       let promises = Hashtbl.create (module Pid) in
-      let slot = {cls; dom; key; name; desc; promises} in
+      let slot = {cls; dom; key; name; desc; promises; pos=slots-1} in
       register slot;
       slot
 
@@ -1019,18 +1127,19 @@ module Knowledge = struct
       fun () -> Int63.incr current; !current
 
     let empty cls =
-      {cls; data=Record.empty; time = next_second ()}
+      let data = Record.empty (Class.fullname cls) in
+      {cls; data; time = next_second ()}
 
     let order {data=x} {data=y} = Record.order x y
 
     let clone cls {data; time} = {cls; data; time}
     let cls {cls} = cls
     let create cls data = {cls; data; time = next_second ()}
-    let put {Slot.key} v x = {
-      v with data = Record.put key v.data x;
+    let put {Slot.pos; key} v x = {
+      v with data = Record.put pos key v.data x;
              time = next_second ()
     }
-    let get {Slot.key; dom} {data} = Record.get key dom data
+    let get {Slot.pos; key; dom} {data} = Record.get pos key dom data
     let strip
       : type a b. (a value, b value) Type_equal.t -> (a,b) Type_equal.t =
       fun T -> T
@@ -1134,12 +1243,23 @@ module Knowledge = struct
         try put {
             s with classes = Map.set classes ~key:slot.cls.id ~data:{
             objs with vals = Map.update vals obj ~f:(function
-            | None -> Record.(put slot.key empty x)
-            | Some v -> match Record.commit slot.key v x with
+            | None ->
+              let empty = Record.empty (Class.fullname slot.cls) in
+              Record.put slot.pos slot.key empty x
+            | Some v -> match Record.commit slot.pos slot.key v x with
               | Ok r -> r
               | Error err -> raise (Record.Merge_conflict err))}}
         with Record.Merge_conflict err ->
           Knowledge.fail (Non_monotonic_update (Slot.name slot, err))
+
+  let provide : type a p. (a,p) slot -> a obj -> p -> unit Knowledge.t =
+    fun slot obj x ->
+    trace_enter ("provide/"^slot.name);
+    provide slot obj x >>= fun () ->
+    trace_leave ("provide/"^slot.name);
+    Knowledge.return ()
+
+
 
   let pids = ref Pid.zero
 
@@ -1236,7 +1356,7 @@ module Knowledge = struct
     objects slot.cls >>| fun {Env.vals} ->
     match Map.find vals id with
     | None -> slot.dom.empty
-    | Some v -> Record.get slot.key slot.dom v
+    | Some v -> Record.get slot.pos slot.key slot.dom v
 
   let rec collect_inner
     : ('a,'p) slot -> 'a obj -> _ -> _ =
@@ -1272,6 +1392,14 @@ module Knowledge = struct
       current slot id
 
 
+  let collect : type a p. (a,p) slot -> a obj -> p Knowledge.t =
+    fun slot id ->
+    trace_enter ("collect/"^slot.name);
+    collect slot id >>= fun r ->
+    trace_leave ("collect/"^slot.name);
+    Knowledge.return r
+
+
   let resolve slot obj =
     collect slot obj >>| Opinions.choice
 
@@ -1287,21 +1415,23 @@ module Knowledge = struct
     type +'a t = 'a obj
     type 'a ord = Oid.comparator_witness
 
-    let with_new_object objs f = match Map.max_elt objs.Env.vals with
+    let with_new_object empty objs f = match Map.max_elt objs.Env.vals with
       | None -> f Oid.first_atom {
           objs
-          with vals = Map.singleton (module Oid) Oid.first_atom Record.empty
+          with vals =
+                 Map.singleton (module Oid) Oid.first_atom empty
         }
       | Some (key,_) ->
         let key = Oid.next key in
         f key {
           objs
-          with vals = Map.add_exn objs.vals ~key ~data:Record.empty
+          with vals = Map.add_exn objs.vals ~key ~data:empty
         }
 
     let create : 'a cls -> 'a obj Knowledge.t = fun cls ->
       objects cls >>= fun objs ->
-      with_new_object objs @@ fun obj objs ->
+      let empty = Record.empty (Class.fullname cls) in
+      with_new_object empty objs @@ fun obj objs ->
       update @@begin function {classes} as s -> {
           s with classes = Map.set classes ~key:cls.id ~data:objs
         }
@@ -1344,8 +1474,8 @@ module Knowledge = struct
             | None -> Set.singleton (module Oid) obj
             | Some pubs -> Set.add pubs obj)
           } in
-      let createsym ~public ~package name classes clsid objects s =
-        with_new_object objects @@ fun obj objects ->
+      let createsym ~public ~package empty name classes clsid objects s =
+        with_new_object empty objects @@ fun obj objects ->
         let syms = Map.set objects.syms obj {package; name} in
         let objs = Map.update objects.objs package ~f:(function
             | None -> Map.singleton (module String) name obj
@@ -1356,17 +1486,18 @@ module Knowledge = struct
         put {s with classes = Map.set classes clsid objects} >>| fun () ->
         obj in
 
-      fun ?(public=false) ?desc:_ ?package name {Class.id} ->
+      fun ?(public=false) ?desc:_ ?package name ({Class.id} as cls) ->
         get () >>= fun ({classes} as s) ->
         let package = Option.value package ~default:s.package in
         let name = normalize_name ~package name in
+        let empty = Record.empty (Class.fullname cls) in
         let objects = match Map.find classes id with
           | None -> Env.empty_class
           | Some objs -> objs in
         match Map.find objects.objs package with
-        | None -> createsym ~public ~package name classes id objects s
+        | None -> createsym ~public ~package empty name classes id objects s
         | Some names -> match Map.find names name with
-          | None -> createsym ~public ~package name classes id objects s
+          | None -> createsym ~public ~package empty name classes id objects s
           | Some obj when not public -> unchanged obj
           | Some obj ->
             if is_public ~package obj objects then unchanged obj
