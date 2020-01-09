@@ -1,0 +1,17 @@
+########### Ghidra Integration Plugin #############################
+
+Flag ida
+  Description: Build Ghidra integration plugin
+  Default: false
+
+Library bap_ghidra_plugin
+  Build$:           flag(everything) || flag(ghidra)
+  Path:             plugins/ghidra
+  FindlibName:      bap-plugin-ghidra
+  CompiledObject:   best
+  BuildDepends:     bap, core_kernel, ppx_jane, fileutils,
+                    bap-knowledge, regular, bap-future, bap-main
+  Modules:          Ghidra_main
+  InternalModules:  Bap_ghidra_config
+  XMETADescription: uses Ghidra to provide rooter, symbolizer, and reconstructor
+  XMETAExtraLines:  tags="ghidra, rooter, brancher, symbolizer, reconstructor"

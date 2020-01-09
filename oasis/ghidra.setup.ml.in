@@ -1,0 +1,2 @@
+let () =
+  add_variable ~doc:"A directory with Ghidra" "ghidra_path"
