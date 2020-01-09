@@ -1,0 +1,11 @@
+./configure \
+--enable-everything \
+--prefix=`opam config var prefix` \
+--disable-lisp \
+--disable-primus \
+--disable-primus-{dictionary,lisp,loader,support,region,test,x86,powerpc} \
+--disable-{taint,trace,traces,beagle,phoenix,piqi,run,microx,bare,callsites,constant-tracker,map-terms,report,symbol-reader,dump-symbols,cxxfilt,benchmarks,propagate-taint,fsi-benchmark,dwarf,warn-unused,cache,report,elf,trivial-condition-form,byteweight-frontend,language,strings,llvm-legacy,primus-machine} \
+--disable-ida \
+--disable-{powerpc,mips,arm} \
+--with-llvm-config=llvm-config-6.0 \
+--with-llvm-version=6.0
