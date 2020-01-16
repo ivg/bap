@@ -10,6 +10,8 @@ open Knowledge.Syntax
 open Theory.Parser
 include Self()
 
+let package = "bap.std"
+
 module Call = struct
   let prefix = "bil-fixup:"
   let extern name =
@@ -170,8 +172,8 @@ module BilParser = struct
       let n = Var.name v in
       match Var.typ v with
       | Unk ->
-         error "can't reify the variable %s: unknown type" (Var.name v);
-         S.error
+        error "can't reify the variable %s: unknown type" (Var.name v);
+        S.error
       | Imm 1 -> S.set_bit n x
       | Imm m -> S.set_reg n m x
       | Mem (ks,vs) ->
@@ -197,7 +199,12 @@ module Optimizer = Theory.Parser.Make(Bil_semantics.Core)
 
 
 let provide_bir () =
-  Knowledge.promise Theory.Program.Semantics.slot @@ fun obj ->
+  KB.Rule.(declare ~package "reify-ir" |>
+           require Theory.Program.Semantics.slot |>
+           require Bil_ir.slot |>
+           provide Theory.Program.Semantics.slot |>
+           comment "reifies IR");
+  KB.promise Theory.Program.Semantics.slot @@ fun obj ->
   KB.collect Theory.Program.Semantics.slot obj >>| fun sema ->
   let bir = Bil_ir.reify @@  KB.Value.get Bil_ir.slot sema in
   KB.Value.put Term.slot sema bir
@@ -384,6 +391,11 @@ let provide_lifter ~with_fp () =
       let bil = Insn.bil sema in
       KB.Value.merge ~on_conflict:`drop_left
         sema (Insn.of_basic ~bil insn) in
+  KB.Rule.(declare ~package "bil-semantics" |>
+           require Memory.slot |>
+           require Disasm_expert.Basic.Insn.slot |>
+           provide Theory.Program.Semantics.slot |>
+           comment "denotates BIL in the Core Theory terms");
   Knowledge.promise Theory.Program.Semantics.slot lifter
 
 
@@ -391,7 +403,7 @@ let init ~with_fp () =
   provide_lifter ~with_fp ();
   provide_bir ();
   Theory.declare !!(module Brancher : Theory.Core)
-    ~package:"bap.std" ~name:"jump-dests"
+    ~package ~name:"jump-dests"
     ~desc:"an approximation of jump destinations"
     ~provides:[
       "brancher";
