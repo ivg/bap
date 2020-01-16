@@ -108,15 +108,22 @@ let extract build disasm =
   Toplevel.get result
 
 
-let provide_arch arch mem =
-  let width = Size.in_bits (Arch.addr_size arch) in
-  KB.promise Arch.slot @@ fun label ->
-  KB.collect Theory.Label.addr label >>| function
-  | None -> `unknown
-  | Some p ->
-    let p = Word.create p width in
-    if Memory.contains mem p then arch
-    else `unknown
+
+let provide_arch =
+  KB.Rule.(declare ~package:"bap.std" "arch-for-mem" |>
+           dynamic ["arch"; "mem"] |>
+           require Theory.Label.addr |>
+           provide Arch.slot |>
+           comment "[Rec.run arch mem] provides [arch] for [mem]");
+  fun arch mem ->
+    let width = Size.in_bits (Arch.addr_size arch) in
+    KB.promise Arch.slot @@ fun label ->
+    KB.collect Theory.Label.addr label >>| function
+    | None -> `unknown
+    | Some p ->
+      let p = Word.create p width in
+      if Memory.contains mem p then arch
+      else `unknown
 
 let scan arch mem state =
   provide_arch arch mem;
