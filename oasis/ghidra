@@ -9,8 +9,10 @@ Library bap_ghidra_plugin
   Path:             plugins/ghidra
   FindlibName:      bap-plugin-ghidra
   CompiledObject:   best
-  BuildDepends:     bap, core_kernel, ppx_jane, fileutils,
-                    bap-knowledge, regular, bap-future, bap-main
+  BuildDepends:     bap, core_kernel, ppx_jane,
+                    bap-knowledge, bap-core-theory, uuidm, bap-main,
+                    bitvec, bitvec-order, bitvec-sexp, bitvec-binprot,
+                    fileutils
   Modules:          Ghidra_main
   InternalModules:  Bap_ghidra_config
   XMETADescription: uses Ghidra to provide rooter, symbolizer, and reconstructor

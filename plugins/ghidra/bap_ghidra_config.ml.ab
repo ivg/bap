@@ -1,1 +1,2 @@
 let ghidra_path = "$ghidra_path"
+let prefix_path = "$prefix"
