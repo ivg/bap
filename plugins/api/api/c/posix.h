@@ -407,3 +407,7 @@ int posix_spawnp(pid_t *pid, const char *file,
                  const void *file_actions,
                  const void *attrp,
                  char *const argv[], char *const envp[]);
+
+// errno.h
+
+int *__errno_location(void);
