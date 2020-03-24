@@ -152,13 +152,7 @@ let run level proj =
   let free = free_vars prog in
   Project.with_program proj @@
   Term.map sub_t prog ~f:(fun sub ->
-      let digest = digest_of_sub sub level in
-      let data = match O.Cache.load digest with
-        | Some data -> data
-        | None ->
-          let data = process_sub free can_touch sub in
-          O.Cache.save digest data;
-          data in
+      let data = process_sub free can_touch sub in
       O.apply sub data)
 
 let () =
