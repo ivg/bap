@@ -8641,8 +8641,18 @@ module Std : sig
         [let nil _ = Or_error.of_string "expected arch"]
 
         or it can just provide an empty information.
+
+        @param state if specified then the provided [state] will be
+        used as the initial state
+
+        @param package if specified, then all symbols during the
+        disassembly will be created (interned) in the specified package.
+
+        @since 2.0.0 the state parameter is added
+        @since 2.2.0 the package parameter is added
     *)
     val create :
+      ?package:string ->
       ?state:state ->
       ?disassembler:string ->
       ?brancher:brancher source ->
@@ -8655,6 +8665,7 @@ module Std : sig
     val arch : t -> arch
 
     val state : t -> state
+
 
     (** [disasm project] returns results of disassembling  *)
     val disasm : t -> disasm
