@@ -1,6 +1,5 @@
 open Bap.Std
 
-
 (** IA32 Architecture Registers.
 
     For simplicity we're using the same names for registers in
@@ -10,7 +9,6 @@ open Bap.Std
 *)
 module IA32 : sig
   include Bap.Std.CPU
-
 
   (** [flags] is a set of flag registers  *)
   val flags : Var.Set.t
@@ -43,10 +41,8 @@ module IA32 : sig
   val rdx : var
 
   (** YMM registers that are available *)
-  val ymms: var array
-
+  val ymms : var array
 end
-
 
 (** AMD64 registers  *)
 module AMD64 : sig

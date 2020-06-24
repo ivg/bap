@@ -4,8 +4,6 @@ open Bap_knowledge
 open Regular.Std
 open Bap_common
 open Bap_bil
-
-
 include Regular.S with type t := stmt
 
 val pp_stmts : Format.formatter -> stmt list -> unit
@@ -20,7 +18,7 @@ module Stmt : sig
 end
 
 module Infix : sig
-  val (:=) : var -> exp -> stmt
+  val ( := ) : var -> exp -> stmt
 end
 
 module Stmts_pp : Printable.S with type t = stmt list

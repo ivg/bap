@@ -2,9 +2,7 @@ open Bin_prot
 
 (** Provides serialization functions for the Binprot Protocol.*)
 
-
 include Binable.S with type t = Bitvec.t
-
 
 (** Same module, but functions only without the type.
 

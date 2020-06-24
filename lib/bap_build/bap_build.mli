@@ -1,6 +1,5 @@
 (** bapbuild implementation library *)
 
-
 (** bapbuild support library.
 
     Underneath the hood [bapbuild] is just a plugin to
@@ -25,7 +24,6 @@
 *)
 module Std : sig
   module Plugin_rules : sig
-
     (** [install ()] installs bap specific rules.
 
         The function installs rules necessary for building bap
@@ -34,8 +32,6 @@ module Std : sig
   end
 
   module Plugin_options : sig
-
-
     (** [set ()] set default options for [bapbuild].  *)
     val set : unit -> unit
   end

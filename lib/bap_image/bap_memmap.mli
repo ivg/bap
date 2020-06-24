@@ -9,10 +9,10 @@
     so that all operations are logarithmic.
 *)
 open Core_kernel
+
 open Bap_types.Std
 
 type mem = Bap_memory.t
-
 type 'a t [@@deriving sexp_of]
 
 (** [empty] map  *)
@@ -68,7 +68,6 @@ val contains : 'a t -> addr -> bool
     containing the [addr] *)
 val lookup : 'a t -> addr -> (mem * 'a) seq
 
-
 (** [map m f] returns a new map with each tag mapped
     with function [f] *)
 val map : 'a t -> f:('a -> 'b) -> 'b t
@@ -105,6 +104,5 @@ val remove_dominators : 'a t -> mem -> 'a t
 val to_sequence : 'a t -> (mem * 'a) Sequence.t
 
 include Container.S1 with type 'a t := 'a t
-
 
 val pp : (Format.formatter -> 'a -> unit) -> Format.formatter -> 'a t -> unit

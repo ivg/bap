@@ -14,22 +14,36 @@ module Make (CPU : X86CPU) : S = struct
 end
 
 module IA32CPU : X86CPU = struct
-  type regs = [
-    | `AL | `BL | `CL | `DL
-    | `AH | `BH | `CH | `DH
-    | `AX | `BX | `CX | `DX
-    | `DI | `SI | `BP | `SP
-    | `EAX | `EBX | `ECX | `EDX
-    | `EDI | `ESI | `EBP | `ESP
+  type regs =
+    [ `AL
+    | `BL
+    | `CL
+    | `DL
+    | `AH
+    | `BH
+    | `CH
+    | `DH
+    | `AX
+    | `BX
+    | `CX
+    | `DX
+    | `DI
+    | `SI
+    | `BP
+    | `SP
+    | `EAX
+    | `EBX
+    | `ECX
+    | `EDX
+    | `EDI
+    | `ESI
+    | `EBP
+    | `ESP
     | X86_asm.Reg.segment_base
-    | X86_asm.Reg.segment
-  ]
+    | X86_asm.Reg.segment ]
 
   let arch = `x86
-  let avaliable = function
-    | #regs -> true
-    | _ -> false
-
+  let avaliable = function #regs -> true | _ -> false
   let cf = X86_env.cf
   let pf = X86_env.pf
   let af = X86_env.af
@@ -45,10 +59,7 @@ module AMD64CPU : X86CPU = struct
   type regs = X86_asm.reg
 
   let arch = `x86_64
-  let avaliable = function
-    | #regs -> true
-    | _ -> false
-
+  let avaliable = function #regs -> true | _ -> false
   let cf = X86_env.cf
   let pf = X86_env.pf
   let af = X86_env.af
@@ -60,5 +71,5 @@ module AMD64CPU : X86CPU = struct
   include X86_env.R64
 end
 
-module IA32 = Make(IA32CPU)
-module AMD64 = Make(AMD64CPU)
+module IA32 = Make (IA32CPU)
+module AMD64 = Make (AMD64CPU)

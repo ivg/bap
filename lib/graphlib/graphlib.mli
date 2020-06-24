@@ -67,8 +67,12 @@ module Std : sig
     (** Semantics of operations is denoted using mathematical model,
         described in {!Graph} interface.  *)
 
-    type t                      (** node type is opaque  *)
+    (** node type is opaque  *)
+    type t
+
+    (** node type is opaque  *)
     type graph
+
     type label
     type edge
 
@@ -205,10 +209,9 @@ module Std : sig
           v}
     *)
     val remove : t -> graph -> graph
+
     include Opaque.S with type t := t
   end
-
-
 
   (** Graph signature.  *)
   module type Graph = sig
@@ -269,16 +272,13 @@ module Std : sig
     (** type of edges  *)
     type edge
 
-
     (** Graph nodes.  *)
-    module Node : Node with type graph = t
-                        and type t = node
-                        and type edge = edge
+    module Node :
+      Node with type graph = t and type t = node and type edge = edge
 
     (** Graph edges  *)
-    module Edge : Edge with type graph = t
-                        and type t = edge
-                        and type node = node
+    module Edge :
+      Edge with type graph = t and type t = edge and type node = node
 
     (** [empty] is an empty graph  *)
     val empty : t
@@ -309,19 +309,16 @@ module Std : sig
       interface.
       Note: this type prenexes only 3 out of 8 type variables, so,
       sometimes it is not enough. *)
-  type ('c,'n,'e) graph =
-    (module Graph with type t = 'c
-                   and type node = 'n
-                   and type edge = 'e)
+  type ('c, 'n, 'e) graph =
+    (module Graph with type t = 'c and type node = 'n and type edge = 'e)
 
   (** Graph edges classification.
       For explanations see {{!Graphlib.depth_first_search}DFS}.*)
-  type edge_kind = [
-    | `Tree                     (** edge is a part of a tree  *)
-    | `Back                     (** back edge   *)
-    | `Cross                    (** cross edge  *)
-    | `Forward                  (** forward edge  *)
-  ]
+  type edge_kind =
+    [ `Tree  (** edge is a part of a tree  *)
+    | `Back  (** back edge   *)
+    | `Cross  (** cross edge  *)
+    | `Forward  (** forward edge  *) ]
 
   (** a {!Tree} representation.  *)
   type 'a tree
@@ -420,7 +417,6 @@ module Std : sig
       This is used for representing dominance and post-dominance
       frontiers.  *)
   module Frontier : sig
-
     type 'a t = 'a frontier
 
     (** [enum f x] enumerates frontier of [x]  *)
@@ -486,7 +482,6 @@ module Std : sig
       a graph into groups of nodes, for example, to strongly connected
       components.*)
   module Partition : sig
-
     type 'a t = 'a partition
 
     (** [trivial s] creates the trivial partition with a single
@@ -503,7 +498,8 @@ module Std : sig
 
         Takes an additional [comp] argument to compare for equality
         within the equivalence classes.  *)
-    val refine : 'a t -> equiv:('a -> 'a -> bool) -> cmp:('a -> 'a -> int) -> 'a t
+    val refine :
+      'a t -> equiv:('a -> 'a -> bool) -> cmp:('a -> 'a -> int) -> 'a t
 
     (** [union p x y] returns the partition p with the classes of [x]
         and [y] merged.  Returns [p] unchanged if either [x] or [y] are
@@ -539,7 +535,6 @@ module Std : sig
       subsets that cover set [S]. See {!Partition} for more
       information.  *)
   module Group : sig
-
     type 'a t = 'a group
 
     (** [enum group] enumerates all elements of a group, including the
@@ -547,12 +542,12 @@ module Std : sig
     val enum : 'a group -> 'a seq
 
     (** [mem group x] checks membership of [x] in a given [group].  *)
-    val mem  : 'a group -> 'a -> bool
+    val mem : 'a group -> 'a -> bool
 
     (** [top group] returns the top element of a group also known as a
         representative element. The function is total since groups is
         guaranteed to be non-empty.    *)
-    val top  : 'a group -> 'a
+    val top : 'a group -> 'a
 
     (** [to_equiv g] returns the ordinal number representing the
         particular group [g] *)
@@ -560,17 +555,17 @@ module Std : sig
 
     (** [pp pp_elem g] prints group [g] using element printer [pp_elem]  *)
     val pp : 'a printer -> 'a t printer
-
   end
 
   (** Ordinal for representing equivalence. Useful, for indexing
       elements based on their equivalence. *)
   module Equiv : sig
     type t = equiv
+
     val to_int : t -> int
+
     include Regular.S with type t := t
   end
-
 
   (** {5 Auxiliary graph data structures}  *)
 
@@ -579,6 +574,7 @@ module Std : sig
   module type Predicate = sig
     type edge
     type node
+
     val edge : edge -> bool
     val node : node -> bool
   end
@@ -590,32 +586,32 @@ module Std : sig
   module type Isomorphism = sig
     type s
     type t
-    val forward  : s -> t
+
+    val forward : s -> t
     val backward : t -> s
   end
 
-  class type ['n,'e,'s] dfs_visitor = object
-    method start_tree :       'n -> 's -> 's
-    method enter_node : int -> 'n -> 's -> 's
-    method leave_node : int -> 'n -> 's -> 's
-    method enter_edge : edge_kind -> 'e -> 's -> 's
-    method leave_edge : edge_kind -> 'e -> 's -> 's
-  end
+  class type ['n, 'e, 's] dfs_visitor =
+    object
+      method start_tree : 'n -> 's -> 's
 
+      method enter_node : int -> 'n -> 's -> 's
+
+      method leave_node : int -> 'n -> 's -> 's
+
+      method enter_edge : edge_kind -> 'e -> 's -> 's
+
+      method leave_edge : edge_kind -> 'e -> 's -> 's
+    end
 
   (** {4 Visual attributes for graph vizualization.}
       Consult OCamlGraph library for more information.
   *)
 
-  type node_attr  = Graph.Graphviz.DotAttributes.vertex
-  type edge_attr  = Graph.Graphviz.DotAttributes.edge
+  type node_attr = Graph.Graphviz.DotAttributes.vertex
+  type edge_attr = Graph.Graphviz.DotAttributes.edge
   type graph_attr = Graph.Graphviz.DotAttributes.graph
-
-  type ('n,'a) labeled = {
-    node : 'n;
-    node_label : 'a;
-  }
-
+  type ('n, 'a) labeled = {node: 'n; node_label: 'a}
 
   (** A solution to a system of fixed-point equations.
 
@@ -625,11 +621,8 @@ module Std : sig
       all variables that are not in [M].
   *)
   module Solution : sig
-
-
     (** an abstract representation of a solution  *)
-    type ('n,'d) t
-
+    type ('n, 'd) t
 
     (** [create constraints default] creates an initial approximation of a
         solution. The [default] parameter defines the default value of
@@ -644,53 +637,49 @@ module Std : sig
         - [iterations s = 0]
         - [get s x = constraints[x] if x in constraints else default]
     *)
-    val create : ('n,'d,_) Map.t -> 'd -> ('n,'d) t
+    val create : ('n, 'd, _) Map.t -> 'd -> ('n, 'd) t
 
     (** [equal s1 s2] is [true] if [s1] and [s2] are equal solutions.
 
         Two solutions are equal if for all [x] in the data domain
         ['d], we have that [equal s1[x] s2[x]].
     *)
-    val equal : equal:('d -> 'd -> bool) -> ('n,'d) t -> ('n,'d) t -> bool
+    val equal : equal:('d -> 'd -> bool) -> ('n, 'd) t -> ('n, 'd) t -> bool
 
     (** [iterations s] returns the total number of iterations that was
         made to obtain the current solution.  *)
-    val iterations : ('n,'d) t -> int
+    val iterations : ('n, 'd) t -> int
 
     (** [default s] return the default value assigned to all variables
         not in the internal finite mapping. This is usually a bottom
         or top value, depending on whether iteration increases or
         decreases.
     *)
-    val default : ('n,'d) t -> 'd
-
+    val default : ('n, 'd) t -> 'd
 
     (** [enum xs] enumerates all non-trivial values in the solution.
 
         A value is non-trivial if it differs from the default value.
     *)
-    val enum : ('n,'d) t -> ('n * 'd) Sequence.t
+    val enum : ('n, 'd) t -> ('n * 'd) Sequence.t
 
     (** [is_fixpoint s] is [true] if the solution is a fixed point
         solution, i.e., is a solution that stabilizes the system of
         equations.  *)
-    val is_fixpoint : ('n,'d) t -> bool
+    val is_fixpoint : ('n, 'd) t -> bool
 
     (** [get s x] returns a value of [x].  *)
-    val get : ('n,'d) t -> 'n -> 'd
+    val get : ('n, 'd) t -> 'n -> 'd
 
     (** [derive s ~f default] creates a new solution from an old one
         with a new [default] and where for each node [n] in [s]'s finite
         map, if [f n (get s n) = Some v] then [n] maps to [v].
     *)
-    val derive : ('n,'d) t -> f:('n -> 'd -> 'a option) -> 'a -> ('n,'a) t
-
+    val derive : ('n, 'd) t -> f:('n -> 'd -> 'a option) -> 'a -> ('n, 'a) t
   end
-
 
   (** Generic Graph Library  *)
   module Graphlib : sig
-
     (** [Make(Node)(Edge)] creates a module that implements [Graph]
         interface and has unlabeled nodes of type [Node.t] and edges
         labeled with [Edge.t]
@@ -705,12 +694,11 @@ module Std : sig
         functions are provided.
 
     *)
-    module Make(Node : Opaque.S)(Edge : T) : Graph
-      with type node = Node.t
-       and type Node.label = Node.t
-       and type Edge.label = Edge.t
-
-
+    module Make (Node : Opaque.S) (Edge : T) :
+      Graph
+        with type node = Node.t
+         and type Node.label = Node.t
+         and type Edge.label = Edge.t
 
     (** [Labeled(Node)(Node_label)(Edge_label)] creates a graph
         structure with both nodes and edges labeled with abitrary
@@ -720,11 +708,11 @@ module Std : sig
         unified, the [Labeled] functor creates a graph data structure,
         where they are different. Moreover, the node label is pure
         abstract and can be any type, including functional.*)
-    module Labeled(Node : Opaque.S)(NL : T)(EL : T) : Graph
-      with type node = (Node.t, NL.t) labeled
-       and type Node.label = (Node.t, NL.t) labeled
-       and type Edge.label = EL.t
-
+    module Labeled (Node : Opaque.S) (NL : T) (EL : T) :
+      Graph
+        with type node = (Node.t, NL.t) labeled
+         and type Node.label = (Node.t, NL.t) labeled
+         and type Edge.label = EL.t
 
     (** [create (module G) ~nodes ~edges ()] creates a graph using
         implementation provided by [module G].
@@ -737,11 +725,14 @@ module Std : sig
               "loop", "loop", true] ()
         ]} *)
     val create :
-      (module Graph with type t = 'c
-                     and type Node.label = 'a
-                     and type Edge.label = 'b) ->
-      ?nodes:'a list ->
-      ?edges:('a * 'a * 'b) list -> unit -> 'c
+         (module Graph
+            with type t = 'c
+             and type Node.label = 'a
+             and type Edge.label = 'b)
+      -> ?nodes:'a list
+      -> ?edges:('a * 'a * 'b) list
+      -> unit
+      -> 'c
 
     (** [union (module G) g1 g2] returns a graph [g] that is a union
         of graphs [g1] and [g2], i.e., contains all nodes and edges
@@ -753,9 +744,10 @@ module Std : sig
         v}
     *)
     val union :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e) -> 'c -> 'c -> 'c
+         (module Graph with type t = 'c and type node = 'n and type edge = 'e)
+      -> 'c
+      -> 'c
+      -> 'c
 
     (** [inter (module G) g1 g2] returns a graph [g] that is an
         intersection of graphs [g1] and [g2], i.e., it contain
@@ -767,10 +759,10 @@ module Std : sig
         v}
     *)
     val inter :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e) -> 'c -> 'c -> 'c
-
+         (module Graph with type t = 'c and type node = 'n and type edge = 'e)
+      -> 'c
+      -> 'c
+      -> 'c
 
     (** [to_dot (module G) ~filename:"graph.dot" g] dumps graph [g]
         using [dot] format. This is a customizable version of printing
@@ -796,17 +788,17 @@ module Std : sig
         Note: if [string_of_node] function is not provided, then graph
         nodes will be labeled with the reverse post order number.  *)
     val to_dot :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e) ->
-      ?graph_attrs:('c -> graph_attr list) ->
-      ?node_attrs:('n -> node_attr list) ->
-      ?edge_attrs:('e -> edge_attr list) ->
-      ?string_of_node:('n -> string) ->
-      ?string_of_edge:('e -> string) ->
-      ?channel:Out_channel.t ->
-      ?formatter:Format.formatter ->
-      ?filename:string -> 'c -> unit
+         (module Graph with type t = 'c and type node = 'n and type edge = 'e)
+      -> ?graph_attrs:('c -> graph_attr list)
+      -> ?node_attrs:('n -> node_attr list)
+      -> ?edge_attrs:('e -> edge_attr list)
+      -> ?string_of_node:('n -> string)
+      -> ?string_of_edge:('e -> string)
+      -> ?channel:Out_channel.t
+      -> ?formatter:Format.formatter
+      -> ?filename:string
+      -> 'c
+      -> unit
 
     (** [depth_first_search (module G) ~init g].  It is the most
         important algorithm of the Graphlib. It builds a forest of
@@ -903,43 +895,48 @@ module Std : sig
         graphs dynamically switches to a heap storage. The space
         complexity is bounded by linear function of the graph depth.  *)
     val depth_first_search :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e) ->
-      ?rev:bool ->
-      ?start:'n ->
-      ?start_tree:('n -> 's -> 's) ->
-      ?enter_node:(int -> 'n -> 's -> 's) ->
-      ?leave_node:(int -> 'n -> 's -> 's) ->
-      ?enter_edge:(edge_kind -> 'e -> 's -> 's) ->
-      ?leave_edge:(edge_kind -> 'e -> 's -> 's) ->
-      'c -> init:'s -> 's
+         (module Graph with type t = 'c and type node = 'n and type edge = 'e)
+      -> ?rev:bool
+      -> ?start:'n
+      -> ?start_tree:('n -> 's -> 's)
+      -> ?enter_node:(int -> 'n -> 's -> 's)
+      -> ?leave_node:(int -> 'n -> 's -> 's)
+      -> ?enter_edge:(edge_kind -> 'e -> 's -> 's)
+      -> ?leave_edge:(edge_kind -> 'e -> 's -> 's)
+      -> 'c
+      -> init:'s
+      -> 's
 
     (** [depth_first_visit (module G) ~init visitor g] allows to
         specify visiting functions using object. That opens space for
         re-usability and using open recursion.  *)
     val depth_first_visit :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e) ->
-      ?rev:bool -> ?start:'n -> 'c -> init:'s -> ('n,'e,'s) dfs_visitor -> 's
+         (module Graph with type t = 'c and type node = 'n and type edge = 'e)
+      -> ?rev:bool
+      -> ?start:'n
+      -> 'c
+      -> init:'s
+      -> ('n, 'e, 's) dfs_visitor
+      -> 's
 
     (** base class with all methods defaults to nothing.  *)
-    class ['n,'e,'s] dfs_identity_visitor : ['n,'e,'s] dfs_visitor
+    class ['n, 'e, 's] dfs_identity_visitor : ['n, 'e, 's] dfs_visitor
 
     (** returns a sequence of nodes in reverse post order.  *)
     val reverse_postorder_traverse :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e) ->
-      ?rev:bool -> ?start:'n -> 'c -> 'n seq
+         (module Graph with type t = 'c and type node = 'n and type edge = 'e)
+      -> ?rev:bool
+      -> ?start:'n
+      -> 'c
+      -> 'n seq
 
     (** returns a sequence of nodes in post order  *)
     val postorder_traverse :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e) ->
-      ?rev:bool -> ?start:'n -> 'c -> 'n seq
+         (module Graph with type t = 'c and type node = 'n and type edge = 'e)
+      -> ?rev:bool
+      -> ?start:'n
+      -> 'c
+      -> 'n seq
 
     (** [dominators (module G) g entry] builds a dominators tree for
         a given graph.
@@ -992,10 +989,11 @@ module Std : sig
         [entry] node are parented by the [entry] node.
     *)
     val dominators :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e) ->
-      ?rev:bool -> 'c -> 'n -> 'n tree
+         (module Graph with type t = 'c and type node = 'n and type edge = 'e)
+      -> ?rev:bool
+      -> 'c
+      -> 'n
+      -> 'n tree
 
     (** [dom_frontier (module G) g dom_tree] calculates dominance
         frontiers for all nodes in a graph [g].
@@ -1005,19 +1003,19 @@ module Std : sig
         not strictly dominate [n]. It is the set of nodes where [d]'s
         dominance stops. *)
     val dom_frontier :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e) ->
-      ?rev:bool -> 'c -> 'n tree -> 'n frontier
+         (module Graph with type t = 'c and type node = 'n and type edge = 'e)
+      -> ?rev:bool
+      -> 'c
+      -> 'n tree
+      -> 'n frontier
 
     (** [strong_components (module G) g] partition graph into strongly
         connected components. The top of each component is a root
         node, i.e., a node that has the least pre-order number.*)
     val strong_components :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e) ->
-      'c -> 'n partition
+         (module Graph with type t = 'c and type node = 'n and type edge = 'e)
+      -> 'c
+      -> 'n partition
 
     (** [shortest_path (module G) ?weight ?rev g u v]
         Find a shortest path from node [u] to node [v].
@@ -1025,19 +1023,24 @@ module Std : sig
         @param weight defines a weight of each edge. It defaults to 1.
         @param rev allows to reverse graph.    *)
     val shortest_path :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e) ->
-      ?weight:('e -> int) -> ?rev:bool -> 'c -> 'n -> 'n -> 'e path option
+         (module Graph with type t = 'c and type node = 'n and type edge = 'e)
+      -> ?weight:('e -> int)
+      -> ?rev:bool
+      -> 'c
+      -> 'n
+      -> 'n
+      -> 'e path option
 
     (** [is_reachable (module G) ?rev g u v] is true if node [v] is
         reachable from node [u] in graph [g]. If rev is true, then it
         will solve the same problem but on a reversed graph.  *)
     val is_reachable :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e) ->
-      ?rev:bool -> 'c -> 'n -> 'n -> bool
+         (module Graph with type t = 'c and type node = 'n and type edge = 'e)
+      -> ?rev:bool
+      -> 'c
+      -> 'n
+      -> 'n
+      -> bool
 
     (** [fold_reachable (module G) ?rev ~init ~f g n] applies function
         [f] to all nodes reachable from node [g] in graph [g]. If
@@ -1047,19 +1050,22 @@ module Std : sig
         [fold_reachable (module G) ~init:G.Node.Set.empty ~f:Set.add]
     *)
     val fold_reachable :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e) ->
-      ?rev:bool -> init:'a -> f:('a -> 'n -> 'a) -> 'c -> 'n -> 'a
+         (module Graph with type t = 'c and type node = 'n and type edge = 'e)
+      -> ?rev:bool
+      -> init:'a
+      -> f:('a -> 'n -> 'a)
+      -> 'c
+      -> 'n
+      -> 'a
 
     (** [compare (module G1) (module G2) g1 g2] compares two graphs,
         with different implementation but the same node type.  *)
     val compare :
-      (module Graph with type t = 'a
-                     and type node = 'n) ->
-      (module Graph with type t = 'b
-                     and type node = 'n) ->
-      'a -> 'b -> int
+         (module Graph with type t = 'a and type node = 'n)
+      -> (module Graph with type t = 'b and type node = 'n)
+      -> 'a
+      -> 'b
+      -> int
 
     (** [let module G' = filtered (module G) ?skip_node ?skip_edge ()]
         creates a new module [G'] that can be used at any place
@@ -1077,77 +1083,78 @@ module Std : sig
             (* all edges added to [killed_edges] will no be visible *)
         ]} *)
     val filtered :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e) ->
-      ?skip_node:('n -> bool) ->
-      ?skip_edge:('e -> bool) -> unit ->
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e)
+         (module Graph with type t = 'c and type node = 'n and type edge = 'e)
+      -> ?skip_node:('n -> bool)
+      -> ?skip_edge:('e -> bool)
+      -> unit
+      -> (module Graph with type t = 'c and type node = 'n and type edge = 'e)
 
     (** [view (module G) ~node ~edge ~node_label ~edge_label]
         creates a proxy module, that will transform back and
         forward elements of graph, using corresponding functions.  *)
     val view :
-      (module Graph with type t = 'c
-                     and type node = 'n
-                     and type edge = 'e
-                     and type Node.label = 'a
-                     and type Edge.label = 'b) ->
-      node:(('n -> 'f) * ('f -> 'n)) ->
-      edge:(('e -> 'd) * ('d -> 'e)) ->
-      node_label:(('a -> 'p) * ('p -> 'a)) ->
-      edge_label:(('b -> 'r) * ('r -> 'b)) ->
-      (module Graph with type t = 'c
-                     and type node = 'f
-                     and type edge = 'd
-                     and type Node.label = 'p
-                     and type Edge.label = 'r)
-
+         (module Graph
+            with type t = 'c
+             and type node = 'n
+             and type edge = 'e
+             and type Node.label = 'a
+             and type Edge.label = 'b)
+      -> node:('n -> 'f) * ('f -> 'n)
+      -> edge:('e -> 'd) * ('d -> 'e)
+      -> node_label:('a -> 'p) * ('p -> 'a)
+      -> edge_label:('b -> 'r) * ('r -> 'b)
+      -> (module Graph
+            with type t = 'c
+             and type node = 'f
+             and type edge = 'd
+             and type Node.label = 'p
+             and type Edge.label = 'r)
 
     (** [To_ocamlgraph(G)] returns a module that implements
         OCamlGraph interface for a persistent graph.  *)
-    module To_ocamlgraph(G : Graph) :
-      Graph.Sig.P with type t = G.t
-                   and type V.t = G.node
-                   and type E.t = G.edge
-                   and type V.label = G.Node.label
-                   and type E.label = G.Edge.label
+    module To_ocamlgraph (G : Graph) :
+      Graph.Sig.P
+        with type t = G.t
+         and type V.t = G.node
+         and type E.t = G.edge
+         and type V.label = G.Node.label
+         and type E.label = G.Edge.label
 
     (** [Of_ocamlgraph(O)] creates an adapter module, that implements
         [Graphlib] interface on top of the module implementing
         [OCamlGraph] interface.*)
-    module Of_ocamlgraph(G : Graph.Sig.P) :
-      Graph with type t = G.t
-             and type node = G.V.t
-             and type edge = G.E.t
-             and type Node.label = G.V.label
-             and type Edge.label = G.E.label
+    module Of_ocamlgraph (G : Graph.Sig.P) :
+      Graph
+        with type t = G.t
+         and type node = G.V.t
+         and type edge = G.E.t
+         and type Node.label = G.V.label
+         and type Edge.label = G.E.label
 
     (** functorized version of a {!filter} function.  *)
     module Filtered
         (G : Graph)
-        (P : Predicate with type node = G.node
-                        and type edge = G.edge) :
-      Graph with type t = G.t
-             and type node = G.node
-             and type edge = G.edge
-             and module Node = G.Node
-             and module Edge = G.Edge
+        (P : Predicate with type node = G.node and type edge = G.edge) :
+      Graph
+        with type t = G.t
+         and type node = G.node
+         and type edge = G.edge
+         and module Node = G.Node
+         and module Edge = G.Edge
 
     (** functorized version of {!Graphlib.view} function.  *)
     module Mapper
-        (G  : Graph)
-        (N  : Isomorphism with type s = G.node)
-        (E  : Isomorphism with type s = G.edge)
+        (G : Graph)
+        (N : Isomorphism with type s = G.node)
+        (E : Isomorphism with type s = G.edge)
         (NL : Isomorphism with type s = G.Node.label)
         (EL : Isomorphism with type s = G.Edge.label) :
-      Graph with type t = G.t
-             and type node = N.t
-             and type edge = E.t
-             and type Node.label = NL.t
-             and type Edge.label = EL.t
+      Graph
+        with type t = G.t
+         and type node = N.t
+         and type edge = E.t
+         and type Node.label = NL.t
+         and type Edge.label = EL.t
 
     (** [fixpoint ~equal ~init ~merge ~f g] computes a solution for a
         system of equations denoted by graph [g], using the initial
@@ -1422,21 +1429,24 @@ module Std : sig
         to the system of equation (as opposed to the classical
         approach where the constraint denotes only the input for the
         entry node).  *)
-    val fixpoint : (module Graph with type t = 'c
-                                  and type node = 'n) ->
-      ?steps:int -> ?start:'n -> ?rev:bool ->
-      ?step:(int -> 'n -> 'd -> 'd -> 'd) ->
-      init:('n,'d) Solution.t ->
-      equal:('d -> 'd -> bool) ->
-      merge:('d -> 'd -> 'd) -> f:('n -> 'd -> 'd) -> 'c -> ('n,'d) Solution.t
-
+    val fixpoint :
+         (module Graph with type t = 'c and type node = 'n)
+      -> ?steps:int
+      -> ?start:'n
+      -> ?rev:bool
+      -> ?step:(int -> 'n -> 'd -> 'd -> 'd)
+      -> init:('n, 'd) Solution.t
+      -> equal:('d -> 'd -> bool)
+      -> merge:('d -> 'd -> 'd)
+      -> f:('n -> 'd -> 'd)
+      -> 'c
+      -> ('n, 'd) Solution.t
 
     (** name generation scheme  *)
     type scheme
 
-
     (** a function that gives a name for a value of type ['a]  *)
-    type 'a symbolizer = ('a -> string)
+    type 'a symbolizer = 'a -> string
 
     (** [create_scheme ~next init] create a name generator, that will
         start with [init] and apply [next] on it infinitly. *)
@@ -1450,16 +1460,18 @@ module Std : sig
     (** numbers from zero to inifinity ([Sys.max_int] in fact) *)
     val numbers : scheme
     (** empty string  *)
+
+    (** empty string  *)
     val nothing : scheme
 
-    val by_given_order : scheme -> ('a -> 'a -> int) -> 'a Sequence.t -> 'a symbolizer
-    val by_natural_order : scheme -> ('a -> 'a -> int) -> 'a Sequence.t -> 'a symbolizer
+    val by_given_order :
+      scheme -> ('a -> 'a -> int) -> 'a Sequence.t -> 'a symbolizer
 
+    val by_natural_order :
+      scheme -> ('a -> 'a -> int) -> 'a Sequence.t -> 'a symbolizer
 
     (** Generic dot printer.  *)
     module Dot : sig
-
-
       (** [pp_graph ~nodes_of_edge ~nodes ~edges ppf] - generic dot
           printer.
 
@@ -1487,17 +1499,18 @@ module Std : sig
           will not be printed.
       *)
       val pp_graph :
-        ?name:string ->
-        ?cluster:bool ->
-        ?subgraph:bool ->
-        ?attrs:string list ->
-        ?string_of_node: 'n symbolizer ->
-        ?node_label: 'n symbolizer ->
-        ?edge_label: 'e symbolizer ->
-        nodes_of_edge : ('e -> 'n * 'n) ->
-        nodes: 'n Sequence.t ->
-        edges: 'e Sequence.t -> Format.formatter -> unit
+           ?name:string
+        -> ?cluster:bool
+        -> ?subgraph:bool
+        -> ?attrs:string list
+        -> ?string_of_node:'n symbolizer
+        -> ?node_label:'n symbolizer
+        -> ?edge_label:'e symbolizer
+        -> nodes_of_edge:('e -> 'n * 'n)
+        -> nodes:'n Sequence.t
+        -> edges:'e Sequence.t
+        -> Format.formatter
+        -> unit
     end
   end
-
 end

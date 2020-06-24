@@ -1,113 +1,100 @@
 open Core_kernel
 open Format
-
 module Cst = Parsexp.Cst
 module Loc = Bap_primus_lisp_loc
 module Index = Bap_primus_lisp_index
-
-module Id = Index.Make()
-module Eq = Index.Make()
+module Id = Index.Make ()
+module Eq = Index.Make ()
 
 type error = Bad_sexp of (string * Parsexp.Parse_error.t)
 
-type ('a,'i,'e) interned = ('a,'i,'e) Index.interned = {
-  data : 'a;
-  id : 'i;
-  eq : 'e;
-}
-type 'a indexed = ('a,Id.t,Eq.t) interned
+type ('a, 'i, 'e) interned = ('a, 'i, 'e) Index.interned =
+  {data: 'a; id: 'i; eq: 'e}
+
+type 'a indexed = ('a, Id.t, Eq.t) interned
 
 type tree = token indexed
+
 and token = Atom of string | List of tree list
 
-type t = {
-  lastid : Id.t;
-  lasteq : Eq.t;
-  hashed : Eq.t Sexp.Map.t;
-  equivs : Eq.t Id.Map.t;
-  origin : string Id.Map.t;
-  ranges : Loc.range Id.Map.t;
-  source : tree list String.Map.t;
-  inputs : string String.Map.t;
-  rclass : Id.t Id.Map.t;
-}
+type t =
+  { lastid: Id.t
+  ; lasteq: Eq.t
+  ; hashed: Eq.t Sexp.Map.t
+  ; equivs: Eq.t Id.Map.t
+  ; origin: string Id.Map.t
+  ; ranges: Loc.range Id.Map.t
+  ; source: tree list String.Map.t
+  ; inputs: string String.Map.t
+  ; rclass: Id.t Id.Map.t }
 
-let empty = {
-  lastid = Id.null;
-  lasteq = Eq.null;
-  hashed = Sexp.Map.empty;
-  equivs = Id.Map.empty;
-  origin = Id.Map.empty;
-  ranges = Id.Map.empty;
-  source = String.Map.empty;
-  inputs = String.Map.empty;
-  rclass = Id.Map.empty;
-}
+let empty =
+  { lastid= Id.null
+  ; lasteq= Eq.null
+  ; hashed= Sexp.Map.empty
+  ; equivs= Id.Map.empty
+  ; origin= Id.Map.empty
+  ; ranges= Id.Map.empty
+  ; source= String.Map.empty
+  ; inputs= String.Map.empty
+  ; rclass= Id.Map.empty }
 
 let is_empty {lastid} = Id.equal Id.null lastid
+let nextid p = {p with lastid= Id.next p.lastid}
+let nexteq p = {p with lasteq= Eq.next p.lasteq}
 
-let nextid p = {
-  p with lastid = Id.next p.lastid
-}
-
-let nexteq p = {p with lasteq = Eq.next p.lasteq}
-
-let rec repr s id = match Map.find s.rclass id with
+let rec repr s id =
+  match Map.find s.rclass id with
   | None -> id
   | Some id' -> if Id.(id = id') then id else repr s id'
 
 let hashcons p sexp =
   match Map.find p.hashed sexp with
-  | Some eq -> p,eq
+  | Some eq -> (p, eq)
   | None ->
-    let p = nexteq p in
-    {p with hashed = Map.set p.hashed ~key:sexp ~data:p.lasteq},
-    p.lasteq
+      let p = nexteq p in
+      ({p with hashed= Map.set p.hashed ~key:sexp ~data:p.lasteq}, p.lasteq)
 
-let unify p eq =
-  {p with equivs = Map.set p.equivs ~key:p.lastid ~data:eq}
-
-
+let unify p eq = {p with equivs= Map.set p.equivs ~key:p.lastid ~data:eq}
 let nopos = Parsexp.Positions.beginning_of_file
-let norange = Parsexp.Positions.make_range_incl
-    ~start_pos:nopos
-    ~last_pos:nopos
+let norange = Parsexp.Positions.make_range_incl ~start_pos:nopos ~last_pos:nopos
 
-let getrange pos parents child = match pos with
+let getrange pos parents child =
+  match pos with
   | None -> norange
-  | Some pos ->
-    Parsexp.Positions.find_sub_sexp_in_list_phys
-      pos parents ~sub:child |> function
-    | None -> norange
-    | Some range -> range
+  | Some pos -> (
+      Parsexp.Positions.find_sub_sexp_in_list_phys pos parents ~sub:child
+      |> function None -> norange | Some range -> range )
 
-let add_range p data =
-  {p with ranges = Map.set p.ranges ~key:p.lastid ~data}
+let add_range p data = {p with ranges= Map.set p.ranges ~key:p.lastid ~data}
 
 let of_cst p sexps =
   let newterm p r s =
     let p = nextid p in
     let p = add_range p r in
     hashcons p (Cst.Forget.t s) in
-  let rec of_sexp p s = match s with
-    | Cst.Comment _ -> p,None
+  let rec of_sexp p s =
+    match s with
+    | Cst.Comment _ -> (p, None)
     | Cst.Sexp (Atom {atom; loc; unescaped} as s) ->
-      let p,eq = newterm p loc s in
-      let x = Option.value unescaped ~default:atom in
-      unify p eq, Some {data=Atom x; id=p.lastid; eq}
-    | Cst.Sexp (List {elements=xs; loc} as s)  ->
-      let p,data = List.fold ~init:(p,[]) ~f:(fun (p,xs) sexp ->
-          match of_sexp p sexp with
-          | p,None -> p,xs
-          | p,Some x -> p,(x::xs)) xs in
-      let p,eq = newterm p loc s in
-      unify p eq,Some {data = List (List.rev data); id=p.lastid; eq} in
-  let p,trees = List.fold sexps ~init:(p,[]) ~f:(fun (p,xs) x ->
-      match of_sexp p x with
-      | p,None -> p,xs
-      | p,Some x -> p,(x::xs)) in
-  p,List.rev trees
-
+        let p, eq = newterm p loc s in
+        let x = Option.value unescaped ~default:atom in
+        (unify p eq, Some {data= Atom x; id= p.lastid; eq})
+    | Cst.Sexp (List {elements= xs; loc} as s) ->
+        let p, data =
+          List.fold ~init:(p, [])
+            ~f:(fun (p, xs) sexp ->
+              match of_sexp p sexp with
+              | p, None -> (p, xs)
+              | p, Some x -> (p, x :: xs))
+            xs in
+        let p, eq = newterm p loc s in
+        (unify p eq, Some {data= List (List.rev data); id= p.lastid; eq}) in
+  let p, trees =
+    List.fold sexps ~init:(p, []) ~f:(fun (p, xs) x ->
+        match of_sexp p x with p, None -> (p, xs) | p, Some x -> (p, x :: xs))
+  in
+  (p, List.rev trees)
 
 let of_sexps ?pos p sexps =
   let getrange = getrange pos sexps in
@@ -115,21 +102,25 @@ let of_sexps ?pos p sexps =
     let p = nextid p in
     let p = add_range p (getrange s) in
     hashcons p s in
-  let rec of_sexp p s = match s with
+  let rec of_sexp p s =
+    match s with
     | Sexp.Atom x ->
-      let p,eq = newterm p s in
-      unify p eq,{data=Atom x; id=p.lastid; eq}
+        let p, eq = newterm p s in
+        (unify p eq, {data= Atom x; id= p.lastid; eq})
     | Sexp.List xs ->
-      let p,data = List.fold ~init:(p,[]) ~f:(fun (p,xs) sexp ->
-          let p,x = of_sexp p sexp in
-          p,(x::xs)) xs in
-      let p,eq = newterm p s in
-      unify p eq,{data = List (List.rev data); id=p.lastid; eq} in
-  let p,trees = List.fold sexps ~init:(p,[]) ~f:(fun (p,xs) x ->
-      let p,x = of_sexp p x in
-      p,(x::xs)) in
-  p,List.rev trees
-
+        let p, data =
+          List.fold ~init:(p, [])
+            ~f:(fun (p, xs) sexp ->
+              let p, x = of_sexp p sexp in
+              (p, x :: xs))
+            xs in
+        let p, eq = newterm p s in
+        (unify p eq, {data= List (List.rev data); id= p.lastid; eq}) in
+  let p, trees =
+    List.fold sexps ~init:(p, []) ~f:(fun (p, xs) x ->
+        let p, x = of_sexp p x in
+        (p, x :: xs)) in
+  (p, List.rev trees)
 
 let add_origin origins origin trees =
   let rec add origins token =
@@ -142,93 +133,81 @@ let add_origin origins origin trees =
 let load p filename =
   let source = In_channel.read_all filename in
   match Parsexp.Many_cst.parse_string source with
-  | Error err -> Error (Bad_sexp (filename,err))
+  | Error err -> Error (Bad_sexp (filename, err))
   | Ok cst ->
-    let p,tree = of_cst p cst in
-    let origin = add_origin p.origin filename tree in
-    Ok {
-      p with
-      origin;
-      source = Map.set p.source ~key:filename ~data:tree;
-      inputs = Map.set p.inputs ~key:filename ~data:source;
-    }
+      let p, tree = of_cst p cst in
+      let origin = add_origin p.origin filename tree in
+      Ok
+        { p with
+          origin
+        ; source= Map.set p.source ~key:filename ~data:tree
+        ; inputs= Map.set p.inputs ~key:filename ~data:source }
 
 let find p filename = Map.find p.source filename
-let range p id = match Map.find p.ranges (repr p id) with
-  | None -> norange
-  | Some rng -> rng
 
-let filename p id  = match Map.find p.origin (repr p id) with
+let range p id =
+  match Map.find p.ranges (repr p id) with None -> norange | Some rng -> rng
+
+let filename p id =
+  match Map.find p.origin (repr p id) with
   | None -> "/unknown/"
   | Some file -> file
 
-let loc p tree = Loc.{
-    file = filename p tree;
-    range = range p tree;
-  }
-
+let loc p tree = Loc.{file= filename p tree; range= range p tree}
 let has_loc p id = Map.mem p.origin (repr p id)
-
 let lastid s = s.lastid
 let lasteq s = s.lasteq
 
-let fold p ~init ~f = Map.fold ~init p.source ~f:(fun ~key ~data user ->
-    f key data user)
+let fold p ~init ~f =
+  Map.fold ~init p.source ~f:(fun ~key ~data user -> f key data user)
 
 let derived p ~from id =
-  if Id.(Id.null = from) then {
-    p with lastid = Id.max id p.lastid
-  } else {
-    p with
-    lastid = Id.max id p.lastid;
-    rclass = Map.set p.rclass ~key:id ~data:from;
-  }
+  if Id.(Id.null = from) then {p with lastid= Id.max id p.lastid}
+  else
+    { p with
+      lastid= Id.max id p.lastid
+    ; rclass= Map.set p.rclass ~key:id ~data:from }
 
-let pp_error ppf (Bad_sexp (filename,err)) =
+let pp_error ppf (Bad_sexp (filename, err)) =
   Parsexp.Parse_error.report ppf ~filename err
 
 let rec sexp_of_tree = function
-  | {data=List xs} -> Sexp.List (List.map xs ~f:sexp_of_tree)
-  | {data=Atom x} -> Sexp.Atom x
+  | {data= List xs} -> Sexp.List (List.map xs ~f:sexp_of_tree)
+  | {data= Atom x} -> Sexp.Atom x
 
-let pp_tree ppf t =
-  Sexp.pp_hum ppf (sexp_of_tree t)
+let pp_tree ppf t = Sexp.pp_hum ppf (sexp_of_tree t)
 
-
-let pp_print_underline ppf (off,len) =
-  let line = String.init len ~f:(fun i ->
-      if i < off then ' ' else '^') in
+let pp_print_underline ppf (off, len) =
+  let line = String.init len ~f:(fun i -> if i < off then ' ' else '^') in
   fprintf ppf "> %s@\n" line
 
-
-let pp_underline ?(context=4)
-    {inputs} ppf
-    {Loc.file; range={start_pos; end_pos}} =
+let pp_underline ?(context = 4) {inputs} ppf
+    {Loc.file; range= {start_pos; end_pos}} =
   match Map.find inputs file with
   | None -> ()
   | Some source ->
-    let current = ref 0 in
-    String.split_lines source |> List.iter ~f:(fun line ->
-        incr current;
-        if current.contents = end_pos.line + 1
-        then pp_print_underline ppf (start_pos.col,end_pos.col);
-        let distance = min
-            (abs (!current - start_pos.line))
-            (abs (!current - end_pos.line)) in
-        let bad = !current >= start_pos.line &&
-                  !current <= end_pos.line in
-        if distance < context
-        then fprintf ppf "%c %s@\n"
-            (if bad then '>' else '|') line);
-    (* in case if the error was on the last line in a file *)
-    if current.contents = end_pos.line
-    then pp_print_underline ppf (start_pos.col,end_pos.col)
+      let current = ref 0 in
+      String.split_lines source
+      |> List.iter ~f:(fun line ->
+             incr current ;
+             if current.contents = end_pos.line + 1 then
+               pp_print_underline ppf (start_pos.col, end_pos.col) ;
+             let distance =
+               min
+                 (abs (!current - start_pos.line))
+                 (abs (!current - end_pos.line)) in
+             let bad = !current >= start_pos.line && !current <= end_pos.line in
+             if distance < context then
+               fprintf ppf "%c %s@\n" (if bad then '>' else '|') line) ;
+      (* in case if the error was on the last line in a file *)
+      if current.contents = end_pos.line then
+        pp_print_underline ppf (start_pos.col, end_pos.col)
 
-let pp {inputs} ppf {Loc.file; range={start_pos; end_pos}} =
+let pp {inputs} ppf {Loc.file; range= {start_pos; end_pos}} =
   match Map.find inputs file with
   | None -> ()
   | Some source ->
-    let pos = start_pos.offset in
-    let len = end_pos.offset - start_pos.offset + 1 in
-    let exp = String.sub source ~pos ~len in
-    fprintf ppf "%s" exp
+      let pos = start_pos.offset in
+      let len = end_pos.offset - start_pos.offset + 1 in
+      let exp = String.sub source ~pos ~len in
+      fprintf ppf "%s" exp

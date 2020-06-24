@@ -1,20 +1,16 @@
 open Bap_core_theory
-
 open Core_kernel
 open Bap_types.Std
 open Image_internal_std
-
 module Disasm = Bap_disasm_driver
 module Callgraph = Bap_disasm_calls
 
 type block = Bap_disasm_block.t
-type edge =  Bap_disasm_block.edge
+type edge = Bap_disasm_block.edge
 type cfg = Bap_disasm_rec.Cfg.t
-
 type t [@@deriving compare, sexp_of]
 type symtab = t [@@deriving compare, sexp_of]
 type fn = string * block * cfg [@@deriving compare, sexp_of]
-
 
 val create : Disasm.state -> Callgraph.t -> t KB.t
 
@@ -25,14 +21,13 @@ end
 val empty : t
 val add_symbol : t -> fn -> t
 val remove : t -> fn -> t
-val find_by_name  : t -> string -> fn option
+val find_by_name : t -> string -> fn option
 val find_by_start : t -> addr -> fn option
 val owners : t -> addr -> fn list
 val dominators : t -> mem -> fn list
 val intersecting : t -> mem -> fn list
 val to_sequence : t -> fn seq
 val span : fn -> unit memmap
-
 
 (** {2 Callgraph Interface}
 

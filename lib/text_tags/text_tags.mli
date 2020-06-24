@@ -123,9 +123,8 @@ open Format
     [html], [blocks], [attr] and [none]
 *)
 type mode = string
+
 exception Unknown_mode of string
-
-
 
 (** [install ppf mode] switch formatter [ppf] into a [mode].
     In a default [mode] (named [none]), the semantics tags are
@@ -134,17 +133,14 @@ exception Unknown_mode of string
 *)
 val install : Format.formatter -> mode -> unit
 
-
 (** [with_mode ppf mode f] installs [mode], calls [f], and then
     reinstalls the previous mode.  *)
 val with_mode : Format.formatter -> mode -> f:(unit -> 'a) -> 'a
-
 
 (** [register_mode mode init] installs new mode.
     The [init] function must install all mode hooks using
     {!Format} interface.  *)
 val register_mode : mode -> (formatter -> unit) -> unit
-
 
 (** [available_modes ()] lists all currently installed modes.  *)
 val available_modes : unit -> mode list
@@ -154,7 +150,6 @@ val available_modes : unit -> mode list
     See {!colors} for the description of the mode.
 *)
 module Attr : sig
-
   (** [show name] enable attribute with the [name].  *)
   val show : string -> unit
 

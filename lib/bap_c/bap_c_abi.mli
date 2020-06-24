@@ -8,7 +8,6 @@ open Core_kernel
 open Bap.Std
 open Bap_c_type
 
-
 (** Function formal parameter is represented as a pair of
     an abstraction of data, that is passed via the parameter,
     and a BIL expression, that denotes the parameter.*)
@@ -31,29 +30,23 @@ type param = Bap_c_data.t * exp
     - the last arg term corresponds to the return argument, if any;
     - all hidden arguments are put between the last positional and the
       return argument.*)
-type args = {
-  return : param option;
-  hidden : (Bap_c_type.t * param) list;
-  params : param list;
-}
+type args =
+  {return: param option; hidden: (Bap_c_type.t * param) list; params: param list}
 
 (** an abi processor.
     Each architecture registers its own abi processor, that is
     responsible for dispatching the processed subroutine between
     architecture specific abi processors.*)
-type t = {
-  (** [insert_args sub attrs proto] infer a list of arguments that
-      should be inserted for a subroutine [sub] annotated with the
-      attribute list [attrs] *)
-  insert_args : sub term -> attr list -> proto -> args option;
-
-  (** [apply_attrs attrs sub] transform a subroutine based on the
-      semantics of the list of attributes, attached to it. See also,
-      C.Attr.register
-
-  *)
-  apply_attrs : attr list -> sub term -> sub term;
-}
+type t =
+  { (** [insert_args sub attrs proto] infer a list of arguments that
+        should be inserted for a subroutine [sub] annotated with the
+        attribute list [attrs] *)
+    insert_args: sub term -> attr list -> proto -> args option
+        (** [apply_attrs attrs sub] transform a subroutine based on the
+        semantics of the list of attributes, attached to it. See also,
+        C.Attr.register
+    *)
+  ; apply_attrs: attr list -> sub term -> sub term }
 
 (** [create_api_processor size t] packs an api processor. The
     processor will insert arg terms into each recognized subroutine,
@@ -65,7 +58,6 @@ type t = {
     The api processor relies on an availability of a front end parser
     for C language.*)
 val create_api_processor : #Bap_c_size.base -> t -> Bap_api.t
-
 
 (** [data size t] creates an abstraction of data that is represented
     by type [t]. The [size] parameter defines a data model, e.g.,
@@ -89,7 +81,6 @@ val register : string -> t -> unit
 (** [get_processor name] is used to access an abi processor with its
     name.*)
 val get_processor : string -> t option
-
 
 (** An abstraction of a stack, commonly used in C compilers.   *)
 module Stack : sig

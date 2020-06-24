@@ -7,26 +7,23 @@ type 'a m
 (** type denoting the arithmetic modulus *)
 type modulus
 
-
 (** [modulus s] is the modulus of bitvectors with size [s].
 
     This is a number $2^s-1$, also known as a Mersenne number.
 *)
 val modulus : int -> modulus
 
-
 (** [m1 = modulus 1] = $1$ is the modulus of bitvectors with size [1]  *)
-val m1  : modulus
+val m1 : modulus
 
 (** [m8 = modulus 8] = $255$ is the modulus of bitvectors with size [8]  *)
-val m8  : modulus
+val m8 : modulus
 
 (** [m32 = modulus 32] = $2^32-1$ is the modulus of bitvectors with size [32]  *)
 val m32 : modulus
 
 (** [m64 = modulus 64] = $2^64-1$ is the modulus of bitvectors with size [64]  *)
 val m64 : modulus
-
 
 (** [(x <op> y) mod m] applies operation [<op>] modulo [m].
 
@@ -41,7 +38,7 @@ val m64 : modulus
     [(x+y) mod m] and won't create any closures, even if [m] is not
     known at compile time.
 *)
-external (mod) : 'a m -> modulus -> 'a = "%apply"
+external ( mod ) : 'a m -> modulus -> 'a = "%apply"
 
 module type S = sig
   (** an abstract representation of an operation modulo some number.*)
@@ -74,10 +71,8 @@ module type S = sig
   (** [succ x mod m] is the successor of [x] modulo [m]  *)
   val succ : t -> t m
 
-
   (** [nsucc x n mod m] is the [n]th successor of [x] modulo [m]  *)
   val nsucc : t -> int -> t m
-
 
   (** [pred x mod m] is the predecessor of [x] modulo [m] *)
   val pred : t -> t m
@@ -95,16 +90,16 @@ module type S = sig
 
       The absolute value of [x] is equal to [neg x] if
       [msb x] and to [x] otherwise. *)
-  val abs  : t -> t m
+  val abs : t -> t m
 
   (** [add x y mod m] is [x + y] modulo [m] *)
-  val add     : t -> t -> t m
+  val add : t -> t -> t m
 
   (** [sub x y mod m] is [x - y] modulo [m] *)
-  val sub     : t -> t -> t m
+  val sub : t -> t -> t m
 
   (** [mul x y mod m] is [x * y] modulo [m] *)
-  val mul     : t -> t -> t m
+  val mul : t -> t -> t m
 
   (** [div x y mod m] is [x / y] modulo [m],
 
@@ -112,7 +107,6 @@ module type S = sig
       that returns [ones m] if [y = 0].
   *)
   val div : t -> t -> t m
-
 
   (** [sdiv x y mod m] is signed division of [x] by [y] modulo [m],
 
@@ -185,7 +179,6 @@ module type S = sig
   *)
   val smod : t -> t -> t m
 
-
   (** [nth x n mod m] is [true] if [n]th bit of [x] is [set].
 
       Returns [msb x mod m] if [n >= m]
@@ -193,32 +186,30 @@ module type S = sig
   *)
   val nth : t -> int -> bool m
 
-
   (** [msb x mod m] returns the most significand bit of [x].  *)
   val msb : t -> bool m
-
 
   (** [lsb x mod m] returns the least significand bit of [x].  *)
   val lsb : t -> bool m
 
   (** [logand x y mod m] is a bitwise logical and of [x] and [y] modulo [m]  *)
-  val logand  : t -> t -> t m
+  val logand : t -> t -> t m
 
   (** [logor x y mod m] is a bitwise logical or of [x] and [y] modulo [m].  *)
-  val logor   : t -> t -> t m
+  val logor : t -> t -> t m
 
   (** [logxor x y mod m] is exclusive [or] between [x] and [y] modulo [m] *)
-  val logxor  : t -> t -> t m
+  val logxor : t -> t -> t m
 
   (** [lshift x y mod m] shifts [x] to left by [y].
       Returns [0] is [y >= m].
   *)
-  val lshift  : t -> t -> t m
+  val lshift : t -> t -> t m
 
   (** [rshift x y mod m] shifts [x] right by [y] bits.
       Returns [0] if [y >= m]
   *)
-  val rshift  : t -> t -> t m
+  val rshift : t -> t -> t m
 
   (** [arshift x y mod m] shifts [x] right by [y] with [msb x]
       filling.
@@ -228,7 +219,6 @@ module type S = sig
   *)
   val arshift : t -> t -> t m
 
-
   (** [gcd x y mod m] returns the greatest common divisor modulo [m]
 
       [gcd x y] is the meet operation of the divisibility lattice,
@@ -236,7 +226,6 @@ module type S = sig
       therefore [gcd x 0 = gcd x 0 = x].
   *)
   val gcd : t -> t -> t m
-
 
   (** [lcm x y mod] returns the least common multiplier modulo [m].
 
@@ -246,7 +235,6 @@ module type S = sig
 
   *)
   val lcm : t -> t -> t m
-
 
   (** [(g,a,b) = gcdext x y mod m], where
       - [g = gcd x y mod m],
@@ -259,74 +247,66 @@ module type S = sig
   *)
   val gcdext : t -> t -> (t * t * t) m
 
-
-
   (** [!$x] is [of_string x]  *)
-  val (!$) : string -> t
+  val ( !$ ) : string -> t
 
   (** [!!x mod m] is [int x mod m]  *)
-  val (!!) : int -> t m
-
+  val ( !! ) : int -> t m
 
   (** [~-x mod m] is [neg x mod m]  *)
-  val (~-) : t -> t m
-
+  val ( ~- ) : t -> t m
 
   (** [~~x mod m] is [lnot x mod m] *)
-  val (~~) : t -> t m
+  val ( ~~ ) : t -> t m
 
   (** [(x + y) mod m] is [add x y mod m] *)
-  val ( + )  : t -> t -> t m
+  val ( + ) : t -> t -> t m
 
   (** [(x - y) mod m] is [sub x y mod m *)
-  val ( - )  : t -> t -> t m
+  val ( - ) : t -> t -> t m
 
   (** [(x * y) mod m] is [mul x y mod m] *)
-  val ( * )  : t -> t -> t m
+  val ( * ) : t -> t -> t m
 
   (** [(x / y) mod m] is [div x y mod m]  *)
-  val ( / )  : t -> t -> t m
+  val ( / ) : t -> t -> t m
 
   (** [x /$ y mod m] is [sdiv x y mod m]  *)
-  val ( /$ )  : t -> t -> t m
+  val ( /$ ) : t -> t -> t m
 
   (** [(x % y) mod m] is [rem x y mod m] *)
-  val (%)  : t -> t -> t m
+  val ( % ) : t -> t -> t m
 
   (** [(x %$ y) mod m] is [smod x y mod m] *)
-  val (%$) : t -> t -> t m
+  val ( %$ ) : t -> t -> t m
 
   (** [(x %^ y) mod m] is [srem x y mod m] *)
-  val (%^) : t -> t -> t m
+  val ( %^ ) : t -> t -> t m
 
   (** [(x land y) mod m] is [logand x y mod m] *)
-  val (land) : t -> t -> t m
+  val ( land ) : t -> t -> t m
 
   (** [(x lor y) mod m] is [logor x y mod m] *)
-  val (lor)  : t -> t -> t m
+  val ( lor ) : t -> t -> t m
 
   (** [(x lxor y) mod m] is [logxor x y mod m]  *)
-  val (lxor) : t -> t -> t m
+  val ( lxor ) : t -> t -> t m
 
   (** [(x lsl y) mod m] [lshift x y mod m]  *)
-  val (lsl)  : t -> t -> t m
+  val ( lsl ) : t -> t -> t m
 
   (** [(x lsr y) mod m] is [rshift x y mod m]  *)
-  val (lsr)  : t -> t -> t m
+  val ( lsr ) : t -> t -> t m
 
   (** [(x asr y) = arshift x y]  *)
-  val (asr)  : t -> t -> t m
+  val ( asr ) : t -> t -> t m
 
   (** [(x ++ n) mod m] is [nsucc x n mod m] *)
-  val (++) : t -> int -> t m
-
+  val ( ++ ) : t -> int -> t m
 
   (** [(x -- n) mod m]is [npred x n mod m] *)
-  val (--) : t -> int -> t m
+  val ( -- ) : t -> int -> t m
 end
-
-
-
 
 (** [compare x y] compares [x] and [y] as unsigned integers,
     i.e.,
@@ -337,17 +317,31 @@ val compare : t -> t -> int
 (** [equal x y] is true if [x] and [y] represent the same integers *)
 val equal : t -> t -> bool
 
+(** [x < y] iff [compare x y = -1]  *)
+val ( < ) : t -> t -> bool
 
-val (<) : t -> t -> bool          (** [x < y] iff [compare x y = -1]  *)
-val (>) : t -> t -> bool          (** [x > y] iff [compare x y =  1]  *)
-val (=) : t -> t -> bool          (** [x = y] iff [compare x y =  0]  *)
-val (<>) : t -> t -> bool          (** [x <> y] iff [compare x y <> 0]  *)
-val (<=) : t -> t -> bool          (** [x <= y] iff [compare x y <= 0]  *)
-val (>=) : t -> t -> bool          (** [x >= y] iff [compare x y >= 0]  *)
+(** [x < y] iff [compare x y = -1]  *)
+val ( > ) : t -> t -> bool
+(** [x > y] iff [compare x y =  1]  *)
+
+(** [x > y] iff [compare x y =  1]  *)
+val ( = ) : t -> t -> bool
+(** [x = y] iff [compare x y =  0]  *)
+
+(** [x = y] iff [compare x y =  0]  *)
+val ( <> ) : t -> t -> bool
+(** [x <> y] iff [compare x y <> 0]  *)
+
+(** [x <> y] iff [compare x y <> 0]  *)
+val ( <= ) : t -> t -> bool
+(** [x <= y] iff [compare x y <= 0]  *)
+
+(** [x <= y] iff [compare x y <= 0]  *)
+val ( >= ) : t -> t -> bool
+(** [x >= y] iff [compare x y >= 0]  *)
 
 (** [hash x] returns such [z] that forall [y] s.t. [x=y], [hash y = z] *)
 val hash : t -> int
-
 
 (** [pp ppf x] is a pretty printer for the bitvectors.
 
@@ -366,7 +360,6 @@ val to_binary : t -> string
 
 (** [of_binary s] returns a bitvector [x] s.t. [to_binary x = s].*)
 val of_binary : string -> t
-
 
 (** [to_string x] returns a textual (human readable) representation
     of the bitvector [x]. *)
@@ -402,14 +395,12 @@ val of_string : string -> t
 *)
 val fits_int : t -> bool
 
-
 (** [to_int x] returns an OCaml integer that has the same
     representation as [x].
 
     The function is undefined if [not (fits_int x)].
 *)
 val to_int : t -> int
-
 
 (** [fits_int32 x] is [true] if [x] could be represented with the OCaml
     [int] type.
@@ -443,13 +434,11 @@ val fits_int64 : t -> bool
 *)
 val to_int64 : t -> int64
 
-
 (** [to_bigint x] returns a natural number that corresponds to [x].
 
     The returned value is always positive.
 *)
 val to_bigint : t -> Z.t
-
 
 (** [extract ~hi ~lo x] extracts bits from [lo] to [hi].
 
@@ -457,7 +446,6 @@ val to_bigint : t -> Z.t
     [(x lsr lo) mod (hi-lo+1)]
 *)
 val extract : hi:int -> lo:int -> t -> t
-
 
 (** [select bits x] builds a bitvector from [bits] of [x].
 
@@ -498,16 +486,14 @@ module type Modulus = sig
   val modulus : modulus
 end
 
-
 (** [module Mx = Make(Modulus)] produces a module [Mx]
     which implements all operation in [S] modulo
     [Modulus.modulus], so that all operations return a
     bitvector directly.
 *)
-module Make(M : Modulus) : sig
+module Make (M : Modulus) : sig
   include S with type 'a m = 'a
 end
-
 
 (** [M1] specializes [Make(struct let modulus = m1 end)]
 
@@ -515,7 +501,7 @@ end
     and on an efficient implementation of the modulo operation
     as the [even x] aka [lsb x] operation.
 *)
-module M1  : S with type 'a m = 'a
+module M1 : S with type 'a m = 'a
 
 (** [M8] specializes [Make(struct let modulus = m8 end)]
 
@@ -524,8 +510,7 @@ module M1  : S with type 'a m = 'a
     calls to the underlying arbitrary precision arithmetic
     library.
 *)
-module M8  : S with type 'a m = 'a
-
+module M8 : S with type 'a m = 'a
 
 (** [M32] specializes [Make(struct let modulus = m32 end)]
 
@@ -535,7 +520,6 @@ module M8  : S with type 'a m = 'a
     library.
 *)
 module M32 : S with type 'a m = 'a
-
 
 (** [M64] specializes [Make(struct let modulus = m64 end)]
 

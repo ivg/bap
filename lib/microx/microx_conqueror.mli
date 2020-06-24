@@ -2,6 +2,7 @@ open Core_kernel
 open Bap.Std
 
 [@@@warning "-D"]
+
 (** execution context.
 
     The context defines the state of execution.
@@ -14,32 +15,44 @@ open Bap.Std
     stall the interpreter.
 *)
 class context :
-  ?max_steps:int ->
-  ?max_loop:int ->
-  program term -> object('s)
-    [@@@warning "-D"]
-    inherit Biri.context
+  ?max_steps:int
+  -> ?max_loop:int
+  -> program term
+  -> object ('s)
+       [@@@warning "-D"]
 
-    method visited : int Tid.Map.t
+       inherit Biri.context
 
-    method add_checkpoint : tid -> 's
-    method checkpoints : 's Tid.Map.t Tid.Map.t
-    method backtrack : 's option
-    method merge : 's -> 's
+       method visited : int Tid.Map.t
 
-    method return : 's
-    method store_return : tid -> 's
+       method add_checkpoint : tid -> 's
 
-    method visit_term : tid -> 's
-    method enter_sub : sub term -> 's
-    method leave_sub : sub term -> 's
-    method enter_blk : blk term -> 's
-    method blk : blk term option
-    method step : 's option
-    method will_loop : tid -> bool
-    method will_return : tid -> bool
-  end
+       method checkpoints : 's Tid.Map.t Tid.Map.t
 
+       method backtrack : 's option
+
+       method merge : 's -> 's
+
+       method return : 's
+
+       method store_return : tid -> 's
+
+       method visit_term : tid -> 's
+
+       method enter_sub : sub term -> 's
+
+       method leave_sub : sub term -> 's
+
+       method enter_blk : blk term -> 's
+
+       method blk : blk term option
+
+       method step : 's option
+
+       method will_loop : tid -> bool
+
+       method will_return : tid -> bool
+     end
 
 (** BIR interpreter, that executes a program in a given context.
 
@@ -48,7 +61,11 @@ class context :
     linearly independent paths.
 
 *)
-class ['a] main : ?deterministic:bool -> program term -> object
-    inherit ['a] biri
-    constraint 'a = #context
-  end
+class ['a] main :
+  ?deterministic:bool
+  -> program term
+  -> object
+       inherit ['a] biri
+
+       constraint 'a = #context
+     end

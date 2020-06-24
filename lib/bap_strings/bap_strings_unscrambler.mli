@@ -5,7 +5,6 @@ module type Alphabet = sig
   (** total number of symbols in the alphabet *)
   val length : int
 
-
   (** [index x] maps [x] to the [n]'th symbol of an alphabet, if [x]
       is a representation of that symbols, returns a number that is
       outside of [[0,len-1]] interval if it is not.*)
@@ -18,21 +17,19 @@ end
     e.g., [Ascii.Digits], [AScii]
 *)
 module Ascii : sig
-
   (** Letters *)
   module Alpha : sig
-
     (** Caseless Letters  *)
     module Caseless : Alphabet
+
     include Alphabet
   end
 
-
   (** Letters and Numbers  *)
   module Alphanum : sig
-
     (** Caseless Letters *)
     module Caseless : Alphabet
+
     include Alphabet
   end
 
@@ -59,12 +56,11 @@ end
     of the dictionary size).
 
 *)
-module Make(A : Alphabet) : sig
+module Make (A : Alphabet) : sig
   type t [@@deriving bin_io, compare, sexp]
 
   (** an empty unscrambler that doesn't know any words *)
   val empty : t
-
 
   (** [of_file name] reads the dictionary from file [name],
       each word is on a separate line. (the standard linux dictionary
@@ -77,10 +73,8 @@ module Make(A : Alphabet) : sig
       words.*)
   val of_files : string list -> t
 
-
   (** [add_word d x] extends the dictionary [d] with the new word [x]. *)
   val add_word : t -> string -> t
-
 
   (** [build d chars] returns a sequence of all words in the
       dictionary [d] that could be built from the sequence of characters [chars]  *)

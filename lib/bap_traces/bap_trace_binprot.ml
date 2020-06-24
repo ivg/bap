@@ -1,28 +1,25 @@
-
 open Core_kernel
 open Regular.Std
 open Bap.Std
 open Result
 open Bin_prot
-
 module Trace = Bap_trace
 
 module Proto = struct
-
   let name = "trace.binprot"
+
   let probe uri =
     match Uri.scheme uri with
     | Some "file" -> Filename.check_suffix (Uri.path uri) ".binprot"
     | _ -> false
 
-  let supports: 'a tag -> bool = fun _ -> true
+  let supports : 'a tag -> bool = fun _ -> true
 
   let read_from_channel chan buf ~pos ~len =
     let s = Bytes.create len in
     match In_channel.really_input chan ~buf:s ~pos:0 ~len with
     | None -> raise End_of_file
-    | Some () ->
-      Bigstring.From_bytes.blito ~src:s ~dst:buf ~dst_pos:pos ()
+    | Some () -> Bigstring.From_bytes.blito ~src:s ~dst:buf ~dst_pos:pos ()
 
   let read reader ch =
     try
@@ -37,69 +34,68 @@ module Proto = struct
     let buf = Utils.bin_dump ~header:true writer value in
     Out_channel.output_string chan (Bigstring.to_string buf)
 
-  let read_tool   = read  Trace.bin_reader_tool
-  let read_meta   = read  Dict.bin_reader_t
-  let read_event  = read  Trace.bin_reader_event
-  let write_tool  = write Trace.bin_writer_tool
-  let write_meta  = write Dict.bin_writer_t
+  let read_tool = read Trace.bin_reader_tool
+  let read_meta = read Dict.bin_reader_t
+  let read_event = read Trace.bin_reader_event
+  let write_tool = write Trace.bin_writer_tool
+  let write_meta = write Dict.bin_writer_t
   let write_event = write Trace.bin_writer_event
-
 end
 
 module TraceWriter = struct
-
   let make_channel path =
     try
       let fd = Unix.(openfile path [O_WRONLY; O_TRUNC; O_CREAT] 0o666) in
       Ok (Unix.out_channel_of_descr fd)
-    with Unix.Unix_error (er,_,_) -> Error (`System_error er)
+    with Unix.Unix_error (er, _, _) -> Error (`System_error er)
 
   let write uri t =
-    make_channel (Uri.path uri) >>= fun ch ->
-    Proto.write_tool (Trace.tool t) ch;
-    Proto.write_meta (Trace.meta t) ch;
-    Trace.read_events t |>
-    Seq.iter ~f:(fun ev -> Proto.write_event ev ch);
+    make_channel (Uri.path uri)
+    >>= fun ch ->
+    Proto.write_tool (Trace.tool t) ch ;
+    Proto.write_meta (Trace.meta t) ch ;
+    Trace.read_events t |> Seq.iter ~f:(fun ev -> Proto.write_event ev ch) ;
     Ok (Out_channel.close ch)
-
 end
 
 module TraceReader = struct
-
   let make_channel path =
     try
       let () = Unix.(access path [R_OK]) in
       Ok (In_channel.create path)
-    with Unix.Unix_error (er,_,_) -> Error (`System_error er)
+    with Unix.Unix_error (er, _, _) -> Error (`System_error er)
 
-  let next_event ch = match Proto.read_event ch with
-    | None -> In_channel.close ch; None
+  let next_event ch =
+    match Proto.read_event ch with
+    | None -> In_channel.close ch ; None
     | Some ev as res -> res
 
   let make_header_error () = Error.of_string "trace has damaged header"
 
-  let err_of_opt read ch = match read ch with
+  let err_of_opt read ch =
+    match read ch with
     | Some res -> res
     | None ->
-      In_channel.close ch;
-      Error (make_header_error ())
+        In_channel.close ch ;
+        Error (make_header_error ())
 
   let make_reader ch =
     let next () = next_event ch in
-    err_of_opt Proto.read_tool ch >>=
-    fun tool -> err_of_opt Proto.read_meta ch >>=
-    fun meta -> Ok (Trace.Reader.({tool; meta; next;}))
+    err_of_opt Proto.read_tool ch
+    >>= fun tool ->
+    err_of_opt Proto.read_meta ch
+    >>= fun meta -> Ok Trace.Reader.{tool; meta; next}
 
   let read uri id =
-    make_channel (Uri.path uri) >>=
-    fun ch -> match make_reader ch with
+    make_channel (Uri.path uri)
+    >>= fun ch ->
+    match make_reader ch with
     | Ok r as res -> res
     | Error er -> Error (`Protocol_error er)
-
 end
 
 let register () =
   let open Trace in
   let proto = register_proto (module Proto : P) in
-  register_reader proto TraceReader.read;
+  register_reader proto TraceReader.read ;
   register_writer proto TraceWriter.write

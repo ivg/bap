@@ -1,7 +1,7 @@
 (** BIR attributes.  *)
 open Bap.Std
-open Bap_c_type
 
+open Bap_c_type
 
 (** Abstraction of a data representation of C value. This
     attribute is attached to each inserted arg term, but can be

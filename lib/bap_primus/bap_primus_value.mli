@@ -2,10 +2,10 @@ open Core_kernel
 open Regular.Std
 open Bap.Std
 open Bap_strings.Std
-
 open Bap_primus_types
 
 type id [@@deriving bin_io, compare, sexp]
+
 module Id : Regular.S with type t = id
 
 type t = value [@@deriving bin_io, compare, sexp]
@@ -15,13 +15,14 @@ val id : t -> id
 
 module Index : sig
   val key_width : int
+
   include Strings.Index.Persistent.S with type key := t
 end
 
-
-module Make(Machine : Machine) : sig
+module Make (Machine : Machine) : sig
   type t = value
   type 'a m = 'a Machine.t
+
   val id : t -> id
   val to_word : t -> word
   val of_word : word -> t m
@@ -64,18 +65,18 @@ module Make(Machine : Machine) : sig
   val arshift : t -> t -> t m
 
   module Syntax : sig
-    val ( ~-) : t -> t m
+    val ( ~- ) : t -> t m
     val ( + ) : t -> t -> t m
     val ( - ) : t -> t -> t m
     val ( * ) : t -> t -> t m
     val ( / ) : t -> t -> t m
-    val (mod) : t -> t -> t m
-    val (lor) : t -> t -> t m
-    val (lsl) : t -> t -> t m
-    val (lsr) : t -> t -> t m
-    val (asr) : t -> t -> t m
-    val (lxor) : t -> t -> t m
-    val (land) : t -> t -> t m
+    val ( mod ) : t -> t -> t m
+    val ( lor ) : t -> t -> t m
+    val ( lsl ) : t -> t -> t m
+    val ( lsr ) : t -> t -> t m
+    val ( asr ) : t -> t -> t m
+    val ( lxor ) : t -> t -> t m
+    val ( land ) : t -> t -> t m
   end
 
   module Symbol : sig

@@ -38,20 +38,22 @@ let create_stub_target arch =
 let targets = Arch.Table.create ()
 
 let target_of_arch =
-  let get arch = match Hashtbl.find targets arch with
+  let get arch =
+    match Hashtbl.find targets arch with
     | Some target -> target
     | None ->
-      let target = create_stub_target arch in
-      Hashtbl.set targets ~key:arch ~data:target;
-      target in
+        let target = create_stub_target arch in
+        Hashtbl.set targets ~key:arch ~data:target ;
+        target in
   get
 
-let type_check bil = match Type.check bil with
+let type_check bil =
+  match Type.check bil with
   | Error te ->
-    let err  =
-      Error.createf "The lifted code is not well-typed: %s"
-        (Type.Error.to_string te) in
-    Error err
+      let err =
+        Error.createf "The lifted code is not well-typed: %s"
+          (Type.Error.to_string te) in
+      Error err
   | Ok () -> Ok bil
 
 let apply_passes bil =
@@ -59,14 +61,13 @@ let apply_passes bil =
     List.fold ~init:bil (Bil.selected_passes ()) ~f:(fun bil f -> f bil) in
   Or_error.(type_check bil >>| Bil.fixpoint f >>= type_check)
 
-module Make(T : Target) = struct
+module Make (T : Target) = struct
   include T
 
-  let lift mem insn = match T.lift mem insn with
-    | Error _ as e -> e
-    | Ok bil -> apply_passes bil
+  let lift mem insn =
+    match T.lift mem insn with Error _ as e -> e | Ok bil -> apply_passes bil
 end
 
 let register_target arch (module Target : Target) =
-  let module T = Make(Target) in
+  let module T = Make (Target) in
   Hashtbl.set targets ~key:arch ~data:(module T)

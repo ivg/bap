@@ -24,7 +24,9 @@ val functions : t -> (string * fn) Sequence.t
 (** Current function representation.  *)
 module Fn : sig
   type t = fn [@@deriving bin_io, compare, sexp]
+
   val pc_lo : t -> addr
   val pc_hi : t -> addr option
+
   include Identifiable.S with type t := t
 end

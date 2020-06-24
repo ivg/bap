@@ -1,9 +1,7 @@
 open Core_kernel
 
 let strip_version ver =
-  if String.length ver <> 5 then ver
-  else String.sub ver 0 3
-
+  if String.length ver <> 5 then ver else String.sub ver 0 3
 
 module Std = struct
   type x86_syntax = [`att | `intel] [@@deriving sexp]

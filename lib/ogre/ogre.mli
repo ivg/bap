@@ -64,13 +64,11 @@ open Core_kernel
 open Monads.Std
 open Format
 
-
 (** the document  *)
 type doc
 
-
 (** type information associated with an attribute  *)
-type ('a,'k) typeinfo constraint 'k = _ -> _
+type ('a, 'k) typeinfo constraint 'k = _ -> _
 
 (** a descriptor of an attribute.
 
@@ -79,8 +77,7 @@ type ('a,'k) typeinfo constraint 'k = _ -> _
 
     Note, that due to a value restriction, an attribute should be
     defined as a function returning a type information.*)
-type ('a,'k) attribute = unit -> ('a,'k) typeinfo
-
+type ('a, 'k) attribute = unit -> ('a, 'k) typeinfo
 
 (** [t field] a descriptor of an attribute field.
 
@@ -119,10 +116,7 @@ type 'a seq = 'a Sequence.t
     attribute for instance), and ['a] variable is extended every time a
     new field is added to a scheme.
 *)
-type ('f,'k) scheme
-  constraint 'f = _ -> _
-  constraint 'k = _ -> _
-
+type ('f, 'k) scheme constraint 'f = _ -> _ constraint 'k = _ -> _
 
 (** [let attr () = declare ~name scheme] declares an attribute named
     with [name], and having a type described by the [scheme].
@@ -132,8 +126,6 @@ type ('f,'k) scheme
 
 *)
 val declare : name:string -> ('f -> 'a, 'k) scheme -> 'f -> ('a, 'k) typeinfo
-
-
 
 (** Ogre type system.
 
@@ -152,16 +144,12 @@ val declare : name:string -> ('f -> 'a, 'k) scheme -> 'f -> ('a, 'k) typeinfo
     queries.
 *)
 module Type : sig
-
-
   (** type descriptor.  *)
   type 'a t
-
 
   (** [int] is represented with OCaml's int64, and has a
       corresponding representation *)
   val int : int64 t
-
 
   (** [bool] is either [true] or [false].  *)
   val bool : bool t
@@ -172,12 +160,11 @@ module Type : sig
       database backend implementations. A user of the library
       shouldn't be bothered by the representation.*)
   val str : string t
-  val float : float t
 
+  val float : float t
 
   (** [scheme field] defines a scheme with one field.   *)
   val scheme : 'a field -> (('a -> 'r) -> 'r, ('a -> 'p) -> 'p) scheme
-
 
   (** [scm $field] adds a [field] to a scheme [scm].
 
@@ -199,18 +186,16 @@ module Type : sig
         (string -> int64 -> int64 -> 'b) -> 'b]}
 
       The scheme is used to construct an attribute. See below.*)
-  val ($) :
-    ('a -> 'b -> 'r, 'd -> 'b -> 'p) scheme -> 'b field ->
-    ('a -> 'r, 'd -> 'p) scheme
-
-
+  val ( $ ) :
+       ('a -> 'b -> 'r, 'd -> 'b -> 'p) scheme
+    -> 'b field
+    -> ('a -> 'r, 'd -> 'p) scheme
 
   (** [def name t] defines a field with the give [name] and type [t].  *)
-  val def  : string -> 'a t -> 'a field
-
+  val def : string -> 'a t -> 'a field
 
   (** [name : t] is the same as [def name t]  *)
-  val (%:) : string -> 'a t -> 'a field
+  val ( %: ) : string -> 'a t -> 'a field
 end
 
 (** Domain specific language for constructing queries.
@@ -224,9 +209,7 @@ end
 
 *)
 module Query : sig
-
   type 'a t = 'a query
-
 
   (** logical expression language, defined as
       {v
@@ -264,7 +247,6 @@ module Query : sig
       5. [x <cop> y] has type bool.
   *)
   type exp
-
 
   (** join statement.
 
@@ -309,7 +291,6 @@ module Query : sig
           ~where:student.(classid) = teacher.(classid)
       ]} *)
   type join
-
 
   (** a selection of attributes.
 
@@ -367,29 +348,23 @@ module Query : sig
 
       It is nearly three times as long, but in return it is type-safe,
       and composable.*)
-  val select :
-    ?where:exp ->
-    ?join:join list list ->
-    'a tables -> 'a t
-
+  val select : ?where:exp -> ?join:join list list -> 'a tables -> 'a t
 
   (** [from attr] adds an attribute [attr] to the query. An attribute
       can be referenced in the query if it occurs in the from
       clause. Otherwise the query is not well-formed.  *)
-  val from : ('a,_) attribute -> (('a -> 'r) -> 'r) tables
-
+  val from : ('a, _) attribute -> (('a -> 'r) -> 'r) tables
 
   (** [attrs $ attr] appends an attribute [attr] to the sequence of
       chosen attributes [attrs].*)
-  val ($) : ('a -> 'b -> 'r) tables -> ('b,_) attribute -> ('a -> 'r) tables
+  val ( $ ) : ('a -> 'b -> 'r) tables -> ('b, _) attribute -> ('a -> 'r) tables
 
   (** [field name] creates an unqualified join variable.
       [field name ~from:attr] creates a qualified join variable.
 
       See the {!join} type description, for the explanation of the
       [join] expressions and joining.  *)
-  val field : ?from: (_,_) attribute -> _ field -> join
-
+  val field : ?from:(_, _) attribute -> _ field -> join
 
   (** Defines a subscripting syntax for creating field variables.
 
@@ -399,15 +374,12 @@ module Query : sig
       returns an [exp] that denotes a field variable of attribute [x]
       that ranges over the values of field [y].*)
   module Array : sig
-
-
     (** [attr.(field)] creates a field variable that ranges over
         values of [field] that belongs to the attribute [attr].
 
         See the module description if you don't understand how it works.*)
-    val get : (_,_) attribute -> _ field -> exp
+    val get : (_, _) attribute -> _ field -> exp
   end
-
 
   (** Defines field subscripting syntax.
 
@@ -427,10 +399,8 @@ module Query : sig
     val get : _ field -> int -> exp
   end
 
-
   (** [str x] creates a string constant.  *)
   val str : string -> exp
-
 
   (** [int x] creates an integer constant  *)
   val int : int64 -> exp
@@ -438,18 +408,14 @@ module Query : sig
   (** [bool x] creates a logic constant  *)
   val bool : bool -> exp
 
-
   (** [float x] creates a real number constant.  *)
   val float : float -> exp
 
-
   (** [x && y] conjunction  *)
-  val (&&) : exp -> exp -> exp
-
+  val ( && ) : exp -> exp -> exp
 
   (** [x || y] disjunction  *)
-  val (||) : exp -> exp -> exp
-
+  val ( || ) : exp -> exp -> exp
 
   (** [x ==> y] implication.
 
@@ -463,46 +429,35 @@ module Query : sig
       expression, that has an implication, as even if you're aware of
       the precedence issue, it is not known to a reader of your code,
       whether you were aware, or wrote this code by a mistake.*)
-  val (==>) : exp -> exp -> exp
-
+  val ( ==> ) : exp -> exp -> exp
 
   (** [not x] logical negation.  *)
   val not : exp -> exp
 
-
   (** [x < y] less than  *)
-  val (<) : exp -> exp -> exp
-
+  val ( < ) : exp -> exp -> exp
 
   (** [x > y] greater than  *)
-  val (>) : exp -> exp -> exp
-
+  val ( > ) : exp -> exp -> exp
 
   (** [x = y] equality  *)
-  val (=) : exp -> exp -> exp
-
+  val ( = ) : exp -> exp -> exp
 
   (** [x <> y] nonequality  *)
-  val (<>) : exp -> exp -> exp
-
+  val ( <> ) : exp -> exp -> exp
 
   (** [x <= y] less than or equal  *)
-  val (<=) : exp -> exp -> exp
-
+  val ( <= ) : exp -> exp -> exp
 
   (** [x >= y] greater or equal *)
-  val (>=) : exp -> exp -> exp
-
+  val ( >= ) : exp -> exp -> exp
 
   (** [x + y] summation  *)
-  val (+) : exp -> exp -> exp
-
+  val ( + ) : exp -> exp -> exp
 
   (** [x - y] subtracting  *)
-  val (-) : exp -> exp -> exp
+  val ( - ) : exp -> exp -> exp
 end
-
-
 
 (** An Ogre document.
 
@@ -512,41 +467,33 @@ end
 module Doc : sig
   type t = doc [@@deriving compare]
 
-
   (** [empty] creates an empty document  *)
   val empty : doc
-
 
   (** [merge d1 d2] merges two documents in one. Returns an error,
       if documents contain inconsistent declarations.*)
   val merge : doc -> doc -> doc Or_error.t
-
 
   (** [load chan] loads a document from a channel, returns an error if
       a document is not well-formed, raises an exception if a system error
       has occurred.  *)
   val load : In_channel.t -> doc Or_error.t
 
-
   (** [save doc out] stores the document in a channel. Raises an
       exception in case of a system error. *)
   val save : doc -> Out_channel.t -> unit
-
 
   (** [from_file name] reads a document from a file with the given
       [name], returns an error, if a document is not well-formed, raises
       an exception if a system error has occurred. *)
   val from_file : string -> doc Or_error.t
 
-
   (** [from_string data] parses document from [data]. Returns an error
       if a document is not well-formed. *)
   val from_string : string -> doc Or_error.t
 
-
   (** [to_string doc] returns a textual representation of a document  *)
   val to_string : doc -> string
-
 
   (** [to_file doc name] stores a document to a file with the given name.  *)
   val to_file : doc -> string -> unit
@@ -554,23 +501,19 @@ module Doc : sig
   (** [pp ppf doc] prints a [doc] in the specified formatter [ppf]  *)
   val pp : Format.formatter -> doc -> unit
 
-
   (** [clear doc] removes all facts from the document.
 
       Useful for extracting scheme from a document.*)
   val clear : doc -> doc
 
-
   (** [declarations doc] returns a number of declarations in the
       document *)
   val declarations : doc -> int
-
 
   (** [definitions doc] returns a number of facts, defined in the
       document. *)
   val definitions : doc -> int
 end
-
 
 (** Monadic interface to the document.
 
@@ -612,13 +555,13 @@ module type S = sig
   (** [require a ~that:p] requires that an attribute [a] has one and
       only one value that satisfies a predicate [p]. It is an error,
       if there are no such values, or if there are more than one value.*)
-  val require : ?that:('a -> bool) -> ('a,_) attribute -> 'a t
+  val require : ?that:('a -> bool) -> ('a, _) attribute -> 'a t
 
   (** [request a ~that:p] request no more than one value of an
       attribute [a], that satisfies a predicate [p]. The returned
       value is wrapped in an option. If there are more than one
       satisfying value, then it is an error. *)
-  val request : ?that:('a -> bool) -> ('a,_) attribute -> 'a option t
+  val request : ?that:('a -> bool) -> ('a, _) attribute -> 'a option t
 
   (** [foreach query ~f:action] applies an [action] for each value of
       an attributes specified in the query. The [query] value is built
@@ -665,11 +608,9 @@ module type S = sig
       defines the type and the arity of the function.*)
   val provide : (_, 'a -> unit t) attribute -> 'a
 
-
   (** [fail error] aborts an inference process with the specified
       [error].  *)
   val fail : Error.t -> 'a t
-
 
   (** [failf fmt args... ()] constructs an error based on the
       specified format [fmt] and arguments, terminated by the unit value
@@ -708,7 +649,7 @@ module type S = sig
       GPA score greater than 3.8.
 
   *)
-  val eval : 'a t -> doc -> 'a  Or_error.t m
+  val eval : 'a t -> doc -> 'a Or_error.t m
 
   (** [exec op doc] executes an operation [op] that, presumably,
       updates the document [doc], returns an updated version.*)
@@ -722,13 +663,13 @@ module type S = sig
   val run : 'a t -> doc -> ('a * doc) Or_error.t m
 end
 
-
 (** [Make(M)] returns an Ogre monad implementation wrapped in a monad [M]. *)
-module Make(M : Monad.S) : S with type 'a m := 'a M.t
-
+module Make (M : Monad.S) : S with type 'a m := 'a M.t
 
 (** Default implementation of the Orge monad, that is not wrapped into
     any other monads (in other words, that is wrapped into the identity)*)
-include S with type 'a m = 'a
-           and type 'a t = 'a Make(Monad.Ident).t
-           and type 'a e = doc -> ('a * doc) Or_error.t
+include
+  S
+    with type 'a m = 'a
+     and type 'a t = 'a Make(Monad.Ident).t
+     and type 'a e = doc -> ('a * doc) Or_error.t

@@ -2,11 +2,8 @@ open Bap.Std
 
 [@@@warning "-D"]
 
-type policy = [
-  | `Random
-  | `Fixed of int64 | `Interval of int64 * int64 ]
+type policy = [`Random | `Fixed of int64 | `Interval of int64 * int64]
 [@@deriving sexp_of]
-
 
 (** expression interpreter that never halts due to an unknown value.
 
@@ -20,8 +17,10 @@ type policy = [
     @param mem_policy a policy for concretizing heap values.
 *)
 class ['a] main :
-  ?memory:(addr -> word option) ->
-  ?lookup:(var -> word option) ->
-  ?random_seed:int ->
-  ?reg_policy:policy ->
-  ?mem_policy:policy -> unit -> ['a] expi
+  ?memory:(addr -> word option)
+  -> ?lookup:(var -> word option)
+  -> ?random_seed:int
+  -> ?reg_policy:policy
+  -> ?mem_policy:policy
+  -> unit
+  -> ['a] expi

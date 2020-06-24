@@ -7,7 +7,6 @@ open Theory
 (** Elementary is a library that provides few primitives for
     approximations of floating point operations via table methods.  *)
 module Elementary (Theory : Theory.Core) : sig
-
   type 'a t = 'a knowledge
 
   exception Not_a_table
@@ -23,13 +22,13 @@ module Elementary (Theory : Theory.Core) : sig
       could be restored by [extract] function with a respect to a
       rank of each coefficient. *)
   val approximate :
-    rank : int ->
-    reduce : (('a,'s) format float -> 'r bitv) ->
-    extract : (int -> 'd bitv -> 's bitv) ->
-    coefs : ('r, 'd) Mem.t var ->
-    ('a,'s) format float ->
-    rmode ->
-    ('a,'s) format float
+       rank:int
+    -> reduce:(('a, 's) format float -> 'r bitv)
+    -> extract:(int -> 'd bitv -> 's bitv)
+    -> coefs:('r, 'd) Mem.t var
+    -> ('a, 's) format float
+    -> rmode
+    -> ('a, 's) format float
 
   (** [tabulate op ~rank ~size x rmode] defines a subset of
       functions that can be created by [approximate], s.t.
@@ -39,19 +38,19 @@ module Elementary (Theory : Theory.Core) : sig
 
       @param op is a name of floating point operation to approximate. *)
   val tabulate :
-    string ->
-    rank:int ->
-    size:int ->
-    ('a,'s) format float ->
-    rmode ->
-    ('a,'s) format float
+       string
+    -> rank:int
+    -> size:int
+    -> ('a, 's) format float
+    -> rmode
+    -> ('a, 's) format float
 
   (** [table operation sort rank] defines a naming scheme for
       approximation of [rank] of an [operation] for values of [sort].  *)
   val table : string -> ('r, 's) format Float.t Value.sort -> int -> string
 
   (** [is_table ident] returns true if [ident] is a table *)
-  val is_table  : Var.ident -> Base.bool
+  val is_table : Var.ident -> Base.bool
 
   (** [operation ident] returns the name of a function,
       which polynomial coefficients reside in a table
@@ -70,7 +69,7 @@ module Elementary (Theory : Theory.Core) : sig
     val pown : 'a t
     val rsqrt : 'a t
     val hypot : 'a t
-    val exp  : 'a t
+    val exp : 'a t
     val expm1 : 'a t
     val exp2 : 'a t
     val exp2m1 : 'a t
@@ -100,5 +99,4 @@ module Elementary (Theory : Theory.Core) : sig
     val acosh : 'a t
     val atanh : 'a t
   end
-
 end

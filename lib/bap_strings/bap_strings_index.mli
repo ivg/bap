@@ -1,5 +1,6 @@
 module type Key = sig
   type t
+
   val compare : t -> t -> int
   val null : t
   val succ : t -> t

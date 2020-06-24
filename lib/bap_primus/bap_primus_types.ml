@@ -1,9 +1,7 @@
 open Core_kernel
 open Bap.Std
 open Monads.Std
-
 open Bap_primus_generator_types
-
 module Exn = Bap_primus_exn
 module Pos = Bap_primus_pos
 
@@ -14,15 +12,10 @@ type provider = Bap_primus_observation.provider
 type 'a statement = 'a Bap_primus_observation.statement
 type subscription = Bap_primus_observation.subscription
 type 'a state = 'a Bap_primus_state.t
-type exit_status =
-  | Normal
-  | Exn of exn
+type exit_status = Normal | Exn of exn
 
 type 'a effect =
-  ?envp:string array ->
-  ?args:string array ->
-  string ->
-  project -> 'a
+  ?envp:string array -> ?args:string array -> string -> project -> 'a
 
 module type State = sig
   type 'a m
@@ -33,11 +26,7 @@ module type State = sig
   val update : 'a t -> f:('a -> 'a) -> unit m
 end
 
-type value = {
-  id : Int63.t;
-  value  : word;
-} [@@deriving bin_io]
-
+type value = {id: Int63.t; value: word} [@@deriving bin_io]
 type id = Monad.State.Multi.id
 
 module type Machine = sig
@@ -55,27 +44,28 @@ module type Machine = sig
 
   module Syntax : sig
     include Monad.Syntax.S with type 'a t := 'a t
-    val (>>>) : 'a observation -> ('a -> unit t) -> unit t
+
+    val ( >>> ) : 'a observation -> ('a -> unit t) -> unit t
   end
 
-  include Monad.State.Multi.S with type 'a t := 'a t
-                               and type 'a m := 'a m
-                               and type env := project
-                               and type id := id
-                               and module Syntax := Syntax
-                               and type 'a e =
-                                     ?boot:unit t ->
-                                     ?init:unit t ->
-                                     ?fini:unit t ->
-                                     (exit_status * project) m effect
-  module Local  : State with type 'a m := 'a t
-                         and type 'a t := 'a state
-  module Global : State with type 'a m := 'a t
-                         and type 'a t := 'a state
+  include
+    Monad.State.Multi.S
+      with type 'a t := 'a t
+       and type 'a m := 'a m
+       and type env := project
+       and type id := id
+       and module Syntax := Syntax
+       and type 'a e =
+               ?boot:unit t
+            -> ?init:unit t
+            -> ?fini:unit t
+            -> (exit_status * project) m effect
+
+  module Local : State with type 'a m := 'a t and type 'a t := 'a state
+  module Global : State with type 'a m := 'a t and type 'a t := 'a state
 
   val raise : exn -> 'a t
   val catch : 'a t -> (exn -> 'a t) -> 'a t
-
   val project : project t
   val program : program term t
   val arch : arch t

@@ -15,7 +15,6 @@
 *)
 open Bap.Std
 
-
 type stats
 
 (** Data interface.
@@ -41,7 +40,6 @@ module type Corpus = sig
   val look : t -> length:int -> int -> key option
 end
 
-
 (** Byteweight algorithm interface.
 
     Byteweight is a supervised machine learning algorithm. Based on
@@ -59,10 +57,8 @@ module type S = sig
   type key
   type corpus
 
-
   (** [create ()] creates an empty instance of the byteweigth decider.  *)
   val create : unit -> t
-
 
   (** [train decider ~max_length test corpus] train the [decider] on
       the specified [corpus]. The [test] function classifies extracted
@@ -70,11 +66,9 @@ module type S = sig
       length of substrings. *)
   val train : t -> max_length:int -> (key -> bool) -> corpus -> unit
 
-
   (** [length decider] total amount of different substrings known to a
       decider.  *)
   val length : t -> int
-
 
   (** [next t ~length ~threshold data begin] the next positive chunk.
 
@@ -86,10 +80,7 @@ module type S = sig
       extended [V1.V2.S] interface.
   *)
 
-  val next : t ->
-    length:int ->
-    threshold:float -> corpus -> int -> int option
-
+  val next : t -> length:int -> threshold:float -> corpus -> int -> int option
 
   (** [pp ppf decider] prints all known to decider chunks.  *)
   val pp : Format.formatter -> t -> unit
@@ -98,18 +89,15 @@ end
 module V1 : sig
   module type S = S
 
-  module Make
-      (Corpus : Corpus)
-      (Trie : Trie.S with type key = Corpus.key) :
-    S with type key = Corpus.key
-       and type corpus = Corpus.t
+  module Make (Corpus : Corpus) (Trie : Trie.S with type key = Corpus.key) :
+    S with type key = Corpus.key and type corpus = Corpus.t
 end
 
 module V2 : sig
   module type S = sig
     include V1.S
-    type token
 
+    type token
 
     (** [next_if t ~length ~f data begin] the next chunk that [f].
 
@@ -118,18 +106,21 @@ module V2 : sig
         substring [s] with length [n] and statistics [stats], such
         that [f s n stats] is [true].
     *)
-    val next_if : t -> length:int -> f:(key -> int -> stats -> bool) -> corpus ->
-      int -> int option
-
+    val next_if :
+         t
+      -> length:int
+      -> f:(key -> int -> stats -> bool)
+      -> corpus
+      -> int
+      -> int option
 
     (** [fold t ~init ~f] applies [f] to all chunks known to the decider.   *)
     val fold : t -> init:'b -> f:('b -> token list -> stats -> 'b) -> 'b
   end
 
-  module Make
-      (Corpus : Corpus)
-      (Trie : Trie.V2.S with type key = Corpus.key) :
-    S with type key = Corpus.key
+  module Make (Corpus : Corpus) (Trie : Trie.V2.S with type key = Corpus.key) :
+    S
+      with type key = Corpus.key
        and type corpus = Corpus.t
        and type token = Trie.token
 end
@@ -142,25 +133,17 @@ end
     particular, it gives an opportunity, to implement normalized
     string comparison.*)
 
-module Make
-    (Corpus : Corpus)
-    (Trie : Trie.S with type key = Corpus.key) :
-  S with type key = Corpus.key
-     and type corpus = Corpus.t
-
+module Make (Corpus : Corpus) (Trie : Trie.S with type key = Corpus.key) :
+  S with type key = Corpus.key and type corpus = Corpus.t
 
 (** Default implementation that uses memory chunk as the domain.  *)
 module Bytes : sig
-  include V2.S with type key = mem
-                and type corpus = mem
-                and type token := word
-
+  include V2.S with type key = mem and type corpus = mem and type token := word
 
   (** [find mem ~length ~threshold corpus] extract addresses of all
       memory chunks of the specified [length], that were classified
       positively under given [threshold]. *)
   val find : t -> length:int -> threshold:float -> corpus -> addr list
-
 
   (** [find_if mem ~length ~f corpus] finds all positively classfied chunks.
 
@@ -170,8 +153,8 @@ module Bytes : sig
       It scans the input corpus using the [next_if] function and
       collects all positive results.
   *)
-  val find_if : t -> length:int -> f:(key -> int -> stats -> bool) -> corpus -> addr list
-
+  val find_if :
+    t -> length:int -> f:(key -> int -> stats -> bool) -> corpus -> addr list
 
   (** [find_using_bayes_factor sigs mem] classify functions starts using the
       Bayes factor procedure.
@@ -226,12 +209,8 @@ module Bytes : sig
         100 and greater       Decisive
       v}
   *)
-  val find_using_bayes_factor : t ->
-    min_length:int ->
-    max_length:int ->
-    float ->
-    corpus -> addr list
-
+  val find_using_bayes_factor :
+    t -> min_length:int -> max_length:int -> float -> corpus -> addr list
 
   (** [find_using_threshold sigs mem] classify function starts using
       a simple thresholding procedure.
@@ -247,17 +226,12 @@ module Bytes : sig
       - n - the total number of occurences of [s] not at the begining
         of a function in [sigs].
   *)
-  val find_using_threshold : t ->
-    min_length:int ->
-    max_length:int ->
-    float ->
-    corpus -> addr list
+  val find_using_threshold :
+    t -> min_length:int -> max_length:int -> float -> corpus -> addr list
 end
-
 
 module Stats : sig
   type t = stats
-
 
   (** [trial stats] is the total number of trials.
 
@@ -265,7 +239,6 @@ module Stats : sig
       all tests, it is equal to [h0 stats + h1 stats].
   *)
   val trials : t -> int
-
 
   (** [h0 stats] is how many times the null-hypothesis being accepted.
 
@@ -276,7 +249,6 @@ module Stats : sig
       substring was classified as not a function start.
   *)
   val h0 : t -> int
-
 
   (** [h1 stats] is how many times the null hypothesis was rejected.
 

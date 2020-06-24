@@ -4,13 +4,9 @@ open Core_kernel
 open Bap_bundle.Std
 open Bap_future.Std
 
-
 (** Interface to the plugin subsystem.  *)
 module Std : sig
-
-
   type plugin
-
 
   (** Plugin - a loadable self-contained piece of code.
 
@@ -19,7 +15,6 @@ module Std : sig
 
   *)
   module Plugin : sig
-
     type t = plugin
 
     (** [of_path path] creates a plugin of a give [path]  *)
@@ -54,7 +49,6 @@ module Std : sig
     val argv : unit -> string array
   end
 
-
   (** Plugin loader.
 
       This module handles the set of plugins, visible to the
@@ -79,15 +73,13 @@ module Std : sig
       about events, that is useful for debugging issues with plugins.
   *)
   module Plugins : sig
-    type event = [
-      | `Opening of string (** a bundle with a plugin is opened     *)
-      | `Loading of plugin (** a plugin loading process is started  *)
-      | `Linking of string (** a library or module is linked in      *)
-      | `Loaded  of plugin (** a plugin was successfully loaded     *)
-      | `Errored of string * Error.t (** failed to load a plugin    *)
-    ] [@@deriving sexp_of]
-
-
+    type event =
+      [ `Opening of string  (** a bundle with a plugin is opened     *)
+      | `Loading of plugin  (** a plugin loading process is started  *)
+      | `Linking of string  (** a library or module is linked in      *)
+      | `Loaded of plugin  (** a plugin was successfully loaded     *)
+      | `Errored of string * Error.t  (** failed to load a plugin    *) ]
+    [@@deriving sexp_of]
 
     (** [path] is the default directory where plugins are stored.  *)
     val path : string
@@ -122,10 +114,11 @@ module Std : sig
 
     *)
     val list :
-      ?env:string list ->
-      ?provides:string list ->
-      ?library:string list ->
-      unit -> plugin list
+         ?env:string list
+      -> ?provides:string list
+      -> ?library:string list
+      -> unit
+      -> plugin list
 
     (** [run ()] loads all plugins.
 
@@ -147,13 +140,14 @@ module Std : sig
         unless you're implementing your own error handling facility
         via the event subsystem.*)
     val run :
-      ?argv:string array ->
-      ?env:string list ->
-      ?provides:string list ->
-      ?don't_setup_handlers:bool ->
-      ?library:string list ->
-      ?exclude:string list ->
-      unit -> unit
+         ?argv:string array
+      -> ?env:string list
+      -> ?provides:string list
+      -> ?don't_setup_handlers:bool
+      -> ?library:string list
+      -> ?exclude:string list
+      -> unit
+      -> unit
 
     (** [load ()] loads all plugins if they are not loaded yet.
 
@@ -171,13 +165,13 @@ module Std : sig
         will be decided.
     *)
     val load :
-      ?argv:string array ->
-      ?env:string list ->
-      ?provides:string list ->
-      ?library:string list ->
-      ?exclude:string list -> unit ->
-      (plugin, string * Error.t) Result.t list
-
+         ?argv:string array
+      -> ?env:string list
+      -> ?provides:string list
+      -> ?library:string list
+      -> ?exclude:string list
+      -> unit
+      -> (plugin, string * Error.t) Result.t list
 
     (** plugin subsystem event stream.   *)
     val events : event stream
@@ -186,13 +180,11 @@ module Std : sig
     val loaded : unit future
   end
 
-
   (** [list_loaded_units ()] evaluates to a list of compilation unit
       names currently loaded into the system. The list includes both,
       units loaded dynamically, and those that were statically linked
       into the host program.  *)
   val list_loaded_units : unit -> string list
-
 
   (** [setup_dynamic_loader loader] installs [loader] program. The
       [loader] takes a filename and loads it.

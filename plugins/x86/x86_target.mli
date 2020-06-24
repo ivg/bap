@@ -7,7 +7,6 @@ module IA32 : Target
 (** AMD64 target *)
 module AMD64 : Target
 
-
 (** IA32 legacy target *)
 module IA32L : Target
 

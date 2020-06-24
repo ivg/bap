@@ -1,9 +1,7 @@
 open Bap_knowledge
 open Bap_core_theory_definition
 open Bap_core_theory_value
-
 open Knowledge.Syntax
-
 module Value = Knowledge.Value
 
 let bool = Bool.t
@@ -13,23 +11,17 @@ module Core : Core = struct
   type 'a t = 'a Knowledge.t
 
   let name =
-    KB.Symbol.intern "empty" theory
-      ~package:"core-theory"
-      ~public:true
+    KB.Symbol.intern "empty" theory ~package:"core-theory" ~public:true
       ~desc:"The empty theory."
 
-  let empty x =
-    Knowledge.return @@
-    Value.empty (KB.Class.refine cls x)
+  let empty x = Knowledge.return @@ Value.empty (KB.Class.refine cls x)
 
   let neweff eff =
-    Knowledge.return @@
-    Value.empty (KB.Class.refine Effect.cls eff)
+    Knowledge.return @@ Value.empty (KB.Class.refine Effect.cls eff)
 
-  let data  = neweff Effect.Sort.bot
-  let ctrl  = neweff Effect.Sort.bot
-  let unit  = neweff Effect.Sort.bot
-
+  let data = neweff Effect.Sort.bot
+  let ctrl = neweff Effect.Sort.bot
+  let unit = neweff Effect.Sort.bot
   let var v = empty (Var.sort v)
   let int s _ = empty s
   let unk s = empty s
@@ -65,7 +57,6 @@ module Core : Core = struct
   let pass = data
   let skip = ctrl
   let perform eff = neweff eff
-
   let set _ _ = data
   let let_ _ _ x = sort x >>= empty
   let jmp _ = ctrl
@@ -78,7 +69,6 @@ module Core : Core = struct
   let mfence = data
   let lfence = data
   let sfence = data
-
   let zero = empty
   let is_zero _ = empty bool
   let non_zero _ = empty bool
@@ -96,8 +86,7 @@ module Core : Core = struct
   let arshift x _ = sort x >>= empty
   let rshift x _ = sort x >>= empty
   let lshift x _ = sort x >>= empty
-
-  let eq  _ _ = empty bool
+  let eq _ _ = empty bool
   let neq _ _ = empty bool
   let slt _ _ = empty bool
   let ult _ _ = empty bool
@@ -105,17 +94,14 @@ module Core : Core = struct
   let ugt _ _ = empty bool
   let sge _ _ = empty bool
   let uge _ _ = empty bool
-
   let rne = empty Rmode.t
   let rna = empty Rmode.t
   let rtp = empty Rmode.t
   let rtn = empty Rmode.t
   let rtz = empty Rmode.t
-  let requal _ _  = empty bool
-
+  let requal _ _ = empty bool
   let float s _ = empty s
   let fbits x = sort x >>| Float.bits >>= empty
-
   let is_finite _ = empty bool
   let is_fzero _ = empty bool
   let is_fneg _ = empty bool
@@ -140,42 +126,40 @@ module Core : Core = struct
   let fsucc x = sort x >>= empty
   let fpred x = sort x >>= empty
   let forder _ _ = empty bool
-
   let pow _ x _ = sort x >>= empty
   let powr _ x _ = sort x >>= empty
   let compound _ x _ = sort x >>= empty
   let rootn _ x _ = sort x >>= empty
   let pown _ x _ = sort x >>= empty
-  let rsqrt _ x  = sort x >>= empty
+  let rsqrt _ x = sort x >>= empty
   let hypot _ x _ = sort x >>= empty
-
-  let exp _ x  = sort x >>= empty
-  let expm1 _ x  = sort x >>= empty
-  let exp2 _ x  = sort x >>= empty
-  let exp2m1 _ x  = sort x >>= empty
-  let exp10 _ x  = sort x >>= empty
-  let exp10m1 _ x  = sort x >>= empty
-  let log _ x  = sort x >>= empty
-  let log2 _ x  = sort x >>= empty
-  let log10 _ x  = sort x >>= empty
-  let logp1 _ x  = sort x >>= empty
-  let log2p1 _ x  = sort x >>= empty
-  let log10p1 _ x  = sort x >>= empty
-  let sin _ x  = sort x >>= empty
-  let cos _ x  = sort x >>= empty
-  let tan _ x  = sort x >>= empty
-  let sinpi _ x  = sort x >>= empty
-  let cospi _ x  = sort x >>= empty
-  let atanpi _ x  = sort x >>= empty
-  let atan2pi _ x _  = sort x >>= empty
-  let asin _ x  = sort x >>= empty
-  let acos _ x  = sort x >>= empty
-  let atan _ x  = sort x >>= empty
+  let exp _ x = sort x >>= empty
+  let expm1 _ x = sort x >>= empty
+  let exp2 _ x = sort x >>= empty
+  let exp2m1 _ x = sort x >>= empty
+  let exp10 _ x = sort x >>= empty
+  let exp10m1 _ x = sort x >>= empty
+  let log _ x = sort x >>= empty
+  let log2 _ x = sort x >>= empty
+  let log10 _ x = sort x >>= empty
+  let logp1 _ x = sort x >>= empty
+  let log2p1 _ x = sort x >>= empty
+  let log10p1 _ x = sort x >>= empty
+  let sin _ x = sort x >>= empty
+  let cos _ x = sort x >>= empty
+  let tan _ x = sort x >>= empty
+  let sinpi _ x = sort x >>= empty
+  let cospi _ x = sort x >>= empty
+  let atanpi _ x = sort x >>= empty
+  let atan2pi _ x _ = sort x >>= empty
+  let asin _ x = sort x >>= empty
+  let acos _ x = sort x >>= empty
+  let atan _ x = sort x >>= empty
   let atan2 _ x _ = sort x >>= empty
-  let sinh _ x  = sort x >>= empty
-  let cosh _ x  = sort x >>= empty
-  let tanh _ x  = sort x >>= empty
-  let asinh _ x  = sort x >>= empty
-  let acosh _ x  = sort x >>= empty
-  let atanh _ x  = sort x >>= empty
+  let sinh _ x = sort x >>= empty
+  let cosh _ x = sort x >>= empty
+  let tanh _ x = sort x >>= empty
+  let asinh _ x = sort x >>= empty
+  let acosh _ x = sort x >>= empty
+  let atanh _ x = sort x >>= empty
 end

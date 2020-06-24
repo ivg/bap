@@ -16,13 +16,10 @@ let andi_dot cpu ops =
   let rs = unsigned cpu.reg ops.(1) in
   let im = unsigned imm ops.(2) in
   let tm = signed var cpu.word_width in
-  RTL.[
-    ra := rs land im;
-    tm := low cpu.word_width ra;
-    nth bit cpu.cr 0 := tm < zero;
-    nth bit cpu.cr 1 := tm > zero;
-    nth bit cpu.cr 2 := tm = zero
-  ]
+  RTL.
+    [ ra := rs land im; tm := low cpu.word_width ra
+    ; nth bit cpu.cr 0 := tm < zero; nth bit cpu.cr 1 := tm > zero
+    ; nth bit cpu.cr 2 := tm = zero ]
 
 (** Fixed-point AND Immediate Shifted
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -34,13 +31,10 @@ let andis_dot cpu ops =
   let im = unsigned imm ops.(2) in
   let sh = unsigned const byte 16 in
   let tm = signed var cpu.word_width in
-  RTL.[
-    ra := rs land (im << sh);
-    tm := low cpu.word_width ra;
-    nth bit cpu.cr 0 := tm < zero;
-    nth bit cpu.cr 1 := tm > zero;
-    nth bit cpu.cr 2 := tm = zero;
-  ]
+  RTL.
+    [ ra := rs land (im << sh); tm := low cpu.word_width ra
+    ; nth bit cpu.cr 0 := tm < zero; nth bit cpu.cr 1 := tm > zero
+    ; nth bit cpu.cr 2 := tm = zero ]
 
 (** Fixed-point AND
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -51,7 +45,7 @@ let and_ cpu ops =
   let ra = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
-  RTL.[ ra := rs land rb; ]
+  RTL.[ra := rs land rb]
 
 (** Fixed-point AND with Complement
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -62,7 +56,7 @@ let andc cpu ops =
   let ra = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
-  RTL.[ ra := rs land (lnot rb); ]
+  RTL.[ra := rs land lnot rb]
 
 (** Fixed-point OR Immediate
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -72,7 +66,7 @@ let ori cpu ops =
   let ra = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let im = unsigned imm ops.(2) in
-  RTL.[ ra := rs lor im; ]
+  RTL.[ra := rs lor im]
 
 (** 60 00 00 00    nop   (equivalen to ori 0,0,0 *)
 let nop cpu ops = []
@@ -86,7 +80,7 @@ let oris cpu ops =
   let rs = unsigned cpu.reg ops.(1) in
   let im = unsigned imm ops.(2) in
   let sh = unsigned const byte 16 in
-  RTL.[ ra := rs lor (im << sh); ]
+  RTL.[ra := rs lor (im << sh)]
 
 (** Fixed-point OR
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -97,7 +91,7 @@ let or_ cpu ops =
   let ra = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
-  RTL.[ ra := rs lor rb; ]
+  RTL.[ra := rs lor rb]
 
 (** Fixed-point OR with Complement
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -108,7 +102,7 @@ let orc cpu ops =
   let ra = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
-  RTL.[ ra := rs lor (lnot rb); ]
+  RTL.[ra := rs lor lnot rb]
 
 (** Fixed-point XOR Immediate
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -118,7 +112,7 @@ let xori cpu ops =
   let ra = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let im = unsigned imm ops.(2) in
-  RTL.[ ra := rs lxor im; ]
+  RTL.[ra := rs lxor im]
 
 (** Fixed-point XOR Immediate Shifted
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -129,7 +123,7 @@ let xoris cpu ops =
   let rs = unsigned cpu.reg ops.(1) in
   let im = unsigned imm ops.(2) in
   let sh = unsigned const byte 16 in
-  RTL.[ ra := rs lxor (im << sh); ]
+  RTL.[ra := rs lxor (im << sh)]
 
 (** Fixed-point XOR
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -140,7 +134,7 @@ let xor cpu ops =
   let ra = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
-  RTL.[ ra := rs lxor rb; ]
+  RTL.[ra := rs lxor rb]
 
 (** Fixed-point NAND
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -151,7 +145,7 @@ let nand cpu ops =
   let ra = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
-  RTL.[ ra := lnot (rs land rb); ]
+  RTL.[ra := lnot (rs land rb)]
 
 (** Fixed-point NOR
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -162,7 +156,7 @@ let nor cpu ops =
   let ra = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
-  RTL.[ ra := lnot (rs lor rb); ]
+  RTL.[ra := lnot (rs lor rb)]
 
 (** Fixed-point Equivalent
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -173,7 +167,7 @@ let eqv cpu ops =
   let ra = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
-  RTL.[ ra := lnot (rs lxor rb); ]
+  RTL.[ra := lnot (rs lxor rb)]
 
 (** Fixed-point Extend Sign Byte/Halfword/Word
     Pages 92-99 of IBM Power ISATM Version 3.0 B
@@ -187,17 +181,17 @@ let eqv cpu ops =
 let extsb cpu ops =
   let ra = signed cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
-  RTL.[ ra := low byte rs;]
+  RTL.[ra := low byte rs]
 
 let extsh cpu ops =
   let ra = signed cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
-  RTL.[ ra := low halfword rs;]
+  RTL.[ra := low halfword rs]
 
 let extsw cpu ops =
   let ra = signed cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
-  RTL.[ ra := low word rs;]
+  RTL.[ra := low word rs]
 
 (** Fixed-point Count Leading Zeros Word/Doubleword
     Pages 92-99 of IBM Power ISATM Version 3.0 B
@@ -213,19 +207,13 @@ let cntlzw cpu ops =
   let cnt = unsigned var byte in
   let has_no_ones = unsigned var bit in
   let biti = unsigned var bit in
-  RTL.[
-    xv := low word rs;
-    cnt := zero;
-    has_no_ones := one;
-    foreach biti xv [
-      if_ (has_no_ones land (biti = zero)) [
-        cnt := cnt + one;
-      ] [
-        has_no_ones := zero;
-      ]
-    ];
-    ra := cnt;
-  ]
+  RTL.
+    [ xv := low word rs; cnt := zero; has_no_ones := one
+    ; foreach biti xv
+        [ if_
+            (has_no_ones land (biti = zero))
+            [cnt := cnt + one]
+            [has_no_ones := zero] ]; ra := cnt ]
 
 let cntlzd cpu ops =
   let ra = unsigned cpu.reg ops.(0) in
@@ -234,19 +222,13 @@ let cntlzd cpu ops =
   let cnt = unsigned var byte in
   let has_no_ones = unsigned var bit in
   let biti = unsigned var bit in
-  RTL.[
-    xv := rs;
-    cnt := zero;
-    has_no_ones := one;
-    foreach biti xv [
-      if_ (has_no_ones land (biti = zero)) [
-        cnt := cnt + one;
-      ] [
-        has_no_ones := zero;
-      ]
-    ];
-    ra := cnt;
-  ]
+  RTL.
+    [ xv := rs; cnt := zero; has_no_ones := one
+    ; foreach biti xv
+        [ if_
+            (has_no_ones land (biti = zero))
+            [cnt := cnt + one]
+            [has_no_ones := zero] ]; ra := cnt ]
 
 (** Fixed-point Count Trailing Zeros Word
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -261,18 +243,10 @@ let cnttzw cpu ops =
   let xv = unsigned var word in
   let cnt = unsigned var word in
   let biti = unsigned var bit in
-  RTL.[
-    xv := low word rs;
-    cnt := zero;
-    foreach biti xv [
-      if_ (biti = zero) [
-        cnt := cnt + one;
-      ] [
-        cnt := zero;
-      ]
-    ];
-    ra := cnt;
-  ]
+  RTL.
+    [ xv := low word rs; cnt := zero
+    ; foreach biti xv [if_ (biti = zero) [cnt := cnt + one] [cnt := zero]]
+    ; ra := cnt ]
 
 let cnttzd cpu ops =
   let ra = unsigned cpu.reg ops.(0) in
@@ -280,18 +254,10 @@ let cnttzd cpu ops =
   let xv = unsigned var doubleword in
   let cnt = unsigned var word in
   let biti = unsigned var bit in
-  RTL.[
-    xv := rs;
-    cnt := zero;
-    foreach biti xv [
-      if_ (biti = zero) [
-        cnt := cnt + one;
-      ] [
-        cnt := zero;
-      ]
-    ];
-    ra := cnt;
-  ]
+  RTL.
+    [ xv := rs; cnt := zero
+    ; foreach biti xv [if_ (biti = zero) [cnt := cnt + one] [cnt := zero]]
+    ; ra := cnt ]
 
 (** Fixed-point Compare Bytes
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -308,19 +274,13 @@ let cmpb cpu ops =
   let byte_k = unsigned var byte in
   let sh = unsigned const byte 8 in
   let tmp = unsigned var cpu.word_width in
-  RTL.[
-    ind := zero;
-    tmp := zero;
-    foreach byte_k tmp [
-      byte_i := nth byte (rs << (ind * sh)) 0;
-      byte_j := nth byte (rb << (ind * sh)) 0;
-      when_ (byte_i = byte_j) [
-        byte_k := xb;
-      ];
-      ind := ind + one;
-    ];
-    ra := tmp;
-  ]
+  RTL.
+    [ ind := zero; tmp := zero
+    ; foreach byte_k tmp
+        [ byte_i := nth byte (rs << ind * sh) 0
+        ; byte_j := nth byte (rb << ind * sh) 0
+        ; when_ (byte_i = byte_j) [byte_k := xb]; ind := ind + one ]; ra := tmp
+    ]
 
 (** Fixed-point Population Count Bytes/Words/Doubleword
     Pages 92-98 of IBM Power ISATM Version 3.0 B
@@ -338,37 +298,21 @@ let popcntw cpu ops =
   let bit_i = unsigned var bit in
   let ind = unsigned var word in
   let x = unsigned const byte 32 in
-  RTL.[
-    res := zero;
-    ind := zero;
-    foreach word_j res [
-      cnt := zero;
-      word_i := nth word (rs << ind * x) 0;
-      foreach bit_i word_i [
-        when_ (bit_i = one) [
-          cnt := cnt + one;
-        ];
-      ];
-      word_j := cnt;
-      ind := ind + one;
-    ];
-    ra := res;
-  ]
+  RTL.
+    [ res := zero; ind := zero
+    ; foreach word_j res
+        [ cnt := zero; word_i := nth word (rs << ind * x) 0
+        ; foreach bit_i word_i [when_ (bit_i = one) [cnt := cnt + one]]
+        ; word_j := cnt; ind := ind + one ]; ra := res ]
 
 let popcntd cpu ops =
   let ra = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let cnt = unsigned var doubleword in
   let bit_i = unsigned var bit in
-  RTL.[
-    cnt := zero;
-    foreach bit_i rs [
-      when_ (bit_i = one) [
-        cnt := cnt + one;
-      ];
-    ];
-    ra := cnt;
-  ]
+  RTL.
+    [ cnt := zero; foreach bit_i rs [when_ (bit_i = one) [cnt := cnt + one]]
+    ; ra := cnt ]
 
 (** Fixed-point Bit Permute Doubleword
     Pages 100 of IBM Power ISATM Version 3.0 B
@@ -384,20 +328,11 @@ let bpermd cpu ops =
   let ind = unsigned var byte in
   let x = unsigned var doubleword in
   let max = unsigned const byte 7 in
-  RTL.[
-    tmp := zero;
-    ind := max;
-    foreach bit_index rs [
-      if_ (bit_index < max_ind) [
-        x := msb (rb << bit_index);
-      ] [
-        x := zero;
-      ];
-      tmp := tmp lor (x << ind);
-      ind := ind - one;
-    ];
-    ra := tmp;
-  ]
+  RTL.
+    [ tmp := zero; ind := max
+    ; foreach bit_index rs
+        [ if_ (bit_index < max_ind) [x := msb (rb << bit_index)] [x := zero]
+        ; tmp := tmp lor (x << ind); ind := ind - one ]; ra := tmp ]
 
 (** Fixed-Point Arithmetic Instructions - Negate
     Page 72 of IBM Power ISATM Version 3.0 B
@@ -407,49 +342,49 @@ let bpermd cpu ops =
 let neg cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = unsigned cpu.reg ops.(1) in
-  RTL.[ rt := lnot ra + one ]
+  RTL.[rt := lnot ra + one]
 
 let init () =
-  "ANDIo"   >| andi_dot;
-  "ANDISo"  >| andis_dot;
-  "AND"     >| and_;
-  "ANDo"    >. and_;
-  "ANDC"    >| andc;
-  "ANDCo"   >. andc;
-  "ORI"     >| ori;
-  "NOP"     >| nop;
-  "ORIS"    >| oris;
-  "OR"      >| or_;
-  "ORo"     >. or_;
-  "ORC"     >| orc;
-  "ORCo"    >. orc;
-  "XORI"    >| xori;
-  "XORIS"   >| xoris;
-  "XOR"     >| xor;
-  "XORo"    >. xor;
-  "NAND"    >| nand;
-  "NANDo"   >. nand;
-  "NOR"     >| nor;
-  "NORo"    >. nor;
-  "EQV"     >| eqv;
-  "EQVo"    >. eqv;
-  "EXTSB"   >| extsb;
-  "EXTSBo"  >. extsb;
-  "EXTSH"   >| extsh;
-  "EXTSHo"  >. extsh;
-  "EXTSW"   >| extsw;
-  "EXTSWo"  >. extsw;
-  "CNTLZW"  >| cntlzw;
-  "CNTLZWo" >. cntlzw;
-  "CNTLZD"  >| cntlzd;
-  "CNTLZDo" >. cntlzd;
-  "CNTTZW"  >| cnttzw;
-  "CNTTZWo" >. cnttzw;
-  "CNTTZD"  >| cnttzd;
-  "CNTTZDo" >. cnttzd;
-  "CMPB"    >| cmpb;
-  "POPCNTW" >| popcntw;
-  "POPCNTD" >| popcntd;
-  "BPERMD"  >| bpermd;
-  "NEG"     >| neg;
-  "NEGo"    >. neg;
+  "ANDIo" >| andi_dot ;
+  "ANDISo" >| andis_dot ;
+  "AND" >| and_ ;
+  "ANDo" >. and_ ;
+  "ANDC" >| andc ;
+  "ANDCo" >. andc ;
+  "ORI" >| ori ;
+  "NOP" >| nop ;
+  "ORIS" >| oris ;
+  "OR" >| or_ ;
+  "ORo" >. or_ ;
+  "ORC" >| orc ;
+  "ORCo" >. orc ;
+  "XORI" >| xori ;
+  "XORIS" >| xoris ;
+  "XOR" >| xor ;
+  "XORo" >. xor ;
+  "NAND" >| nand ;
+  "NANDo" >. nand ;
+  "NOR" >| nor ;
+  "NORo" >. nor ;
+  "EQV" >| eqv ;
+  "EQVo" >. eqv ;
+  "EXTSB" >| extsb ;
+  "EXTSBo" >. extsb ;
+  "EXTSH" >| extsh ;
+  "EXTSHo" >. extsh ;
+  "EXTSW" >| extsw ;
+  "EXTSWo" >. extsw ;
+  "CNTLZW" >| cntlzw ;
+  "CNTLZWo" >. cntlzw ;
+  "CNTLZD" >| cntlzd ;
+  "CNTLZDo" >. cntlzd ;
+  "CNTTZW" >| cnttzw ;
+  "CNTTZWo" >. cnttzw ;
+  "CNTTZD" >| cnttzd ;
+  "CNTTZDo" >. cnttzd ;
+  "CMPB" >| cmpb ;
+  "POPCNTW" >| popcntw ;
+  "POPCNTD" >| popcntd ;
+  "BPERMD" >| bpermd ;
+  "NEG" >| neg ;
+  "NEGo" >. neg

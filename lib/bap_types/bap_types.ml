@@ -4,7 +4,6 @@
 
 *)
 
-
 open Core_kernel
 open Regular.Std
 open Bap_common
@@ -16,69 +15,62 @@ module Std = struct
   (** A definition for a regular type, and a handy module,
       that can create regular types out of thin air. *)
   module Integer = Integer
-  module Toplevel = Bap_toplevel
-  module Trie = struct
-    include Bap_trie_intf
-    include Bap_trie
-  end
 
+  module Toplevel = Bap_toplevel
+  module Trie = struct include Bap_trie_intf include Bap_trie end
   module Interval_tree = Bap_interval_tree
 
   module type Integer = Integer
   module type Trie = Trie
 
   module Legacy = struct
-    [@@@deprecated "[since 2017-04] all definitions in this module are deprecated"]
+    [@@@deprecated
+    "[since 2017-04] all definitions in this module are deprecated"]
+
     module Monad = struct
       [@@@deprecated "[since 2017-04] use new monads library"]
 
-      include Bap_monad        [@@warning "-3"]
-      include Bap_monad_types  [@@warning "-3"]
+      include Bap_monad [@@warning "-3"]
+      include Bap_monad_types [@@warning "-3"]
     end
   end
 
-
   (** Target architecture. *)
   module Arch = struct
-    include Arch
-    include Bap_arch
+    include Arch include Bap_arch
   end
 
-
   (** Typed and always fresh variables.  *)
-  module Var  = Bap_var
-
+  module Var = Bap_var
 
   (** Sizes of expression operands  *)
   module Size = struct
-    include Size
-    include Bap_size
+    include Size include Bap_size
   end
 
   module Eff = Bap_helpers.Eff
 
   module Bil = struct
     type t = Bap_bil.bil [@@deriving bin_io, compare, sexp]
+
     include (Bap_stmt.Stmts_pp : Printable.S with type t := t)
     include (Bap_stmt.Stmts_data : Data.S with type t := t)
+
     module Types = struct
       type var = Bap_var.t
-      type typ = Type.t =
-        | Imm of int
-        | Mem of addr_size * size
-        | Unk
+
+      type typ = Type.t = Imm of int | Mem of addr_size * size | Unk
       [@@deriving bin_io, compare, sexp]
+
       include Bap_bil.Cast
       include Bap_bil.Binop
       include Bap_bil.Unop
       include Bap_bil.Exp
       include Bap_bil.Stmt
     end
+
     include Types
-    module Infix = struct
-      include Bap_exp.Infix
-      include Bap_stmt.Infix
-    end
+    module Infix = struct include Bap_exp.Infix include Bap_stmt.Infix end
     include Infix
     include Bap_exp.Exp
     include Bap_exp.Unop
@@ -89,14 +81,14 @@ module Std = struct
     include Bap_helpers
     module Result = Bap_result
     module Storage = Result.Storage
+
     class type storage = Result.storage
-    type value = Result.value =
-      | Imm of word
-      | Mem of storage
-      | Bot
+
+    type value = Result.value = Imm of word | Mem of storage | Bot
     type var_compare = Var.comparator_witness
-    type vars = (var,var_compare) Set.t
+    type vars = (var, var_compare) Set.t
     type result = Result.t
+
     include Bap_bil_pass
     module Pass = Bap_bil_pass.Pass_pp
     include Bap_bil_optimizations
@@ -110,8 +102,9 @@ module Std = struct
   module Type = struct
     include Type
     include Bap_type
-    type error = Bap_type_error.t
-    [@@deriving bin_io, compare, sexp]
+
+    type error = Bap_type_error.t [@@deriving bin_io, compare, sexp]
+
     module Error = Bap_type_error
     include Bap_helpers.Type
   end
@@ -120,12 +113,12 @@ module Std = struct
       like [reg8_t], or [mem32_t]. Look at [Bap_type], for more. *)
   include Type.Export
 
-
   module Eval = struct
     include Bap_eval_types.Eval
     module Make2 = Bap_eval.Make2
     module Make = Bap_eval.Make
   end
+
   module Expi = Bap_expi
   module Bili = Bap_bili
   module Biri = Bap_biri
@@ -141,8 +134,10 @@ module Std = struct
   (** [Regular] interface for BIL expressions *)
   module Exp = struct
     type t = Bap_bil.exp [@@deriving bin_io, compare, sexp]
+
     include Bap_helpers.Exp
     include (Bap_exp : Regular.S with type t := t)
+
     let eval = Bap_expi.eval
     let simpl = Bap_helpers.Simpl.exp
     let pp_adt = Bap_bil_adt.pp_exp
@@ -152,8 +147,10 @@ module Std = struct
   (** [Regular] interface for BIL statements  *)
   module Stmt = struct
     type t = Bap_bil.stmt [@@deriving bin_io, compare, sexp]
+
     include Bap_helpers.Stmt
     include (Bap_stmt : Regular.S with type t := t)
+
     let eval = Bap_bili.eval
     let simpl = Bap_helpers.Simpl.bil
     let pp_adt = Bap_bil_adt.pp_stmt
@@ -175,8 +172,7 @@ module Std = struct
       Look at [Bap_addr] for more information.
   *)
   module Addr = struct
-    include Bitvector
-    include Bap_addr
+    include Bitvector include Bap_addr
   end
 
   (** A fancy abbreviation for bitvectors, that are supposed to
@@ -200,29 +196,28 @@ module Std = struct
   (** polymorphic sizes allows one to specify explicitly a set of
       acceptable sizes, e.g., [type mmx = [`r128 | `r256] poly_size]
   *)
-  type 'a size_p = 'a Size.p
-  [@@deriving bin_io, compare, sexp]
+  type 'a size_p = 'a Size.p [@@deriving bin_io, compare, sexp]
 
   (** [addr_size] is a subset of sizes that contains only two
       instances [`r32] and [`r64]  *)
   type nonrec addr_size = Bap_common.addr_size
   [@@deriving bin_io, compare, sexp]
 
-  type addr  = Addr.t      [@@deriving bin_io, compare, sexp]
-  type arch  = Arch.t      [@@deriving bin_io, compare, sexp]
-  type bil   = Bap_bil.bil [@@deriving bin_io, compare, sexp]
-  type binop = Bil.binop   [@@deriving bin_io, compare, sexp]
-  type cast  = Bil.cast    [@@deriving bin_io, compare, sexp]
-  type exp   = Exp.t       [@@deriving bin_io, compare, sexp]
-  type size  = Size.t      [@@deriving bin_io, compare, sexp]
-  type stmt  = Stmt.t      [@@deriving bin_io, compare, sexp]
-  type typ   = Type.t      [@@deriving bin_io, compare, sexp]
-  type unop  = Bil.unop    [@@deriving bin_io, compare, sexp]
-  type var   = Var.t       [@@deriving bin_io, compare, sexp]
-  type word  = Word.t      [@@deriving bin_io, compare, sexp]
-  type nat1  = int         [@@deriving bin_io, compare, sexp]
-  type value = Value.t     [@@deriving bin_io, compare, sexp]
-  type dict  = Value.dict  [@@deriving bin_io, compare, sexp]
+  type addr = Addr.t [@@deriving bin_io, compare, sexp]
+  type arch = Arch.t [@@deriving bin_io, compare, sexp]
+  type bil = Bap_bil.bil [@@deriving bin_io, compare, sexp]
+  type binop = Bil.binop [@@deriving bin_io, compare, sexp]
+  type cast = Bil.cast [@@deriving bin_io, compare, sexp]
+  type exp = Exp.t [@@deriving bin_io, compare, sexp]
+  type size = Size.t [@@deriving bin_io, compare, sexp]
+  type stmt = Stmt.t [@@deriving bin_io, compare, sexp]
+  type typ = Type.t [@@deriving bin_io, compare, sexp]
+  type unop = Bil.unop [@@deriving bin_io, compare, sexp]
+  type var = Var.t [@@deriving bin_io, compare, sexp]
+  type word = Word.t [@@deriving bin_io, compare, sexp]
+  type nat1 = int [@@deriving bin_io, compare, sexp]
+  type value = Value.t [@@deriving bin_io, compare, sexp]
+  type dict = Value.dict [@@deriving bin_io, compare, sexp]
   type 'a tag = 'a Value.tag
 
   class ['a] exp_visitor = ['a] Bap_visitor.bil_visitor
@@ -237,11 +232,9 @@ module Std = struct
 
   include Bap_int_conversions
   include Bap_attributes
-
   module Seq = Seq
+
   type 'a seq = 'a Seq.t [@@deriving bin_io, compare, sexp]
 
   module Callgraph = Bap_ir_callgraph
-
-
 end

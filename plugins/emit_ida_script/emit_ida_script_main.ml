@@ -1,21 +1,20 @@
 open Core_kernel
 open Bap.Std
 open Format
-include Self()
-
+include Self ()
 module Buffer = Caml.Buffer
 
 (** ida uses a strange color coding, bgr, IIRC  *)
 let idacode_of_color = function
-  | `black   -> 0x000000
-  | `red     -> 0xCCCCFF
-  | `green   -> 0x99FF99
-  | `yellow  -> 0xC2FFFF
-  | `blue    -> 0xFFB2B2
+  | `black -> 0x000000
+  | `red -> 0xCCCCFF
+  | `green -> 0x99FF99
+  | `yellow -> 0xC2FFFF
+  | `blue -> 0xFFB2B2
   | `magenta -> 0xFFB2FF
-  | `cyan    -> 0xFFFFB2
-  | `white   -> 0xFFFFFF
-  | `gray    -> 0xEAEAEA
+  | `cyan -> 0xFFFFB2
+  | `white -> 0xFFFFFF
+  | `gray -> 0xEAEAEA
   | _ -> invalid_arg "unexpected color"
 
 let string_of_color c = Sexp.to_string (sexp_of_color c)
@@ -36,32 +35,31 @@ let string_of_color c = Sexp.to_string (sexp_of_color c)
             None otherwise.*)
 module Py = struct
   (** this is emitted at the start of the script *)
-  let prologue =
-    {|
+  let prologue = {|
 from bap.utils import ida
 |}
 
   (** this is emitted at the end of the script *)
-  let epilogue =
-    {|
+  let epilogue = {|
 # eplogue code if needed
 |}
 
-
-  let escape = unstage @@ String.Escaping.escape
-      ~escapeworthy:['\''; '\\'; '$']
-      ~escape_char:'\\'
-
+  let escape =
+    unstage
+    @@ String.Escaping.escape ~escapeworthy:['\''; '\\'; '$'] ~escape_char:'\\'
 
   let color s = sprintf "ida.set_color($addr, 0x%06x)" (idacode_of_color s)
+
   let comment s =
     sprintf "ida.comment.add($addr, '%s', '%s')"
-      (escape (Value.tagname s)) (escape (Value.to_string s))
+      (escape (Value.tagname s))
+      (escape (Value.to_string s))
+
   let foreground s =
     sprintf "ida.comment.add($addr, 'foreground', '%s')" (string_of_color s)
+
   let background s =
     sprintf "ida.comment.add($addr, 'background', '%s')" (string_of_color s)
-
 end
 
 (** [emit_attr buffer sub_name insn_addr attr] emits into the [buffer]
@@ -77,46 +75,49 @@ let emit_attr buf sub_name addr attr =
     | "sub_name" -> sub_name
     | "addr" -> asprintf "%a" Word.pp_hex addr
     | s -> s in
-  let case tag f = case tag (fun attr ->
-      Buffer.add_substitute buf substitute (f attr);
-      Buffer.add_char buf '\n') in
-  switch attr @@
-  case color Py.color @@
-  case foreground Py.foreground @@
-  case background Py.background @@
-  default (fun () ->
-      Buffer.add_substitute buf substitute (Py.comment attr);
-      Buffer.add_char buf '\n')
+  let case tag f =
+    case tag (fun attr ->
+        Buffer.add_substitute buf substitute (f attr) ;
+        Buffer.add_char buf '\n') in
+  switch attr @@ case color Py.color
+  @@ case foreground Py.foreground
+  @@ case background Py.background
+  @@ default (fun () ->
+         Buffer.add_substitute buf substitute (Py.comment attr) ;
+         Buffer.add_char buf '\n')
 
 let program_visitor buf attrs =
   object
     inherit [string * word option] Term.visitor
-    method! leave_term _ t (name,addr) =
+
+    method! leave_term _ t (name, addr) =
       match addr with
-      | None -> name,addr
+      | None -> (name, addr)
       | Some addr ->
-        Term.attrs t |> Dict.to_sequence |> Seq.iter ~f:(fun (_,x) ->
-            let attr = Value.tagname x in
-            if List.mem ~equal:String.equal attrs attr
-            then emit_attr buf name addr x);
-        name,Some addr
-    method! enter_term _ t (name,_) =
-      name,Term.get_attr t address
-    method! enter_sub sub (_,addr) = Sub.name sub,addr
+          Term.attrs t |> Dict.to_sequence
+          |> Seq.iter ~f:(fun (_, x) ->
+                 let attr = Value.tagname x in
+                 if List.mem ~equal:String.equal attrs attr then
+                   emit_attr buf name addr x) ;
+          (name, Some addr)
+
+    method! enter_term _ t (name, _) = (name, Term.get_attr t address)
+
+    method! enter_sub sub (_, addr) = (Sub.name sub, addr)
   end
 
 let extract_script data code attrs =
   let open Value.Match in
   let buf = Buffer.create 4096 in
-  Buffer.add_string buf Py.prologue;
-  Memmap.to_sequence data |> Seq.iter ~f:(fun (mem,x) ->
-      switch x @@
-      case python (fun line -> Buffer.add_string buf line) @@
-      default ignore);
-  (program_visitor buf attrs)#run code ("",None) |> ignore;
-  Buffer.add_string buf Py.epilogue;
+  Buffer.add_string buf Py.prologue ;
+  Memmap.to_sequence data
+  |> Seq.iter ~f:(fun (mem, x) ->
+         switch x
+         @@ case python (fun line -> Buffer.add_string buf line)
+         @@ default ignore) ;
+  (program_visitor buf attrs)#run code ("", None) |> ignore ;
+  Buffer.add_string buf Py.epilogue ;
   Buffer.contents buf
-
 
 let main dst attrs project =
   let data = Project.memory project in
@@ -127,22 +128,29 @@ let main dst attrs project =
   | Some dst -> Out_channel.write_all dst ~data
 
 let () =
-  let () = Config.manpage [
-      `S "DESCRIPTION";
-      `P "Iterates through memory for tagged BIR attributes,
-      and dumps them into a python script, that can be later
-      loaded into IDA. The special `color' tag causes the
-      respective address to be colored.";
-      `S "SEE ALSO";
-      `P "$(b,bap-ida)(3), $(b,bap-plugin-ida)(1)"
-    ] in
-  let dst = Config.(param (some string) "file" ~docv:"NAME"
-                      ~doc:"Dump annotations to the specified file $(docv). If
-                            not specified, then the script will dumped into the
-                            standard output") in
-  let attrs = Config.(param_all string "attr"
-                        ~doc: "Emit specified BIR attribute. Can be specified
-                               multiple times.") in
-  Config.when_ready (fun {Config.get=(!)} ->
+  let () =
+    Config.manpage
+      [ `S "DESCRIPTION"
+      ; `P
+          "Iterates through memory for tagged BIR attributes,\n\
+          \      and dumps them into a python script, that can be later\n\
+          \      loaded into IDA. The special `color' tag causes the\n\
+          \      respective address to be colored."; `S "SEE ALSO"
+      ; `P "$(b,bap-ida)(3), $(b,bap-plugin-ida)(1)" ] in
+  let dst =
+    Config.(
+      param (some string) "file" ~docv:"NAME"
+        ~doc:
+          "Dump annotations to the specified file $(docv). If\n\
+          \                            not specified, then the script will \
+           dumped into the\n\
+          \                            standard output") in
+  let attrs =
+    Config.(
+      param_all string "attr"
+        ~doc:
+          "Emit specified BIR attribute. Can be specified\n\
+          \                               multiple times.") in
+  Config.when_ready (fun {Config.get= ( ! )} ->
       let main = main !dst !attrs in
-      Project.register_pass' main )
+      Project.register_pass' main)

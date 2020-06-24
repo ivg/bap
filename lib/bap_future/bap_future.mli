@@ -96,7 +96,6 @@ module Std : sig
   type 'a stream
   type 'a signal
 
-
   module Applicable : sig
     (** Applicable is an abstraction lying between Arrow, Monad and
         Applicative. It can be seen as a more general form of
@@ -107,7 +106,7 @@ module Std : sig
       type 'a t
 
       (** [map xs ~f] transform [xs] with [f]  *)
-      val map   : 'a t -> f:('a -> 'b) -> 'b t
+      val map : 'a t -> f:('a -> 'b) -> 'b t
 
       (** [apply fs xs] apply functions [fs] to [xs]  *)
       val apply : ('a -> 'b) t -> 'a t -> 'b t
@@ -221,16 +220,14 @@ module Std : sig
 
   *)
   module Variadic : sig
-
     (** Variadic argument list.  *)
     module type S = sig
-
       (** [('f,'r) t] is a list of arguments, where ['f] defines the
           arrow type of the arguments, and ['r] is the return type.
           C.f., ['f] and ['r] with the first and last parameter of
           the [format] type constructor.
       *)
-      type ('f,'r) t
+      type ('f, 'r) t
 
       (** ['a arg] is an Applicable value  *)
       type 'a arg
@@ -238,19 +235,18 @@ module Std : sig
       (** [args x] creates a singleton list of arguments that can be
           applied to a function that takes [x] argument, and returns a value
           of type ['b].*)
-      val args : 'a arg -> ('a -> 'b,'b) t
+      val args : 'a arg -> ('a -> 'b, 'b) t
 
       (** [args $x] appends argument [x] to a list of arguments [args].  *)
-      val ($) : ('a, 'b -> 'c) t -> 'b arg -> ('a,'c) t
+      val ( $ ) : ('a, 'b -> 'c) t -> 'b arg -> ('a, 'c) t
 
       (** [apply args ~f] applies function [f] to arguments [args].*)
-      val apply : f:'f -> ('f,'r) t -> 'r arg
+      val apply : f:'f -> ('f, 'r) t -> 'r arg
     end
 
-    module Make(T : Applicable.S) : S with type 'a arg = 'a T.t
+    module Make (T : Applicable.S) : S with type 'a arg = 'a T.t
     include S with type 'a arg = 'a
   end
-
 
   (** Future is an object whose value will be decided somewhere in the
       future, if that future has occurred.
@@ -283,14 +279,13 @@ module Std : sig
       defined asynchronously. Once can also think of futures and
       threads as a software pattern to work with callbacks. *)
   module Future : sig
-
     type 'a t = 'a future
+
     include Monad.S with type 'a t := 'a t
     include Applicative.S with type 'a t := 'a t
     module Variadic : Variadic.S with type 'a arg = 'a t
 
     module Args : sig
-
       (** ['f] is the type of a function that consumes the list of arguments and returns an ['r]. *)
       type ('f, 'r) t
 
@@ -301,7 +296,7 @@ module Std : sig
       val cons : 'a future -> ('f, 'r) t -> ('a -> 'f, 'r) t
 
       (** [@>] infix operator for [cons] *)
-      val (@>) : 'a future -> ('f, 'r) t -> ('a -> 'f, 'r) t
+      val ( @> ) : 'a future -> ('f, 'r) t -> ('a -> 'f, 'r) t
 
       (** [step t ~f] transforms argument values in some way.
           For example, one can label a function argument like so:
@@ -316,7 +311,6 @@ module Std : sig
 
       (** [mapN ~f args] applies function [f] to [args] *)
       val mapN : f:'f -> ('f, 'r) t -> 'r future
-
     end
 
     (** [create ()] creates a new future. The function returns a pair
@@ -400,7 +394,6 @@ module Std : sig
 
     module Variadic : Variadic.S with type 'a arg = 'a t
 
-
     (** [create ()] returns a stream and a signal handler that is used
         to feed the stream. Every time a value is signaled, it will
         occur in the stream. *)
@@ -417,19 +410,19 @@ module Std : sig
         invocations of the generator function.  A new value is
         produced by a stream, every time it is signaled with an
         associated signal handler. *)
-    val unfold : init:'b -> f:('b -> ('a * 'b)) -> 'a t * unit signal
+    val unfold : init:'b -> f:('b -> 'a * 'b) -> 'a t * unit signal
 
     (** [unfold_until ~init ~f] returns [(stream,signal,future)] is the
         same as [unfold], except that function [f] is called until it
         returns a [None] value. Once this happens, the [future]
         becomes determined. *)
-    val unfold_until : init:'b -> f:('b -> ('a * 'b) option) ->
-      'a t * unit signal * unit future
+    val unfold_until :
+      init:'b -> f:('b -> ('a * 'b) option) -> 'a t * unit signal * unit future
 
     (** [unfold' ~init ~f] is a batched version of the [unfold]
         function. A new value is produced by a stream, every time it
         is signaled with associated signal handler. *)
-    val unfold' : init:'b -> f:('b -> ('a Queue.t * 'b)) -> 'a t * unit signal
+    val unfold' : init:'b -> f:('b -> 'a Queue.t * 'b) -> 'a t * unit signal
 
     (** [repeat x] returns a stream [xs] and a signal [s]. Every time
         [s] is signaled stream [xs] will produce a value [x] *)
@@ -458,7 +451,6 @@ module Std : sig
         underlying sequence. All consecutive signals from [es] are
         ignored.*)
     val of_sequence : 'a Sequence.t -> 'a t * unit signal * unit future
-
 
     (** {2 Subscriber interface}
 
@@ -511,7 +503,6 @@ module Std : sig
 
     (** {2 Combinators} *)
 
-
     (** [s' = map' s ~f] apply function [f] for each value of a
         stream [s] and push values from a resulting queue into the
         stream [s'].
@@ -542,9 +533,8 @@ module Std : sig
         stream [s], for which [f] evaluates to true.  *)
     val filter : 'a t -> f:('a -> bool) -> 'a t
 
-
     (** [either xs ys] is a discriminated union of two streams.  *)
-    val either : 'a t -> 'b t -> ('a,'b) Either.t t
+    val either : 'a t -> 'b t -> ('a, 'b) Either.t t
 
     (** [merge xs ys f] merges streams [xs] and [ys] using function
         [f]. *)
@@ -619,7 +609,8 @@ module Std : sig
             Float.(foldw ss n ~init:zero ~f:(+) >>| fun s / of_int n)
 
         ]} *)
-    val foldw : ?stride:int -> 'a t -> int -> init:'b -> f:('b -> 'a -> 'b) -> 'b t
+    val foldw :
+      ?stride:int -> 'a t -> int -> init:'b -> f:('b -> 'a -> 'b) -> 'b t
 
     (** [frame ~clk s ~init ~f] will gather elements of [s] into frames,
         where the start of the new frame is signaled by a stream [clk].
@@ -670,7 +661,6 @@ module Std : sig
     *)
     val hd : 'a t -> 'a future
 
-
     (** [tl s] ignores the next occurrence in the stream [s]  *)
     val tl : 'a t -> 'a t
 
@@ -683,7 +673,6 @@ module Std : sig
         that evaluated to [Some] value *)
     val find_map : 'a t -> f:('a -> 'b option) -> 'b future
 
-
     (** [take xs n] returns a future that will evaluate to [n] values
         of the stream [xs] that has occurred after the future was
         created.  *)
@@ -692,7 +681,7 @@ module Std : sig
     (** [nth xs n] returns [n]'th element of the stream [xs]. The
         element is [n]'th with respect to the future [f], if was [n]'th
         element of the stream after the creation of the stream.  *)
-    val nth  : 'a t -> int -> 'a future
+    val nth : 'a t -> int -> 'a future
 
     (** [upon e xs] returns a future that will be fulfilled with a
         last value of a stream [xs] before an event [e] has
@@ -703,25 +692,23 @@ module Std : sig
 
     (** [before e xs] returns a list that contains elements of
         the stream [xs] that occurred before the event [e] *)
-    val before: unit future -> 'a t -> 'a list future
+    val before : unit future -> 'a t -> 'a list future
 
     (** [last_before e xs n] returns a list of length up to [n], that
         contains last elements of the stream [xs] that occurred before the
         event [e] *)
     val last_before : unit future -> 'a t -> int -> 'a list future
-
   end
-
 
   (** A handler to produce elements in streams.  *)
   module Signal : sig
     type 'a t = 'a signal
 
     (** [send s x] sends value [x] to an associated stream.  *)
-    val send  : 'a signal -> 'a -> unit
+    val send : 'a signal -> 'a -> unit
 
     (** [repeat s ~times:n x] sends value [x] to an associated
         stream [n] times *)
-    val repeat: 'a signal -> times:int -> 'a -> unit
+    val repeat : 'a signal -> times:int -> 'a -> unit
   end
 end

@@ -1,7 +1,6 @@
 exception Target_directory_is_a_file
 
 type t
-
 type channel = Format.formatter
 
 (** [create filename]  *)
@@ -16,7 +15,5 @@ val with_cfg_file : t -> string -> f:(channel -> unit) -> unit
 val with_bil_file : t -> string -> f:(channel -> unit) -> unit
 
 val with_index_file : t -> f:(channel -> unit) -> unit
-
 val with_funcs_file : t -> f:(channel -> unit) -> unit
-
 val with_dump_file : t -> f:(channel -> unit) -> unit

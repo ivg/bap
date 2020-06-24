@@ -3,7 +3,6 @@ open OUnit2
 open Or_error
 open Word_size
 open Format
-
 open Bap.Std
 
 let create_addr = function
@@ -12,9 +11,9 @@ let create_addr = function
 
 let empty_table = Table.empty
 
-let create_mem ?(addr_size=W32) ?(start_addr=0x00) ?(size=0x08) () =
+let create_mem ?(addr_size = W32) ?(start_addr = 0x00) ?(size = 0x08) () =
   let addr = create_addr W32 start_addr in
-  let contents = Bigstring.init size ~f:(fun i -> char_of_int (i+0x61)) in
+  let contents = Bigstring.init size ~f:(fun i -> char_of_int (i + 0x61)) in
   let m = Memory.create LittleEndian addr contents in
   match m with
   | Ok m -> m
@@ -27,24 +26,21 @@ let table =
   | Ok t -> t
   | Error err -> assert_failure (Error.to_string_hum err)
 
-let test_table_len ctxt =
-  assert_equal 0 (Table.length empty_table)
-
-let test_table_len2 ctxt =
-  assert_equal 1 (Table.length table)
+let test_table_len ctxt = assert_equal 0 (Table.length empty_table)
+let test_table_len2 ctxt = assert_equal 1 (Table.length table)
 
 let test_find ctxt =
   let mem_to_find = create_mem () in
-  Table.find table mem_to_find |> function
-  | Some x -> assert_equal "Tagged" x
-  | None -> assert_failure "Not found"
+  Table.find table mem_to_find
+  |> function
+  | Some x -> assert_equal "Tagged" x | None -> assert_failure "Not found"
 
 let test_mem ctxt =
   let mem_to_find = create_mem () in
   assert_bool "Memory not found" (Table.mem table mem_to_find)
 
 let get_mem_tag = function
-  | Some (_,x) -> x
+  | Some (_, x) -> x
   | None -> assert_failure "No memory contents"
 
 let mem_low = create_mem ~start_addr:0x10 ~size:0x10 ()
@@ -52,8 +48,9 @@ let mem_high = create_mem ~start_addr:0x30 ~size:0x10 ()
 
 (* Construct a new table tab *)
 let tab =
-  let t = Table.add empty_table mem_low "lo" >>= fun t ->
-    Table.add t mem_high "hi" >>= fun t -> return t in
+  let t =
+    Table.add empty_table mem_low "lo"
+    >>= fun t -> Table.add t mem_high "hi" >>= fun t -> return t in
   match t with
   | Ok t -> t
   | Error err -> assert_failure (Error.to_string_hum err)
@@ -62,7 +59,7 @@ let tab =
 let test_intersections ctxt ~start_addr ~size ~expect =
   let mem_intersect = create_mem ~start_addr ~size () in
   let result = Table.intersections tab mem_intersect in
-  let regions = Seq.fold result ~init:[] ~f:(fun acc x -> (snd x) :: acc) in
+  let regions = Seq.fold result ~init:[] ~f:(fun acc x -> snd x :: acc) in
   let printer l = Sexp.to_string_hum (sexp_of_list sexp_of_string l) in
   assert_equal ~ctxt ~printer expect regions
 
@@ -91,41 +88,39 @@ let test_max ctxt =
 let test_one_to_one ctxt =
   let tab2 =
     let extra = create_mem ~start_addr:0x50 ~size:0x30 () in
-    let t = Table.add empty_table mem_low "reg1" >>= fun t ->
-      Table.add t mem_high "reg2" >>= fun t ->
-      Table.add t extra "reg3" >>= fun t -> return t in
+    let t =
+      Table.add empty_table mem_low "reg1"
+      >>= fun t ->
+      Table.add t mem_high "reg2"
+      >>= fun t -> Table.add t extra "reg3" >>= fun t -> return t in
     match t with
     | Ok t -> t
     | Error err -> assert_failure (Error.to_string_hum err) in
-  let link_table =
-    Table.(link ~one_to:one String.hashable tab tab2) in
+  let link_table = Table.(link ~one_to:one String.hashable tab tab2) in
   assert_equal "reg2" (link_table "hi")
 
-let suite () = "Table" >::: [
-    "table_length_zero" >:: test_table_len;
-    "table_length_nonzero" >:: test_table_len2;
-    "find" >:: test_find;
-    "mem" >:: test_mem;
-    "intersections1" >::
-    test_intersections ~start_addr:0x10 ~size:0x30 ~expect:["hi";"lo"];
-    "intersections2" >::
-    test_intersections ~start_addr:0x1F ~size:0x30 ~expect:["hi";"lo"];
-    "intersections3" >::
-    test_intersections ~start_addr:0x20 ~size:0x10 ~expect:[];
-    "intersections4" >::
-    test_intersections ~start_addr:0x20 ~size:0x30 ~expect:["hi"];
-    "intersections5" >::
-    test_intersections ~start_addr:0x31 ~size:0x01 ~expect:["hi"];
-    "intersections6" >::
-    test_intersections ~start_addr:0x31 ~size:0x20 ~expect:["hi"];
-    "intersections7" >::
-    test_intersections ~start_addr:0x0 ~size:0x10 ~expect:[];
-    "intersections8" >::
-    test_intersections ~start_addr:0x0 ~size:0x11 ~expect:["lo"];
-    "intersections9" >::
-    test_intersections ~start_addr:0x0 ~size:0x21 ~expect:["lo"];
-    "next" >:: test_next;
-    "prev" >:: test_prev;
-    "min" >:: test_min;
-    "max" >:: test_max;
-  ]
+let suite () =
+  "Table"
+  >::: [ "table_length_zero" >:: test_table_len
+       ; "table_length_nonzero" >:: test_table_len2; "find" >:: test_find
+       ; "mem" >:: test_mem
+       ; "intersections1"
+         >:: test_intersections ~start_addr:0x10 ~size:0x30 ~expect:["hi"; "lo"]
+       ; "intersections2"
+         >:: test_intersections ~start_addr:0x1F ~size:0x30 ~expect:["hi"; "lo"]
+       ; "intersections3"
+         >:: test_intersections ~start_addr:0x20 ~size:0x10 ~expect:[]
+       ; "intersections4"
+         >:: test_intersections ~start_addr:0x20 ~size:0x30 ~expect:["hi"]
+       ; "intersections5"
+         >:: test_intersections ~start_addr:0x31 ~size:0x01 ~expect:["hi"]
+       ; "intersections6"
+         >:: test_intersections ~start_addr:0x31 ~size:0x20 ~expect:["hi"]
+       ; "intersections7"
+         >:: test_intersections ~start_addr:0x0 ~size:0x10 ~expect:[]
+       ; "intersections8"
+         >:: test_intersections ~start_addr:0x0 ~size:0x11 ~expect:["lo"]
+       ; "intersections9"
+         >:: test_intersections ~start_addr:0x0 ~size:0x21 ~expect:["lo"]
+       ; "next" >:: test_next; "prev" >:: test_prev; "min" >:: test_min
+       ; "max" >:: test_max ]

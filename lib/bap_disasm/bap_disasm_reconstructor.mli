@@ -1,13 +1,11 @@
 open Core_kernel
 open Bap_types.Std
 open Bap_image_std
-
 open Bap_disasm_block
 open Bap_disasm_symtab
 open Bap_disasm_source
 
 type cfg = Bap_disasm_rec.Cfg.t
-
 type t
 type reconstructor = t
 

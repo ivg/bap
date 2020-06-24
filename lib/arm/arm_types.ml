@@ -1,13 +1,12 @@
 open Core_kernel
 open Regular.Std
 open Bap.Std
-
 module Basic = Disasm_expert.Basic
 
 exception Lifting_failed of string
 
-type cond = [
-  | `EQ
+type cond =
+  [ `EQ
   | `NE
   | `CS
   | `CC
@@ -21,15 +20,14 @@ type cond = [
   | `LT
   | `GT
   | `LE
-  | `AL
-] [@@deriving bin_io, compare, sexp, enumerate]
-
-type nil_reg = [ `Nil ]
+  | `AL ]
 [@@deriving bin_io, compare, sexp, enumerate]
 
+type nil_reg = [`Nil] [@@deriving bin_io, compare, sexp, enumerate]
+
 (** General purpose registers  *)
-type gpr_reg = [
-  | `R0
+type gpr_reg =
+  [ `R0
   | `R1
   | `R2
   | `R3
@@ -44,35 +42,27 @@ type gpr_reg = [
   | `R12
   | `LR
   | `PC
-  | `SP
-] [@@deriving bin_io, compare, sexp, enumerate]
+  | `SP ]
+[@@deriving bin_io, compare, sexp, enumerate]
 
 type gpr_or_nil = [nil_reg | gpr_reg]
 [@@deriving bin_io, compare, sexp, enumerate]
 
 (** conditition code registers  *)
-type ccr_reg = [
-  | `CPSR
-  | `SPSR
-  | `ITSTATE
-] [@@deriving bin_io, compare, sexp, enumerate]
+type ccr_reg = [`CPSR | `SPSR | `ITSTATE]
+[@@deriving bin_io, compare, sexp, enumerate]
 
-type ccr_or_nil = [nil_reg | ccr_reg ]
+type ccr_or_nil = [nil_reg | ccr_reg]
 [@@deriving bin_io, compare, sexp, enumerate]
 
 type non_nil_reg = [gpr_reg | ccr_reg]
 [@@deriving bin_io, compare, sexp, enumerate]
 
-type reg = [nil_reg | non_nil_reg]
-[@@deriving bin_io, compare, sexp, enumerate]
+type reg = [nil_reg | non_nil_reg] [@@deriving bin_io, compare, sexp, enumerate]
+type op = [`Reg of reg | `Imm of word] [@@deriving bin_io, compare, sexp]
 
-type op = [
-  | `Reg of reg
-  | `Imm of word
-] [@@deriving bin_io, compare, sexp]
-
-type move_insn = [
-  | `ADCri
+type move_insn =
+  [ `ADCri
   | `ADCrr
   | `ADCrsi
   | `ADCrsr
@@ -138,11 +128,11 @@ type move_insn = [
   | `TSTri
   | `TSTrr
   | `TSTrsi
-  | `TSTrsr
-] [@@deriving bin_io, compare, sexp, enumerate]
+  | `TSTrsr ]
+[@@deriving bin_io, compare, sexp, enumerate]
 
-type bits_insn = [
-  | `BFC
+type bits_insn =
+  [ `BFC
   | `BFI
   | `PKHTB
   | `RBIT
@@ -159,11 +149,11 @@ type bits_insn = [
   | `UXTH
   | `REV
   | `REV16
-  | `CLZ
-] [@@deriving bin_io, compare, sexp, enumerate]
+  | `CLZ ]
+[@@deriving bin_io, compare, sexp, enumerate]
 
-type mult_insn = [
-  | `MLA
+type mult_insn =
+  [ `MLA
   | `MLS
   | `MUL
   | `SMLABB
@@ -176,12 +166,11 @@ type mult_insn = [
   | `SMULL
   | `SMULTB
   | `UMLAL
-  | `UMULL
-] [@@deriving bin_io, compare, sexp, enumerate]
+  | `UMULL ]
+[@@deriving bin_io, compare, sexp, enumerate]
 
-
-type mem_multi_insn = [
-  | `LDMDA
+type mem_multi_insn =
+  [ `LDMDA
   | `LDMDA_UPD
   | `LDMDB
   | `LDMDB_UPD
@@ -196,12 +185,11 @@ type mem_multi_insn = [
   | `STMIA
   | `STMIA_UPD
   | `STMIB
-  | `STMIB_UPD
-] [@@deriving bin_io, compare, sexp, enumerate]
+  | `STMIB_UPD ]
+[@@deriving bin_io, compare, sexp, enumerate]
 
-
-type mem_insn = [
-  | mem_multi_insn
+type mem_insn =
+  [ mem_multi_insn
   | `LDRBT_POST_IMM
   | `LDRBT_POST_REG
   | `LDRB_POST_IMM
@@ -262,63 +250,42 @@ type mem_insn = [
   | `STR_PRE_IMM
   | `STR_PRE_REG
   | `STRi12
-  | `STRrs
-] [@@deriving bin_io, compare, sexp, enumerate]
+  | `STRrs ]
+[@@deriving bin_io, compare, sexp, enumerate]
 
-type branch_insn = [
-  | `BL
-  | `BLX
-  | `BLX_pred
-  | `BLXi
-  | `BL_pred
-  | `BX
-  | `BX_RET
-  | `BX_pred
-  | `Bcc
-] [@@deriving bin_io, compare, sexp, enumerate]
+type branch_insn =
+  [`BL | `BLX | `BLX_pred | `BLXi | `BL_pred | `BX | `BX_RET | `BX_pred | `Bcc]
+[@@deriving bin_io, compare, sexp, enumerate]
 
-type special_insn = [
-  | `CPS2p
-  | `DMB
-  | `DSB
-  | `HINT
-  | `MRS
-  | `MSR
-  | `PLDi12
-  | `SVC
-] [@@deriving bin_io, compare, sexp, enumerate]
+type special_insn = [`CPS2p | `DMB | `DSB | `HINT | `MRS | `MSR | `PLDi12 | `SVC]
+[@@deriving bin_io, compare, sexp, enumerate]
 
-type insn = [
-  | move_insn
-  | bits_insn
-  | mult_insn
-  | mem_insn
-  | branch_insn
-  | special_insn
-] [@@deriving bin_io, compare, sexp, enumerate]
+type insn =
+  [move_insn | bits_insn | mult_insn | mem_insn | branch_insn | special_insn]
+[@@deriving bin_io, compare, sexp, enumerate]
 
 (** Memory access operations *)
 
 (** Types for single-register memory access *)
 type mode_r = Offset | PreIndex | PostIndex
+
 type sign = Signed | Unsigned
 type operation = Ld | St
-type size = B | H | W | D
-[@@deriving compare]
+type size = B | H | W | D [@@deriving compare]
 
 (** Types for multiple-register memory access *)
 type mode_m = IA | IB | DA | DB
+
 type update_m = Update | NoUpdate
 
 (** Types for data movement operations  *)
-type arth = [`ADD | `ADC | `SBC | `RSC | `SUB | `RSB ]
-type move = [`AND | `BIC | `EOR | `MOV | `MVN | `ORR ]
-type data_oper = [ arth | move]
+type arth = [`ADD | `ADC | `SBC | `RSC | `SUB | `RSB]
 
+type move = [`AND | `BIC | `EOR | `MOV | `MVN | `ORR]
+type data_oper = [arth | move]
 type repair = [`POS | `NEG] [@@deriving compare]
 
 (** shift types *)
 type shift = [`ASR | `LSL | `LSR | `ROR | `RRX]
-
 
 type smul_size = BB | BT | TB | TT | D | DX | WB | WT

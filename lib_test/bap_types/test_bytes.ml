@@ -35,10 +35,6 @@ let as_string ctxt =
   assert_equal ~ctxt b test_bytes
 
 let suite =
-  "Bytes" >::: [
-    "create"           >:: create;
-    "of and to string" >:: with_string;
-    "as_string"        >:: as_string;
-    "sexp"             >:: sexp;
-    "binp"             >:: binp;
-  ]
+  "Bytes"
+  >::: [ "create" >:: create; "of and to string" >:: with_string
+       ; "as_string" >:: as_string; "sexp" >:: sexp; "binp" >:: binp ]

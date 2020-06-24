@@ -1,6 +1,5 @@
 open Core_kernel
 open Bap.Std
-
 include module type of X86_asm_reg_types
 
 (** [width reg_type] returns the size of the given [reg_type] *)

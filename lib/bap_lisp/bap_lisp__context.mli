@@ -235,16 +235,12 @@
 *)
 
 open Core_kernel
-
 module Attribute = Bap_lisp__attribute
 
 type t
 
 val t : t Attribute.t
-
 val empty : t
-
-
 
 (** [cx <= cx'] is true if [cx] is same as [cx'] or if [cx] is more
     specific. Where a context [c] is the same as context [c'] if [c]
@@ -262,8 +258,7 @@ val empty : t
     ((arch arm v7) (compiler gcc)) <= ((arch arm)) => false
     v}
 *)
-val (<=) : t -> t -> bool
-
+val ( <= ) : t -> t -> bool
 
 (** Partial ordering between context classes.
 
@@ -272,12 +267,11 @@ val (<=) : t -> t -> bool
 
 *)
 type porder =
-  | Less     (** less generic:     c1 <= c2  && not(c2 <= c1) *)
-  | Same     (** exactly the same: c1 <= c2  &&   c2 <= c1  *)
-  | Equiv    (** not comparable :  not(c1 <= c2) && not(c2 <= c1) *)
-  | More     (** more generic :  not(c1 <= c2) &&   c2 <= c1  *)
+  | Less  (** less generic:     c1 <= c2  && not(c2 <= c1) *)
+  | Same  (** exactly the same: c1 <= c2  &&   c2 <= c1  *)
+  | Equiv  (** not comparable :  not(c1 <= c2) && not(c2 <= c1) *)
+  | More  (** more generic :  not(c1 <= c2) &&   c2 <= c1  *)
 
 val compare : t -> t -> porder
 val pp : Format.formatter -> t -> unit
-
 val merge : t -> t -> t

@@ -1,7 +1,6 @@
 open Core_kernel
 open Bap.Std
 open OUnit2
-
 open Powerpc_tests_helpers
 
 let crand arch ctxt =
@@ -10,10 +9,7 @@ let crand arch ctxt =
   let cr1 = cr_bit 1 in
   let cr2 = cr_bit 2 in
   let cr3 = cr_bit 3 in
-  let init = Bil.[
-      cr2 := int Word.b1;
-      cr3 := int Word.b1;
-    ] in
+  let init = Bil.[cr2 := int Word.b1; cr3 := int Word.b1] in
   check_gpr init bytes cr1 Word.b1 arch ctxt
 
 let crnand arch ctxt =
@@ -22,10 +18,7 @@ let crnand arch ctxt =
   let cr1 = cr_bit 1 in
   let cr2 = cr_bit 2 in
   let cr3 = cr_bit 3 in
-  let init = Bil.[
-      cr2 := int Word.b1;
-      cr3 := int Word.b1;
-    ] in
+  let init = Bil.[cr2 := int Word.b1; cr3 := int Word.b1] in
   check_gpr init bytes cr1 Word.b0 arch ctxt
 
 let cror arch ctxt =
@@ -34,10 +27,7 @@ let cror arch ctxt =
   let cr1 = cr_bit 1 in
   let cr2 = cr_bit 2 in
   let cr3 = cr_bit 3 in
-  let init = Bil.[
-      cr2 := int Word.b1;
-      cr3 := int Word.b0;
-    ] in
+  let init = Bil.[cr2 := int Word.b1; cr3 := int Word.b0] in
   check_gpr init bytes cr1 Word.b1 arch ctxt
 
 let crxor arch ctxt =
@@ -46,10 +36,7 @@ let crxor arch ctxt =
   let cr1 = cr_bit 1 in
   let cr2 = cr_bit 2 in
   let cr3 = cr_bit 3 in
-  let init = Bil.[
-      cr2 := int Word.b1;
-      cr3 := int Word.b1;
-    ] in
+  let init = Bil.[cr2 := int Word.b1; cr3 := int Word.b1] in
   check_gpr init bytes cr1 Word.b0 arch ctxt
 
 let crnor arch ctxt =
@@ -58,10 +45,7 @@ let crnor arch ctxt =
   let cr1 = cr_bit 1 in
   let cr2 = cr_bit 2 in
   let cr3 = cr_bit 3 in
-  let init = Bil.[
-      cr2 := int Word.b0;
-      cr3 := int Word.b0;
-    ] in
+  let init = Bil.[cr2 := int Word.b0; cr3 := int Word.b0] in
   check_gpr init bytes cr1 Word.b1 arch ctxt
 
 let creqv arch ctxt =
@@ -70,10 +54,7 @@ let creqv arch ctxt =
   let cr1 = cr_bit 1 in
   let cr2 = cr_bit 2 in
   let cr3 = cr_bit 3 in
-  let init = Bil.[
-      cr2 := int Word.b1;
-      cr3 := int Word.b1;
-    ] in
+  let init = Bil.[cr2 := int Word.b1; cr3 := int Word.b1] in
   check_gpr init bytes cr1 Word.b1 arch ctxt
 
 let crandc arch ctxt =
@@ -82,10 +63,7 @@ let crandc arch ctxt =
   let cr1 = cr_bit 1 in
   let cr2 = cr_bit 2 in
   let cr3 = cr_bit 3 in
-  let init = Bil.[
-      cr2 := int Word.b1;
-      cr3 := int Word.b0;
-    ] in
+  let init = Bil.[cr2 := int Word.b1; cr3 := int Word.b0] in
   check_gpr init bytes cr1 Word.b1 arch ctxt
 
 let crorc arch ctxt =
@@ -94,10 +72,7 @@ let crorc arch ctxt =
   let cr1 = cr_bit 1 in
   let cr2 = cr_bit 2 in
   let cr3 = cr_bit 3 in
-  let init = Bil.[
-      cr2 := int Word.b0;
-      cr3 := int Word.b0;
-    ] in
+  let init = Bil.[cr2 := int Word.b0; cr3 := int Word.b0] in
   check_gpr init bytes cr1 Word.b1 arch ctxt
 
 let mcrf arch ctxt =
@@ -111,40 +86,27 @@ let mcrf arch ctxt =
   let cr13 = cr_bit 13 in
   let cr14 = cr_bit 14 in
   let cr15 = cr_bit 15 in
-  let init = Bil.[
-      cr12 := int Word.b1;
-      cr13 := int Word.b0;
-      cr14 := int Word.b1;
-      cr15 := int Word.b0;
-    ] in
+  let init =
+    Bil.
+      [ cr12 := int Word.b1; cr13 := int Word.b0; cr14 := int Word.b1
+      ; cr15 := int Word.b0 ] in
   let ctxt = eval init bytes arch in
   let cr4_val = lookup_var ctxt cr4 in
   let cr5_val = lookup_var ctxt cr5 in
   let cr6_val = lookup_var ctxt cr6 in
   let cr7_val = lookup_var ctxt cr7 in
-  assert_bool "mcrf failed: bit 4" (is_equal_words Word.b1 cr4_val);
-  assert_bool "mcrf failed: bit 5" (is_equal_words Word.b0 cr5_val);
-  assert_bool "mcrf failed: bit 6" (is_equal_words Word.b1 cr6_val);
+  assert_bool "mcrf failed: bit 4" (is_equal_words Word.b1 cr4_val) ;
+  assert_bool "mcrf failed: bit 5" (is_equal_words Word.b0 cr5_val) ;
+  assert_bool "mcrf failed: bit 6" (is_equal_words Word.b1 cr6_val) ;
   assert_bool "mcrf failed: bit 7" (is_equal_words Word.b0 cr7_val)
 
-let suite  = "CR" >::: [
-    "crand"   >:: crand `ppc;
-    "crnand"  >:: crnand `ppc;
-    "cror"    >:: cror `ppc;
-    "crxor"   >:: crxor `ppc;
-    "crnor"   >:: crnor `ppc;
-    "creqv"   >:: creqv `ppc;
-    "crandc"  >:: crandc `ppc;
-    "crorc"   >:: crorc `ppc;
-    "mcrf"    >:: mcrf `ppc;
-
-    "crand 64"   >:: crand `ppc64;
-    "crnand 64"  >:: crnand `ppc64;
-    "cror 64"    >:: cror `ppc64;
-    "crxor 64"   >:: crxor `ppc64;
-    "crnor 64"   >:: crnor `ppc64;
-    "creqv 64"   >:: creqv `ppc64;
-    "crandc 64"  >:: crandc `ppc64;
-    "crorc 64"   >:: crorc `ppc64;
-    "mcrf 64"    >:: mcrf `ppc64;
-  ]
+let suite =
+  "CR"
+  >::: [ "crand" >:: crand `ppc; "crnand" >:: crnand `ppc; "cror" >:: cror `ppc
+       ; "crxor" >:: crxor `ppc; "crnor" >:: crnor `ppc; "creqv" >:: creqv `ppc
+       ; "crandc" >:: crandc `ppc; "crorc" >:: crorc `ppc; "mcrf" >:: mcrf `ppc
+       ; "crand 64" >:: crand `ppc64; "crnand 64" >:: crnand `ppc64
+       ; "cror 64" >:: cror `ppc64; "crxor 64" >:: crxor `ppc64
+       ; "crnor 64" >:: crnor `ppc64; "creqv 64" >:: creqv `ppc64
+       ; "crandc 64" >:: crandc `ppc64; "crorc 64" >:: crorc `ppc64
+       ; "mcrf 64" >:: mcrf `ppc64 ]

@@ -1,8 +1,8 @@
 open Core_kernel
 
 module Std : sig
-
   exception Not_a_bundle
+
   type bundle
 
   (** [main_bundle ()] returns a program's bundle if the program is
@@ -22,46 +22,45 @@ module Std : sig
 
   (**/**)
 
-
-
   (** Program meta information.  *)
   module Manifest : sig
-    type t = {
-      name : string;            (** program name *)
-      version : string;         (** program version *)
-      desc : string;            (** one line description *)
-      main : string;            (** entry point *)
-      author : string;          (** program author *)
-      date : float;             (** last update date *)
-      requires : string list;   (** required libraries *)
-      provides : string list;   (** provided features *)
-      url : string option;      (** project URL *)
-      license : string option;  (** project license *)
-      copyrights : string option; (** copyright holders *)
-      tags : string list;       (** bundle tags  *)
-      cons : string list;       (** bundle constraints  *)
-    } [@@deriving bin_io, compare, fields, sexp]
+    type t =
+      { name: string  (** program name *)
+      ; version: string  (** program version *)
+      ; desc: string  (** one line description *)
+      ; main: string  (** entry point *)
+      ; author: string  (** program author *)
+      ; date: float  (** last update date *)
+      ; requires: string list  (** required libraries *)
+      ; provides: string list  (** provided features *)
+      ; url: string option  (** project URL *)
+      ; license: string option  (** project license *)
+      ; copyrights: string option  (** copyright holders *)
+      ; tags: string list  (** bundle tags  *)
+      ; cons: string list  (** bundle constraints  *) }
+    [@@deriving bin_io, compare, fields, sexp]
 
     (** [create name] create a bundle for a program with a given [name] *)
     val create :
-      ?author:string ->
-      ?version:string ->
-      ?main:string ->
-      ?date:float ->
-      ?desc:string ->
-      ?requires:string list ->
-      ?provides:string list ->
-      ?url:string ->
-      ?license:string ->
-      ?copyrights:string ->
-      ?tags:string list ->
-      ?cons:string list -> string -> t
+         ?author:string
+      -> ?version:string
+      -> ?main:string
+      -> ?date:float
+      -> ?desc:string
+      -> ?requires:string list
+      -> ?provides:string list
+      -> ?url:string
+      -> ?license:string
+      -> ?copyrights:string
+      -> ?tags:string list
+      -> ?cons:string list
+      -> string
+      -> t
 
     include Stringable with type t := t
   end
 
   type manifest = Manifest.t
-
 
   (** Program Bundle.
 
@@ -81,10 +80,8 @@ module Std : sig
     (** creates new bundle or opens existing  *)
     val of_uri : Uri.t -> t
 
-
     (** [manifest bundle] extracts program manifest from the [bundle] *)
     val manifest : t -> manifest
-
 
     (** [get_file ?name bundle uri] extracts a file.
 
@@ -94,11 +91,9 @@ module Std : sig
         filename for the extraction.  *)
     val get_file : ?name:string -> t -> Uri.t -> Uri.t option
 
-
     (** [get_data bundle path] extracts data specified by a [path] as
         a string.  *)
     val get_data : t -> string -> string option
-
 
     (** [list bundle] returns a list of paths, that are accessible in
         the [bundle]. *)
@@ -107,7 +102,6 @@ module Std : sig
     (** [update_manifest bundle ~f] update program manifest with
         function [f].  *)
     val update_manifest : t -> f:(manifest -> manifest) -> unit
-
 
     (** [insert_files bundle spec] bundle files.
 
@@ -120,12 +114,10 @@ module Std : sig
     *)
     val insert_files : t -> (string option * Uri.t) list -> unit
 
-
     (** [insert_file ?name bundle uri] insert a file specified by the
         [uri]. If [name] is specified, then the file will be stored
         under the specified [name] in the bundle.*)
     val insert_file : ?name:string -> t -> Uri.t -> unit
-
 
     (** [insert_data bundle ~name ~data] insert [data] at path [name].  *)
     val insert_data : t -> name:string -> data:string -> unit
@@ -154,14 +146,15 @@ module Std : sig
         behavior. The function is intended for building a new
         bundle. Once it is created it may be sealed and made
         readonly.*)
-    val update : t -> f:(string -> [
-        | `Drop
-        | `Copy
-        | `Proc of (string -> unit)
-        | `Map  of (string -> string)
-      ]) -> unit
-
-
+    val update :
+         t
+      -> f:
+           (   string
+            -> [ `Drop
+               | `Copy
+               | `Proc of string -> unit
+               | `Map of string -> string ])
+      -> unit
 
     (** Incremental bundle builder.
 
@@ -172,26 +165,21 @@ module Std : sig
     module Builder : sig
       type t
 
-
       (** [create ()] creates a builder.  *)
       val create : unit -> t
-
 
       (** [put_file ?name builder uri] insert a file specified by the
           [uri]. If [name] is specified, then the file will be stored
           under the specified [name] in the bundle.*)
       val put_file : ?name:string -> t -> Uri.t -> unit
 
-
       (** [put_data builder ~name ~data] insert [data] at path
           [name].  *)
       val put_data : t -> name:string -> data:string -> unit
 
-
       (** [embed_manifest builder manifest] embeds a manifest. If it
           was already embedded, then old one will be overwritten.  *)
       val embed_manifest : t -> manifest -> unit
-
 
       (** [flush builder output] finish the building and output the
           resulting bundle into the file [output].  *)

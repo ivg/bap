@@ -1,16 +1,13 @@
 open Core_kernel
 open Monads.Std
 
-
 (** The Knowledge Representation Library.
 
     A library for building knowledge representation and
     reasoning systems. *)
 
-
 (** a knowledge dependent computation.  *)
 type 'a knowledge
-
 
 (** The Knowledge Representation Library.
 
@@ -113,12 +110,11 @@ type 'a knowledge
 
 *)
 module Knowledge : sig
-
   (** a knowledge monad  *)
   type 'a t = 'a knowledge
 
   (** a sort ['s] of class ['k].   *)
-  type (+'k,+'s) cls
+  type (+'k, +'s) cls
 
   (** an object of class ['k]  *)
   type +'k obj
@@ -127,7 +123,7 @@ module Knowledge : sig
   type +'c value
 
   (** a slot holding a property ['p] of a class ['k] object. *)
-  type (+'k,'p) slot
+  type (+'k, 'p) slot
 
   (** an instance of the domain type class  *)
   type 'p domain
@@ -156,8 +152,7 @@ module Knowledge : sig
       there are promises registered in the knowledge system, to compute
       the property [p] then they will be invoked, otherwise the empty
       value of the property domain is returned as the result.  *)
-  val collect : ('a,'p) slot -> 'a obj -> 'p t
-
+  val collect : ('a, 'p) slot -> 'a obj -> 'p t
 
   (** [resolve p x] resolves the multi-opinion property [p]
 
@@ -168,7 +163,7 @@ module Knowledge : sig
       a value from the opinions domain and computes the current
       consensus.
   *)
-  val resolve : ('a,'p opinions) slot -> 'a obj -> 'p t
+  val resolve : ('a, 'p opinions) slot -> 'a obj -> 'p t
 
   (** [provide p x v] provides the value [v] for the property [p].
 
@@ -179,15 +174,14 @@ module Knowledge : sig
       If [join v v'] doesn't exist (i.e., it is [Error conflict])
       then [provide p x v] diverges into a conflict.
   *)
-  val provide : ('a,'p) slot -> 'a obj -> 'p -> unit t
-
+  val provide : ('a, 'p) slot -> 'a obj -> 'p -> unit t
 
   (** [suggest a p x v] suggests [v] as the value for the property [p].
 
       The same as [provide] except the provided value is predicated by
       the agent identity.
   *)
-  val suggest : agent -> ('a,'p opinions) slot -> 'a obj -> 'p -> unit t
+  val suggest : agent -> ('a, 'p opinions) slot -> 'a obj -> 'p -> unit t
 
   (** [promise p f] promises to compute the property [p].
 
@@ -201,7 +195,7 @@ module Knowledge : sig
       the least fixed point solution of all functions [g] involved
       in the property computation is computed.
   *)
-  val promise : ('a,'p) slot -> ('a obj -> 'p t) -> unit
+  val promise : ('a, 'p) slot -> ('a obj -> 'p t) -> unit
 
   (** [propose p f] proposes the opinion computation.
 
@@ -210,23 +204,17 @@ module Knowledge : sig
   *)
   val propose : agent -> ('a, 'p opinions) slot -> ('a obj -> 'p t) -> unit
 
-
   (** state with no knowledge  *)
   val empty : state
-
-
 
   (** [of_bigstring data] loads state from [data] *)
   val of_bigstring : Bigstring.t -> state
 
-
   (** [to_bigstring state] serializes state into a binary representation.  *)
   val to_bigstring : state -> Bigstring.t
 
-
   (** prints the state of the knowledge base.  *)
   val pp_state : Format.formatter -> state -> unit
-
 
   (** [run cls comp init] computes the value of the object [obj] given
 
@@ -242,30 +230,27 @@ module Knowledge : sig
       knowledge accumulated during the computation.
 
   *)
-  val run : ('k,'s) cls -> 'k obj t -> state -> (('k,'s) cls value * state, conflict) result
+  val run :
+       ('k, 's) cls
+    -> 'k obj t
+    -> state
+    -> (('k, 's) cls value * state, conflict) result
 
   module Syntax : sig
     include Monad.Syntax.S with type 'a t := 'a t
 
-
     (** [x-->p] is [collect p x] *)
-    val (-->) : 'a obj -> ('a,'p) slot -> 'p t
-
+    val ( --> ) : 'a obj -> ('a, 'p) slot -> 'p t
 
     (** [p <-- f] is [promise p f]  *)
-    val (<--) : ('a,'p) slot -> ('a obj -> 'p t) -> unit
-
+    val ( <-- ) : ('a, 'p) slot -> ('a obj -> 'p t) -> unit
 
     (** [c // s] is [Object.read c s]  *)
-    val (//) : ('a,_) cls -> string -> 'a obj t
+    val ( // ) : ('a, _) cls -> string -> 'a obj t
   end
 
-
-  include Monad.S with type 'a t := 'a t
-                   and module Syntax := Syntax
-
-  include Monad.Fail.S with type 'a t := 'a t
-                        and type 'a error = conflict
+  include Monad.S with type 'a t := 'a t and module Syntax := Syntax
+  include Monad.Fail.S with type 'a t := 'a t and type 'a error = conflict
 
   (** Orders knowledge by its information content.
 
@@ -288,7 +273,6 @@ module Knowledge : sig
 
   *)
   module Order : sig
-
     (** partial ordering for two way comparison.
 
         The semantics of constructors:
@@ -299,9 +283,7 @@ module Knowledge : sig
     *)
     type partial = LT | EQ | GT | NC
 
-
     module type S = sig
-
       (** a partially ordered type  *)
       type t
 
@@ -316,7 +298,6 @@ module Knowledge : sig
       val order : t -> t -> partial
     end
   end
-
 
   (** Class is a collection of sorts.
 
@@ -339,8 +320,7 @@ module Knowledge : sig
 
   *)
   module Class : sig
-    type (+'k,'s) t = ('k,'s) cls
-
+    type (+'k, 's) t = ('k, 's) cls
 
     (** [declare name sort] declares a new
         class with the given [name] and [sort] index.
@@ -356,16 +336,18 @@ module Knowledge : sig
         class will referenced in the Knowledge documentation output.
     *)
     val declare :
-      ?public:bool ->
-      ?desc:string ->
-      ?package:string -> string -> 's -> ('k,'s) cls
-
+         ?public:bool
+      -> ?desc:string
+      -> ?package:string
+      -> string
+      -> 's
+      -> ('k, 's) cls
 
     (** [refine cls s] refines the [sort] of class ['k] to [s].   *)
-    val refine : ('k,_) cls -> 's -> ('k,'s) cls
+    val refine : ('k, _) cls -> 's -> ('k, 's) cls
 
     (** [same x y] is true if [x] and [y] denote the same class [k] *)
-    val same : ('a,_) cls -> ('b,_) cls -> bool
+    val same : ('a, _) cls -> ('b, _) cls -> bool
 
     (** [equal x y] constructs a type witness of classes equality.
 
@@ -381,8 +363,8 @@ module Knowledge : sig
         Note that the equality is reflexive, so the obtained witness
         could be used in both direction, for upcasting and downcasting.
     *)
-    val equal : ('a,_) cls -> ('b,_) cls -> ('a obj, 'b obj) Type_equal.t option
-
+    val equal :
+      ('a, _) cls -> ('b, _) cls -> ('a obj, 'b obj) Type_equal.t option
 
     (** [assert_equal x y] asserts the equality of two classes.
 
@@ -398,8 +380,8 @@ module Knowledge : sig
             x + y (* where (+) has type [bitv obj -> bitv obj -> bit obj] *)
         ]}
     *)
-    val assert_equal : ('a,_) cls -> ('b,_) cls -> ('a obj, 'b obj) Type_equal.t
-
+    val assert_equal :
+      ('a, _) cls -> ('b, _) cls -> ('a obj, 'b obj) Type_equal.t
 
     (** [property cls name dom] declares
         a new property of all instances of class [k].
@@ -420,19 +402,21 @@ module Knowledge : sig
         property will referenced in the Knowledge documentation output.
     *)
     val property :
-      ?public:bool ->
-      ?desc:string ->
-      ?persistent:'p persistent ->
-      ?package:string ->
-      ('k,_) cls -> string -> 'p domain -> ('k,'p) slot
+         ?public:bool
+      -> ?desc:string
+      -> ?persistent:'p persistent
+      -> ?package:string
+      -> ('k, _) cls
+      -> string
+      -> 'p domain
+      -> ('k, 'p) slot
 
     (** [name cls] is the class name.  *)
-    val name : ('a,_) cls -> name
+    val name : ('a, _) cls -> name
 
     (** [sort cls] returns the sort index of the class [k].  *)
-    val sort : ('k,'s) cls -> 's
+    val sort : ('k, 's) cls -> 's
   end
-
 
   (** Knowledge Base Objects.
 
@@ -445,7 +429,7 @@ module Knowledge : sig
     type 'a ord
 
     (** [create] is a fresh new object with an idefinite extent.  *)
-    val create : ('a,_) cls -> 'a obj knowledge
+    val create : ('a, _) cls -> 'a obj knowledge
 
     (** [scoped scope] pass a fresh new object to [scope].
 
@@ -457,14 +441,13 @@ module Knowledge : sig
         thus care should be taken to prevent the object value from
         escaping the scope of the function.
     *)
-    val scoped : ('a,_) cls -> ('a obj -> 'b knowledge) -> 'b knowledge
+    val scoped : ('a, _) cls -> ('a obj -> 'b knowledge) -> 'b knowledge
 
     (** [repr x] returns a textual representation of the object [x] *)
-    val repr : ('a,_) cls -> 'a t -> string knowledge
+    val repr : ('a, _) cls -> 'a t -> string knowledge
 
     (** [read s] returns an object [x] such that [repr x = s].  *)
-    val read : ('a,_) cls -> string -> 'a t knowledge
-
+    val read : ('a, _) cls -> string -> 'a t knowledge
 
     (** [cast class_equality x] changes the type of an object.
 
@@ -479,25 +462,22 @@ module Knowledge : sig
     *)
     val cast : ('a obj, 'b obj) Type_equal.t -> 'a obj -> 'b obj
 
-
     (** [id obj] returns the internal representation of an object.   *)
     val id : 'a obj -> Int63.t
-
 
     (** Ordered and persistent data types.  *)
     module type S = sig
       type t [@@deriving sexp]
+
       include Base.Comparable.S with type t := t
       include Binable.S with type t := t
     end
 
-
     (** [derive cls] a module of type [S] for the given class [cls].*)
-    val derive : ('a,'d) cls -> (module S
-                                  with type t = 'a obj
-                                   and type comparator_witness = 'a ord)
+    val derive :
+         ('a, 'd) cls
+      -> (module S with type t = 'a obj and type comparator_witness = 'a ord)
   end
-
 
   (** Knowledge Values.
 
@@ -557,23 +537,20 @@ module Knowledge : sig
   module Value : sig
     type 'a t = 'a value
 
-
     (** a witness of the ordering  *)
     type 'a ord
-    include Type_equal.Injective with type 'a t := 'a t
 
+    include Type_equal.Injective with type 'a t := 'a t
 
     (** [empty cls] the empty value of class [cls].
 
         The empty value has the least information content, i.e., all
         slots are empty.
     *)
-    val empty : ('a,'b) cls -> ('a,'b) cls value
-
+    val empty : ('a, 'b) cls -> ('a, 'b) cls value
 
     (** [order x y] orders [x] and [y] by their information content.  *)
     val order : 'a value -> 'a value -> Order.partial
-
 
     (** [join x y] joins pairwise all slots of [x] and [y].
 
@@ -581,8 +558,7 @@ module Knowledge : sig
         function. The result is either a pairwise join or a conflict
         if any of the joins ended up with a conflict.
     *)
-    val join : 'a value -> 'a value -> ('a value,conflict) result
-
+    val join : 'a value -> 'a value -> ('a value, conflict) result
 
     (** [merge x y] joins [x] and [y] and resolves conflicts.
 
@@ -607,24 +583,20 @@ module Knowledge : sig
         - [`drop_right] a conflicting property of [y] is ignored;
         - [`drop_left] a conflicting property of [x] is ignored.
     *)
-    val merge : ?on_conflict:[
-      | `drop_old
-      | `drop_new
-      | `drop_right
-      | `drop_left
-    ] -> 'a value -> 'a value -> 'a value
-
+    val merge :
+         ?on_conflict:[`drop_old | `drop_new | `drop_right | `drop_left]
+      -> 'a value
+      -> 'a value
+      -> 'a value
 
     (** [cls x] is the class of [x].   *)
-    val cls : ('k,'s) cls value -> ('k,'s) cls
-
+    val cls : ('k, 's) cls value -> ('k, 's) cls
 
     (** [get p v] gets a value of the property [p].  *)
-    val get : ('k,'p) slot -> ('k,_) cls value -> 'p
-
+    val get : ('k, 'p) slot -> ('k, _) cls value -> 'p
 
     (** [put p v x] sets a value of the property [p].  *)
-    val put : ('k,'p) slot -> ('k,'s) cls value -> 'p -> ('k,'s) cls value
+    val put : ('k, 'p) slot -> ('k, 's) cls value -> 'p -> ('k, 's) cls value
 
     (** [refine v s] refines the sort of [v] to [s].
 
@@ -632,23 +604,24 @@ module Knowledge : sig
         the value, the time-stamp of the returned value is the same,
         therefore [v = refine v s].
     *)
-    val refine : ('k,_) cls value -> 's -> ('k,'s) cls value
+    val refine : ('k, _) cls value -> 's -> ('k, 's) cls value
 
     module type S = sig
       type t [@@deriving sexp]
+
       val empty : t
       val domain : t domain
+
       include Base.Comparable.S with type t := t
       include Binable.S with type t := t
     end
 
-
     (** [derive cls] derives the implementation of the [S] structure.   *)
-    val derive : ('a,'s) cls ->
-      (module S
-        with type t = ('a,'s) cls t
-         and type comparator_witness = ('a,'s) cls ord)
-
+    val derive :
+         ('a, 's) cls
+      -> (module S
+            with type t = ('a, 's) cls t
+             and type comparator_witness = ('a, 's) cls ord)
 
     (** [pp ppf v] outputs [v] to the formatter [ppf].
 
@@ -656,13 +629,11 @@ module Knowledge : sig
     *)
     val pp : Format.formatter -> 'a value -> unit
 
-
     (** [pp_slots slots ppf v] prints the specified set of slots.
 
         Prints only slots that has a name in [slots].*)
     val pp_slots : string list -> Format.formatter -> 'a value -> unit
   end
-
 
   (** Property accessor.
 
@@ -677,21 +648,20 @@ module Knowledge : sig
 
   *)
   module Slot : sig
-    type ('a,'p) t = ('a,'p) slot
+    type ('a, 'p) t = ('a, 'p) slot
 
     (** [domain slot] the [slot] domain.  *)
-    val domain : ('a,'p) slot -> 'p domain
+    val domain : ('a, 'p) slot -> 'p domain
 
     (** [cls slot] slot's class.  *)
-    val cls : ('a,_) slot -> ('a, unit) cls
+    val cls : ('a, _) slot -> ('a, unit) cls
 
     (** [name slot] the slot name.  *)
-    val name : ('a,'p) slot -> name
+    val name : ('a, 'p) slot -> name
 
     (** [desc slot] the slot documentation.  *)
-    val desc : ('a,'p) slot -> string
+    val desc : ('a, 'p) slot -> string
   end
-
 
   (** A symbol is an object with a unique name.
 
@@ -735,7 +705,6 @@ module Knowledge : sig
       will be treated differently, e.g., [Foo <> foo].
   *)
   module Symbol : sig
-
     (** [intern ?public ?desc ?package name cls] interns a symbol in
         a package.
 
@@ -760,8 +729,13 @@ module Knowledge : sig
         package separator symbol ([:]) will be escaped and won't be
         treated as a package/name separator.
     *)
-    val intern : ?public:bool -> ?desc:string -> ?package:string -> string ->
-      ('a,_) cls -> 'a obj knowledge
+    val intern :
+         ?public:bool
+      -> ?desc:string
+      -> ?package:string
+      -> string
+      -> ('a, _) cls
+      -> 'a obj knowledge
 
     (** [keyword = "keyword"] is the special name for the package
         that contains keywords. Basically, keywords are special kinds
@@ -778,7 +752,6 @@ module Knowledge : sig
         yield something like [#<buf 123>], instead of [#<pkg:buf 123>].
     *)
     val in_package : string -> (unit -> 'a knowledge) -> 'a knowledge
-
 
     (** [import ?strict ?package:p names] imports all [names] into [p].
 
@@ -815,7 +788,8 @@ module Knowledge : sig
         imported into the current package, as set by the [in_package]
         function.
     *)
-    val import : ?strict:bool -> ?package:string -> string list -> unit knowledge
+    val import :
+      ?strict:bool -> ?package:string -> string list -> unit knowledge
   end
 
   (** An information provider.
@@ -835,14 +809,11 @@ module Knowledge : sig
   module Agent : sig
     type t = agent
 
-
     (** the agent's id.  *)
     type id
 
-
     (** abstract ordered type to quantify reliability of agents.*)
     type reliability
-
 
     (** [register name] registers a new agent.
 
@@ -856,10 +827,11 @@ module Knowledge : sig
         (defaults to trustworthy).
     *)
     val register :
-      ?desc:string ->
-      ?package:string ->
-      ?reliability:reliability -> string -> agent
-
+         ?desc:string
+      -> ?package:string
+      -> ?reliability:reliability
+      -> string
+      -> agent
 
     (** [registry ()] is the current registry of agents.
 
@@ -868,25 +840,19 @@ module Knowledge : sig
     *)
     val registry : unit -> id list
 
-
     (** [name id] is the name of the agent.  *)
     val name : id -> name
-
 
     (** [desc id] is the overall description of the agent.  *)
     val desc : id -> string
 
-
     (** [reliability id] is the current reliability of the agent  *)
     val reliability : id -> reliability
-
 
     (** [set_reliability id] changes the reliability of the agent.  *)
     val set_reliability : id -> reliability -> unit
 
-
     (** {3 Reliability Levels} *)
-
 
     (** The highest level of reliability.
 
@@ -903,15 +869,13 @@ module Knowledge : sig
     *)
     val authorative : reliability
 
-
     (** A highly reliable source.
 
         This source rarely, if ever, provides inaccurate results.
 
         It could be compared to the information obtained from a
         well-known expert, peer-reviewed journal, etc. *)
-    val reliable    : reliability
-
+    val reliable : reliability
 
     (** A very reliable source.
 
@@ -923,7 +887,6 @@ module Knowledge : sig
     *)
     val trustworthy : reliability
 
-
     (** Nearly reliable source.
 
         This source sometimes provides inaccurate information or relies
@@ -933,8 +896,7 @@ module Knowledge : sig
         It could be compared to the information obtained from a
         knowledgeable person.
     *)
-    val doubtful    : reliability
-
+    val doubtful : reliability
 
     (** A not worthwhile source.
 
@@ -945,21 +907,17 @@ module Knowledge : sig
         It could be compared to the knowledge obtained from gossips, i.e.,
         from not knowledgeable persons close to the knowledge.
     *)
-    val unreliable  : reliability
-
+    val unreliable : reliability
 
     (** prints the agent information.  *)
     val pp : Format.formatter -> t -> unit
 
-
     (** prints the agent's id.  *)
     val pp_id : Format.formatter -> id -> unit
-
 
     (** prints the reliability level.  *)
     val pp_reliability : Format.formatter -> reliability -> unit
   end
-
 
   (** Partially ordered sets with the least element.
 
@@ -991,7 +949,6 @@ module Knowledge : sig
   module Domain : sig
     type 'a t = 'a domain
 
-
     (** [define ~inspect ~empty ~order name] defines a domain for the
         type ['a].
 
@@ -1017,11 +974,12 @@ module Knowledge : sig
         used only for introspection and better error messages.
     *)
     val define :
-      ?inspect:('a -> Base.Sexp.t) ->
-      ?join:('a -> 'a -> ('a,conflict) result) ->
-      empty:'a ->
-      order:('a -> 'a -> Order.partial) -> string -> 'a domain
-
+         ?inspect:('a -> Base.Sexp.t)
+      -> ?join:('a -> 'a -> ('a, conflict) result)
+      -> empty:'a
+      -> order:('a -> 'a -> Order.partial)
+      -> string
+      -> 'a domain
 
     (** [total empty order name] defines a domain from the total [order].
 
@@ -1043,12 +1001,12 @@ module Knowledge : sig
          v}
     *)
     val total :
-      ?inspect:('a -> Base.Sexp.t) ->
-      ?join:('a -> 'a -> ('a,conflict) result) ->
-      empty:'a ->
-      order:('a -> 'a -> int) ->
-      string -> 'a domain
-
+         ?inspect:('a -> Base.Sexp.t)
+      -> ?join:('a -> 'a -> ('a, conflict) result)
+      -> empty:'a
+      -> order:('a -> 'a -> int)
+      -> string
+      -> 'a domain
 
     (** [flat empty equal name] defines a flat domain.
 
@@ -1070,12 +1028,12 @@ module Knowledge : sig
 
     *)
     val flat :
-      ?inspect:('a -> Base.Sexp.t) ->
-      ?join:('a -> 'a -> ('a,conflict) result) ->
-      empty:'a ->
-      equal:('a -> 'a -> bool) ->
-      string -> 'a domain
-
+         ?inspect:('a -> Base.Sexp.t)
+      -> ?join:('a -> 'a -> ('a, conflict) result)
+      -> empty:'a
+      -> equal:('a -> 'a -> bool)
+      -> string
+      -> 'a domain
 
     (** [optional ~equal name] a flat domain with [None] as bot.
 
@@ -1090,11 +1048,11 @@ module Knowledge : sig
         unknown ([None]), true ([Some true]), or false ([Some false].
     *)
     val optional :
-      ?inspect:('a -> Base.Sexp.t) ->
-      ?join:('a -> 'a -> ('a,conflict) result) ->
-      equal:('a -> 'a -> bool) ->
-      string -> 'a option domain
-
+         ?inspect:('a -> Base.Sexp.t)
+      -> ?join:('a -> 'a -> ('a, conflict) result)
+      -> equal:('a -> 'a -> bool)
+      -> string
+      -> 'a option domain
 
     (** [mapping total_order data_equal name] a point-wise mapping domain.
 
@@ -1116,12 +1074,11 @@ module Knowledge : sig
         - [NC] iff neither of the above rules applicable.
     *)
     val mapping :
-      ('a,'e) Map.comparator ->
-      ?inspect:('d -> Base.Sexp.t) ->
-      equal:('d -> 'd -> bool) ->
-      string ->
-      ('a,'d,'e) Map.t domain
-
+         ('a, 'e) Map.comparator
+      -> ?inspect:('d -> Base.Sexp.t)
+      -> equal:('d -> 'd -> bool)
+      -> string
+      -> ('a, 'd, 'e) Map.t domain
 
     (** [powerset total name] defines a set of all subsets domain.
 
@@ -1129,11 +1086,11 @@ module Knowledge : sig
         operator is the set union, and the order operator is the
         [is_subset] function.
     *)
-    val powerset : ('a,'e) Set.comparator ->
-      ?inspect:('a -> Sexp.t) ->
-      string ->
-      ('a,'e) Set.t domain
-
+    val powerset :
+         ('a, 'e) Set.comparator
+      -> ?inspect:('a -> Sexp.t)
+      -> string
+      -> ('a, 'e) Set.t domain
 
     (** [opinions empty equal name] defines an opinionated domain.
 
@@ -1145,49 +1102,39 @@ module Knowledge : sig
         See corresponding [suggest], [propose], and [resolve] operators.
     *)
     val opinions :
-      ?inspect:('a -> Sexp.t) ->
-      empty:'a ->
-      equal:('a -> 'a -> bool) ->
-      string ->
-      'a opinions domain
-
+         ?inspect:('a -> Sexp.t)
+      -> empty:'a
+      -> equal:('a -> 'a -> bool)
+      -> string
+      -> 'a opinions domain
 
     (** [string] is flat domain with an empty string at the bottom.  *)
     val string : string domain
 
-
     (** [bool] is the tribool domain. *)
     val bool : bool option domain
 
-
     (** [obj] is a flat domain with a nil object at the bottom.  *)
-    val obj : ('a,_) cls -> 'a obj domain
-
+    val obj : ('a, _) cls -> 'a obj domain
 
     (** [empty domain] is the bottom of the [domain].  *)
     val empty : 'a t -> 'a
 
-
     (** [is_empty domain x] is [true] if [x] is [empty domain].  *)
     val is_empty : 'a t -> 'a -> bool
-
 
     (** [order domain x y] orders [x] and [y] according to the [domain] order.  *)
     val order : 'a t -> 'a -> 'a -> Order.partial
 
-
     (** [join domain x y] is the upper bound of [x] and [y].  *)
-    val join  : 'a t -> 'a -> 'a -> ('a,conflict) result
-
+    val join : 'a t -> 'a -> 'a -> ('a, conflict) result
 
     (** [inspect domain x] introspects [x].  *)
     val inspect : 'a t -> 'a -> Base.Sexp.t
 
-
     (** [name domain] is the domain name.  *)
     val name : 'a t -> string
   end
-
 
   (** Persistence type class.
 
@@ -1198,28 +1145,24 @@ module Knowledge : sig
   module Persistent : sig
     type 'a t = 'a persistent
 
-
     (** [define to_string of_string] derives an instance of [persistent].
 
         Uses the provided [of_string] and [to_string] to deserialize
         and serialize properties.
     *)
     val define :
-      to_string:('a -> string) ->
-      of_string:(string -> 'a) ->
-      'a persistent
-
+      to_string:('a -> string) -> of_string:(string -> 'a) -> 'a persistent
 
     (** [derive to_persistent of_persistent] derives an instance from
         other instance. *)
     val derive :
-      to_persistent:('a -> 'b) ->
-      of_persistent:('b -> 'a) ->
-      'b persistent -> 'a persistent
+         to_persistent:('a -> 'b)
+      -> of_persistent:('b -> 'a)
+      -> 'b persistent
+      -> 'a persistent
 
     (** [of_binable t] derives [persistent] from the binable instance [t].  *)
     val of_binable : (module Binable.S with type t = 'a) -> 'a persistent
-
 
     (** string is a persistent data type.  *)
     val string : string persistent
@@ -1234,11 +1177,11 @@ module Knowledge : sig
     val array : 'a persistent -> 'a array persistent
 
     (** [set order t] derives persistent for a set.  *)
-    val set : ('a,'c) Set.comparator -> 'a t -> ('a,'c) Set.t persistent
-
+    val set : ('a, 'c) Set.comparator -> 'a t -> ('a, 'c) Set.t persistent
 
     (** [map order t] derives persistent for a map.  *)
-    val map : ('k,'c) Map.comparator -> 'k t -> 'd t -> ('k,'d,'c) Map.t persistent
+    val map :
+      ('k, 'c) Map.comparator -> 'k t -> 'd t -> ('k, 'd, 'c) Map.t persistent
   end
 
   (** Conflicting information.
@@ -1257,14 +1200,11 @@ module Knowledge : sig
   module Conflict : sig
     type t = conflict = ..
 
-
     (** prints the conflict  *)
     val pp : Format.formatter -> conflict -> unit
 
-
     (** the s-expression denoting the conflict. *)
     val sexp_of_t : t -> Sexp.t
-
 
     (** registers a printer for user specified extension of the conflict type.
 
@@ -1274,11 +1214,9 @@ module Knowledge : sig
     val register_printer : (t -> string option) -> unit
   end
 
-
   (** Fully qualified names.  *)
   module Name : sig
     type t = name [@@deriving bin_io, compare, sexp]
-
 
     (** [create ?package name] creates a fully qualified name.
 
@@ -1291,7 +1229,6 @@ module Knowledge : sig
         ["user"] package.
     *)
     val create : ?package:string -> string -> t
-
 
     (** [read ?package input] reads a full name from input.
 
@@ -1342,7 +1279,6 @@ module Knowledge : sig
     *)
     val read : ?package:string -> string -> t
 
-
     (** [show name] is the readable representation of [name].
 
         The name is represented as [<package>:<name>], with all
@@ -1378,46 +1314,35 @@ module Knowledge : sig
   (** the s-expression denoting the conflict. *)
   val sexp_of_conflict : conflict -> Sexp.t
 
-
   (** Online Knowledge documentation.
 
       Provides information about declared knowledge entities, such as
       classes, properties, and agents.
   *)
   module Documentation : sig
-
-
     (** A documentation element.  *)
     module type Element = sig
-
       (** the type of the element  *)
       type t
 
-
       (** [name elt] is the fully qualified element name.  *)
       val name : t -> name
-
 
       (** [desc elt] is the text describing the element.  *)
       val desc : t -> string
     end
 
-
     (** Describes Knowledge agents.  *)
     module Agent : Element
-
 
     (** Describes Knowledge classes.  *)
     module Class : Element
 
-
     (** Describes Class properties.  *)
     module Property : Element
 
-
     (** [agents ()] is the list of currently registered agents.  *)
     val agents : unit -> Agent.t list
-
 
     (** [classes ()] public classes and their properties.
 

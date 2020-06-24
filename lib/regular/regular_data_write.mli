@@ -1,18 +1,19 @@
 open Core_kernel
 open Regular_data_types
-type 'a t
 
+type 'a t
 type bytes = Regular_bytes.t
 
 val create :
-  ?to_bytes  : ('a -> bytes) ->
-  ?to_bigstring : ('a -> bigstring) ->
-  ?dump  : (Out_channel.t -> 'a -> unit) ->
-  ?pp : (Format.formatter -> 'a -> unit) ->
-  ?size  : ('a -> int) ->
-  ?blit_to_string:('a,bytes) copy ->
-  ?blit_to_bigstring:('a,bigstring) copy ->
-  unit -> 'a t
+     ?to_bytes:('a -> bytes)
+  -> ?to_bigstring:('a -> bigstring)
+  -> ?dump:(Out_channel.t -> 'a -> unit)
+  -> ?pp:(Format.formatter -> 'a -> unit)
+  -> ?size:('a -> int)
+  -> ?blit_to_string:('a, bytes) copy
+  -> ?blit_to_bigstring:('a, bigstring) copy
+  -> unit
+  -> 'a t
 
 val size : 'a t -> 'a -> int
 val to_channel : 'a t -> Out_channel.t -> 'a -> unit

@@ -8,7 +8,6 @@ open Bap_trace_meta_types
     specified in this module.
 *)
 
-
 (** description of a tracer that was used to create the trace  *)
 val tracer : tracer tag
 

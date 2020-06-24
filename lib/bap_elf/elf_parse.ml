@@ -29,14 +29,12 @@
  * SUCH DAMAGE.
  *)
 open Core_kernel
-
 open Bitstring
 open Elf_types
 open Elf_internal_utils
-
 module Char = Caml.Char
 
-let elf_max_header_size = 64         (* no magick! *)
+let elf_max_header_size = 64 (* no magick! *)
 
 (** value mapping *)
 
@@ -53,9 +51,7 @@ let parse_e_data data =
   | _ -> invalid_arg "parse_e_data"
 
 let endian_of ei_data =
-  match ei_data with
-  | ELFDATA2LSB -> LittleEndian
-  | ELFDATA2MSB -> BigEndian
+  match ei_data with ELFDATA2LSB -> LittleEndian | ELFDATA2MSB -> BigEndian
 
 let parse_e_osabi abi =
   match abi with
@@ -96,7 +92,6 @@ let parse_e_machine mach =
   | 8 -> EM_MIPS
   | 9 -> EM_S370
   | 10 -> EM_MIPS_RS3_LE
-
   | 15 -> EM_PARISC
   | 17 -> EM_VPP500
   | 18 -> EM_SPARC32PLUS
@@ -104,7 +99,6 @@ let parse_e_machine mach =
   | 20 -> EM_PPC
   | 21 -> EM_PPC64
   | 22 -> EM_S390
-
   | 36 -> EM_V800
   | 37 -> EM_FR20
   | 38 -> EM_RH32
@@ -133,7 +127,6 @@ let parse_e_machine mach =
   | 61 -> EM_TINYJ
   | 62 -> EM_X86_64
   | 63 -> EM_PDSP
-
   | 66 -> EM_FX66
   | 67 -> EM_ST9PLUS
   | 68 -> EM_ST7
@@ -180,11 +173,7 @@ let parse_p_type = function
   | n -> PT_OTHER n
 
 let parse_p_flag n =
-  match n with
-  | 0 -> PF_X
-  | 1 -> PF_W
-  | 2 -> PF_R
-  | _ -> PF_EXT n
+  match n with 0 -> PF_X | 1 -> PF_W | 2 -> PF_R | _ -> PF_EXT n
 
 let parse_sh_type = function
   | 0l -> SHT_NULL
@@ -212,10 +201,7 @@ let parse_flags flag_of bit data =
   let rec test fs n data =
     if n = bit then fs
     else
-      let fs =
-        if Int64.(bit_and data 1L = 1L)
-        then flag_of n :: fs
-        else fs in
+      let fs = if Int64.(bit_and data 1L = 1L) then flag_of n :: fs else fs in
       test fs (n + 1) (Int64.shift_right_logical data 1) in
   test [] 0 data
 
@@ -232,22 +218,24 @@ let parse_elf_ident bits =
       e_abiver  : 8;
       e_pad     : 56;
       rest      : -1 : bitstring
-    |} ->
-    (parse_e_class e_class,
-     parse_e_data e_data,
-     e_version,
-     parse_e_osabi e_osabi,
-     e_abiver,
-     rest)
-[@@warning "-D"]
+    |}
+    ->
+      ( parse_e_class e_class
+      , parse_e_data e_data
+      , e_version
+      , parse_e_osabi e_osabi
+      , e_abiver
+      , rest )
+  [@@warning "-D"]
 
 (* elf header *)
 let parse_elf_hdr elf =
-  let (ei_class, ei_data, ei_version, ei_osabi, ei_abiver, rest) =
+  let ei_class, ei_data, ei_version, ei_osabi, ei_abiver, rest =
     parse_elf_ident elf in
   let endian = endian_of ei_data in
   match ei_class with
-  | ELFCLASS32 ->  (match%bitstring rest with
+  | ELFCLASS32 -> (
+      match%bitstring rest with
       | {|e_type      : 16 : endian (endian);
           e_machine   : 16 : endian (endian);
           e_version   : 32 : endian (endian);
@@ -261,33 +249,31 @@ let parse_elf_hdr elf =
           e_shentsize : 16 : endian (endian);
           e_shnum     : 16 : endian (endian);
           e_shstrndx  : 16 : endian (endian)
-        |} ->
-        let elf = {
-          e_class = ei_class;
-          e_data = ei_data;
-          e_version = ei_version;
-          e_osabi = ei_osabi;
-          e_abiver = ei_abiver;
-          e_type = parse_e_type e_type;
-          e_machine = parse_e_machine e_machine;
-          e_entry = Int64.of_int32 e_entry;
-          e_sections = Sequence.empty;
-          e_segments = Sequence.empty;
-          e_shstrndx;
-        } in
-        let seg_table = {
-          table_offset = Int64.of_int32 e_phoff;
-          entry_size = e_phentsize;
-          entry_num = e_phnum;
-        } in
-        let sec_table = {
-          table_offset = Int64.of_int32 e_shoff;
-          entry_size = e_shentsize;
-          entry_num = e_shnum;
-        } in
-        elf, seg_table, sec_table
-    )
-  | ELFCLASS64 -> ( match%bitstring rest with
+        |}
+        ->
+          let elf =
+            { e_class= ei_class
+            ; e_data= ei_data
+            ; e_version= ei_version
+            ; e_osabi= ei_osabi
+            ; e_abiver= ei_abiver
+            ; e_type= parse_e_type e_type
+            ; e_machine= parse_e_machine e_machine
+            ; e_entry= Int64.of_int32 e_entry
+            ; e_sections= Sequence.empty
+            ; e_segments= Sequence.empty
+            ; e_shstrndx } in
+          let seg_table =
+            { table_offset= Int64.of_int32 e_phoff
+            ; entry_size= e_phentsize
+            ; entry_num= e_phnum } in
+          let sec_table =
+            { table_offset= Int64.of_int32 e_shoff
+            ; entry_size= e_shentsize
+            ; entry_num= e_shnum } in
+          (elf, seg_table, sec_table) )
+  | ELFCLASS64 -> (
+      match%bitstring rest with
       | {|e_type      : 16 : endian (endian);
           e_machine   : 16 : endian (endian);
           e_version   : 32 : endian (endian);
@@ -301,38 +287,34 @@ let parse_elf_hdr elf =
           e_shentsize : 16 : endian (endian);
           e_shnum     : 16 : endian (endian);
           e_shstrndx  : 16 : endian (endian)
-        |} ->
-        let elf = {
-          e_class = ei_class;
-          e_data = ei_data;
-          e_version = ei_version;
-          e_osabi = ei_osabi;
-          e_abiver = ei_abiver;
-          e_type = parse_e_type e_type;
-          e_machine = parse_e_machine e_machine;
-          e_entry = e_entry;
-          e_shstrndx;
-          e_sections = Sequence.empty;
-          e_segments = Sequence.empty;
-        } in
-        let seg_table = {
-          table_offset = e_phoff;
-          entry_size = e_phentsize;
-          entry_num = e_phnum;
-        } in
-        let sec_table = {
-          table_offset = e_shoff;
-          entry_size = e_shentsize;
-          entry_num = e_shnum;
-        } in
-        elf, seg_table, sec_table
-    )
-[@@warning "-D"]
+        |}
+        ->
+          let elf =
+            { e_class= ei_class
+            ; e_data= ei_data
+            ; e_version= ei_version
+            ; e_osabi= ei_osabi
+            ; e_abiver= ei_abiver
+            ; e_type= parse_e_type e_type
+            ; e_machine= parse_e_machine e_machine
+            ; e_entry
+            ; e_shstrndx
+            ; e_sections= Sequence.empty
+            ; e_segments= Sequence.empty } in
+          let seg_table =
+            {table_offset= e_phoff; entry_size= e_phentsize; entry_num= e_phnum}
+          in
+          let sec_table =
+            {table_offset= e_shoff; entry_size= e_shentsize; entry_num= e_shnum}
+          in
+          (elf, seg_table, sec_table) )
+  [@@warning "-D"]
 
 (* segment *)
 let parse_segment ei_class endian bit =
   match ei_class with
-  | ELFCLASS32 -> (match%bitstring bit with
+  | ELFCLASS32 -> (
+      match%bitstring bit with
       | {|p_type   : 32 : endian (endian);
           p_offset : 32 : endian (endian);
           p_vaddr  : 32 : endian (endian);
@@ -341,17 +323,18 @@ let parse_segment ei_class endian bit =
           p_memsz  : 32 : endian (endian);
           p_flags  : 32 : endian (endian);
           p_align  : 32 : endian (endian)
-        |} -> {
-          p_type   = parse_p_type p_type;
-          p_flags  = parse_flags parse_p_flag 32 (Int64.of_int32 p_flags);
-          p_vaddr  = Int64.of_int32 p_vaddr;
-          p_paddr  = Int64.of_int32 p_paddr;
-          p_align  = Int64.of_int32 p_align;
-          p_memsz  = Int64.of_int32 p_memsz;
-          p_filesz = Int64.of_int32 p_filesz;
-          p_offset = Int64.of_int32 p_offset;
-        })
-  | ELFCLASS64 -> (match%bitstring bit with
+        |}
+        ->
+          { p_type= parse_p_type p_type
+          ; p_flags= parse_flags parse_p_flag 32 (Int64.of_int32 p_flags)
+          ; p_vaddr= Int64.of_int32 p_vaddr
+          ; p_paddr= Int64.of_int32 p_paddr
+          ; p_align= Int64.of_int32 p_align
+          ; p_memsz= Int64.of_int32 p_memsz
+          ; p_filesz= Int64.of_int32 p_filesz
+          ; p_offset= Int64.of_int32 p_offset } )
+  | ELFCLASS64 -> (
+      match%bitstring bit with
       | {|p_type   : 32 : endian (endian);
           p_flags  : 32 : endian (endian);
           p_offset : 64 : endian (endian);
@@ -360,22 +343,23 @@ let parse_segment ei_class endian bit =
           p_filesz : 64 : endian (endian);
           p_memsz  : 64 : endian (endian);
           p_align  : 64 : endian (endian)
-        |} -> {
-          p_type  = parse_p_type p_type;
-          p_flags = parse_flags parse_p_flag 32 (Int64.of_int32 p_flags);
-          p_vaddr;
-          p_paddr;
-          p_align;
-          p_memsz;
-          p_filesz;
-          p_offset;
-        })
-[@@warning "-D"]
+        |}
+        ->
+          { p_type= parse_p_type p_type
+          ; p_flags= parse_flags parse_p_flag 32 (Int64.of_int32 p_flags)
+          ; p_vaddr
+          ; p_paddr
+          ; p_align
+          ; p_memsz
+          ; p_filesz
+          ; p_offset } )
+  [@@warning "-D"]
 
 (* section *)
 let parse_section ei_class endian bit =
   match ei_class with
-  | ELFCLASS32 -> (match%bitstring bit with
+  | ELFCLASS32 -> (
+      match%bitstring bit with
       | {|sh_name      : 32 : endian (endian);
           sh_type      : 32 : endian (endian);
           sh_flags     : 32 : endian (endian);
@@ -386,19 +370,20 @@ let parse_section ei_class endian bit =
           sh_info      : 32 : endian (endian);
           sh_addralign : 32 : endian (endian);
           sh_entsize   : 32 : endian (endian)
-        |} -> {
-          sh_name = Int32.to_int_exn sh_name;
-          sh_type = parse_sh_type sh_type;
-          sh_flags = parse_flags parse_sh_flag 32 (Int64.of_int32 sh_flags);
-          sh_addr = Int64.of_int32 sh_addr;
-          sh_size = Int64.of_int32 sh_size;
-          sh_link = sh_link;
-          sh_info = sh_info;
-          sh_addralign = Int64.of_int32 sh_addralign;
-          sh_entsize = Int64.of_int32 sh_entsize;
-          sh_offset = Int64.of_int32 sh_offset;
-        })
-  | ELFCLASS64 -> (match%bitstring bit with
+        |}
+        ->
+          { sh_name= Int32.to_int_exn sh_name
+          ; sh_type= parse_sh_type sh_type
+          ; sh_flags= parse_flags parse_sh_flag 32 (Int64.of_int32 sh_flags)
+          ; sh_addr= Int64.of_int32 sh_addr
+          ; sh_size= Int64.of_int32 sh_size
+          ; sh_link
+          ; sh_info
+          ; sh_addralign= Int64.of_int32 sh_addralign
+          ; sh_entsize= Int64.of_int32 sh_entsize
+          ; sh_offset= Int64.of_int32 sh_offset } )
+  | ELFCLASS64 -> (
+      match%bitstring bit with
       | {|
         sh_name      : 32 : endian (endian);
         sh_type      : 32 : endian (endian);
@@ -410,84 +395,88 @@ let parse_section ei_class endian bit =
         sh_info      : 32 : endian (endian);
         sh_addralign : 64 : endian (endian);
         sh_entsize   : 64 : endian (endian)
-      |} -> {
-          sh_name = Int32.to_int_exn sh_name;
-          sh_type = parse_sh_type sh_type;
-          sh_flags = parse_flags parse_sh_flag 64 sh_flags;
-          sh_addr = sh_addr;
-          sh_link = sh_link;
-          sh_info = sh_info;
-          sh_addralign = sh_addralign;
-          sh_entsize = sh_entsize;
-          sh_size;
-          sh_offset;
-        })
-[@@warning "-D"]
+      |}
+        ->
+          { sh_name= Int32.to_int_exn sh_name
+          ; sh_type= parse_sh_type sh_type
+          ; sh_flags= parse_flags parse_sh_flag 64 sh_flags
+          ; sh_addr
+          ; sh_link
+          ; sh_info
+          ; sh_addralign
+          ; sh_entsize
+          ; sh_size
+          ; sh_offset } )
+  [@@warning "-D"]
 
-let validate_offsets desc  ~pos ~len ~offset ~size : unit Or_error.t =
-  Validate.(result @@ name_list desc [
-      name "size" @@ Int.validate_bound size
-        ~min:(Incl 0) ~max:(Incl len);
-      name "offset" @@ Int.validate_bound offset
-        ~min:(Incl pos)
-        ~max:(Excl (pos + len));
-      name "size+offset" @@
-      Int.validate_ubound (size + offset)
-        ~max:(Incl (pos + len))
-    ])
-[@@warning "-D"]
+let validate_offsets desc ~pos ~len ~offset ~size : unit Or_error.t =
+  Validate.(
+    result
+    @@ name_list desc
+         [ name "size" @@ Int.validate_bound size ~min:(Incl 0) ~max:(Incl len)
+         ; name "offset"
+           @@ Int.validate_bound offset ~min:(Incl pos) ~max:(Excl (pos + len))
+         ; name "size+offset"
+           @@ Int.validate_ubound (size + offset) ~max:(Incl (pos + len)) ])
+  [@@warning "-D"]
 
 let split bits size : bitstring * bitstring =
   match%bitstring bits with
   | {|hd : size * 8 : bitstring;
-      tl : -1       : bitstring|} -> hd,tl
-[@@warning "-D"]
+      tl : -1       : bitstring|} -> (hd, tl)
+  [@@warning "-D"]
 
 (* Bitlength needed that's why we multiply by 8 *)
-let bitstring_of_bytes b = b, 0, Bytes.length b * 8
+let bitstring_of_bytes b = (b, 0, Bytes.length b * 8)
 
 (** returns a sequence of table entries  *)
 let split_table ti ~pos ~len data : bitstring Sequence.t Or_error.t =
   let open Or_error in
   let table_size = ti.entry_size * ti.entry_num in
-  int_of_int64 ti.table_offset >>= fun offset ->
+  int_of_int64 ti.table_offset
+  >>= fun offset ->
   validate_offsets "table" ~pos ~len ~offset ~size:table_size
   >>= fun () ->
   let bits = Bytes.create table_size in
-  Bigstring.To_bytes.blit
-    ~src:data ~src_pos:(pos + offset) ~dst:bits ~dst_pos:0 ~len:table_size;
-  let t = Sequence.unfold ~init:(bitstring_of_bytes bits)
-      ~f:(fun bits -> Some (split bits ti.entry_size)) in
+  Bigstring.To_bytes.blit ~src:data ~src_pos:(pos + offset) ~dst:bits ~dst_pos:0
+    ~len:table_size ;
+  let t =
+    Sequence.unfold ~init:(bitstring_of_bytes bits) ~f:(fun bits ->
+        Some (split bits ti.entry_size)) in
   return (Sequence.take t ti.entry_num)
 
 let validate_bounds ~pos ~len ~data_len =
-  Validate.(result @@ name_list "bigstring bounds" [
-      name "pos in bounds" @@ Int.validate_bound pos
-        ~min:(Incl 0) ~max:(Excl data_len);
-      name "len in bounds" @@ Int.validate_bound len
-        ~min:(Incl elf_max_header_size) ~max:(Incl data_len);
-      name "pos+len in bounds" @@ Int.validate_ubound (pos+len)
-        ~max:(Incl data_len)
-    ])
+  Validate.(
+    result
+    @@ name_list "bigstring bounds"
+         [ name "pos in bounds"
+           @@ Int.validate_bound pos ~min:(Incl 0) ~max:(Excl data_len)
+         ; name "len in bounds"
+           @@ Int.validate_bound len ~min:(Incl elf_max_header_size)
+                ~max:(Incl data_len)
+         ; name "pos+len in bounds"
+           @@ Int.validate_ubound (pos + len) ~max:(Incl data_len) ])
 
-let from_bigstring_exn ?(pos=0) ?len data =
+let from_bigstring_exn ?(pos = 0) ?len data =
   let open Or_error in
   let data_len = Bigstring.length data in
   let len = Option.value len ~default:data_len in
-  validate_bounds ~pos ~len ~data_len >>= fun () ->
+  validate_bounds ~pos ~len ~data_len
+  >>= fun () ->
   let header = Bytes.create elf_max_header_size in
-  Bigstring.To_bytes.blit
-    ~src:data ~src_pos:pos ~dst:header ~dst_pos:0
-    ~len:elf_max_header_size;
-  let (elf, seg_ti, sec_ti) =
-    parse_elf_hdr (bitstring_of_bytes header) in
+  Bigstring.To_bytes.blit ~src:data ~src_pos:pos ~dst:header ~dst_pos:0
+    ~len:elf_max_header_size ;
+  let elf, seg_ti, sec_ti = parse_elf_hdr (bitstring_of_bytes header) in
   let endian = endian_of elf.e_data in
-  split_table seg_ti ~pos ~len data >>= fun ph ->
-  split_table sec_ti ~pos ~len data >>= fun sh ->
+  split_table seg_ti ~pos ~len data
+  >>= fun ph ->
+  split_table sec_ti ~pos ~len data
+  >>= fun sh ->
   let parse_table f = Sequence.map ~f:(f elf.e_class endian) in
   let e_segments = parse_table parse_segment ph in
   let e_sections = parse_table parse_section sh in
-  return { elf with e_segments; e_sections }
+  return {elf with e_segments; e_sections}
 
 let from_bigstring ?pos ?len data =
-  Or_error.try_with_join ~backtrace:true (fun () -> from_bigstring_exn ?pos ?len data)
+  Or_error.try_with_join ~backtrace:true (fun () ->
+      from_bigstring_exn ?pos ?len data)

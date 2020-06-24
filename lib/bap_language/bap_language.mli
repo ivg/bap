@@ -106,9 +106,7 @@ open Bap.Std
     framework, that maps API languages to ABI implementations.
 *)
 
-
 module Std : sig
-
   type 'a language
 
   module Language : sig
@@ -117,7 +115,7 @@ module Std : sig
     val create : name:string -> 'a language
     val name : 'a language -> string
 
-    module Property(T : T1) : sig
+    module Property (T : T1) : sig
       type t
       type 'a data = 'a T.t
 

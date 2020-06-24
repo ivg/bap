@@ -7,7 +7,6 @@ open Bap_future.Std
 open Bap_strings.Std
 
 module Std : sig
-
   [@@@warning "-D"]
 
   (** {1 The Primus Framework}
@@ -144,10 +143,8 @@ module Std : sig
       {!Primus.Jobs.run} or using the [run] plugin.
   *)
 
-
   (** The Primus Framework inteface.  *)
   module Primus : sig
-
     (** Machine Exception.
 
         The exn type is an extensible variant, and components
@@ -163,7 +160,6 @@ module Std : sig
     (** a cancelable subscription to an observation.
         @since 2.1.0 *)
     type subscription
-
 
     (** a system definition.
         @since 2.1.0 *)
@@ -181,9 +177,7 @@ module Std : sig
     (** Machine exit status.
         A machine may terminate normally, or abnormally with the
         specified exception. *)
-    type exit_status =
-      | Normal
-      | Exn of exn
+    type exit_status = Normal | Exn of exn
 
     (** An abstract type that represents an effect produced by a
         Machine run. That type is left abstract, and has no
@@ -205,7 +199,6 @@ module Std : sig
         components are functors, the values of type observation should
         not depenend on the type of the functor.*)
     module Observation : sig
-
       (** An observation provider.
           A provider facilitates introspection of the Primus Machine,
           for the sake of debugging and dumping the effects. The
@@ -213,7 +206,6 @@ module Std : sig
           behavior of a machine, or for the analysis, as its main
           purpose is debugging, logging, and tracing the execution.*)
       type provider
-
 
       (** [provide ?inspect name] returns a pair of two handlers. The
           first element is used to observe values, the second is used
@@ -223,14 +215,15 @@ module Std : sig
           an observed value, that will be used for introspection and
           pretty-printing (it is not required, and if it is provided, it
           is not necessary to disclose everything *)
-      val provide : ?desc:string -> ?inspect:('a -> Sexp.t) ->
-        ?package:string ->
-        string -> 'a observation * 'a statement
-
+      val provide :
+           ?desc:string
+        -> ?inspect:('a -> Sexp.t)
+        -> ?package:string
+        -> string
+        -> 'a observation * 'a statement
 
       (** [name observation] is a name of the observed attribute.  *)
       val name : 'a observation -> string
-
 
       (** [inspect observation value] returns a sexp representation of
           an observed [value] *)
@@ -238,7 +231,6 @@ module Std : sig
 
       (** enumerate all currently available observation providers  *)
       val list_providers : unit -> provider list
-
 
       (** [list ()] introspects all available observations.
           @since 2.1.0   *)
@@ -279,39 +271,35 @@ module Std : sig
 
       (** [(t,p) level] a cursor pointing to a [t term], that is
           nested in the parent cursor [p]. *)
-      type ('a,'b) level = {
-        me : 'a term;          (** [me] current position *)
-        up : 'b;               (** [up] parent cursor *)
-      }
-
+      type ('a, 'b) level =
+        { me: 'a term  (** [me] current position *)
+        ; up: 'b  (** [up] parent cursor *) }
 
       (** the highest level of the hierarchy - a cursor the points
           to the whole program. This is a starting position.  *)
-      type level3 = (top,nil) level
+      type level3 = (top, nil) level
 
       (** a cursor pointing to a function  *)
-      type level2 = (sub,level3) level
+      type level2 = (sub, level3) level
 
       (** a level of arguments and basic blocks  *)
-      type 'a level1 = ('a,level2) level
+      type 'a level1 = ('a, level2) level
 
       (** a level of the basic terms, e.g., defs, jmps and phi-nodes.  *)
-      type 'a level0 = ('a,blk level1) level
+      type 'a level0 = ('a, blk level1) level
 
       (** a program location  *)
       type t =
-        | Top of level3       (** a program *)
-        | Sub of level2       (** a subroutine  *)
-        | Arg of arg level1   (** subroutine argument *)
-        | Blk of blk level1   (** a basic block *)
-        | Phi of phi level0   (** a phi-node *)
-        | Def of def level0   (** a definition *)
-        | Jmp of jmp level0   (** a jump term *)
-
+        | Top of level3  (** a program *)
+        | Sub of level2  (** a subroutine  *)
+        | Arg of arg level1  (** subroutine argument *)
+        | Blk of blk level1  (** a basic block *)
+        | Phi of phi level0  (** a phi-node *)
+        | Def of def level0  (** a definition *)
+        | Jmp of jmp level0  (** a jump term *)
 
       (** [tid p] is term identifier of the term enclosing position [p] *)
       val tid : t -> tid
-
 
       (** [get a p] get a value of the attribute [a] associated with
           the given position [p]. Example, [Pos.get address p] returns
@@ -327,7 +315,7 @@ module Std : sig
           [cls]. Returns an error if there is no valid transition
           from the current program position to the specified program
           term.  *)
-      val next : t -> ('p,'t) cls -> 't term -> (t,exn) Monad.Result.result
+      val next : t -> ('p, 't) cls -> 't term -> (t, exn) Monad.Result.result
     end
 
     type pos = Pos.t [@@deriving sexp_of]
@@ -340,22 +328,20 @@ module Std : sig
         The user analysis is usually written in a form of a component,
         and is registered with the {!Primus.Components.register} function.*)
     module Machine : sig
-
       (** Machine identifier type.   *)
       type id = Monad.State.Multi.id
 
       (** A synonym to [System.init] *)
       val init : unit observation
-      [@@deprecated "[since 2020-03] use System.init or System.start instead"]
+        [@@deprecated "[since 2020-03] use System.init or System.start instead"]
 
       (** A synonym to [System.fini]   *)
       val finished : unit observation
-      [@@deprecated "[since 2020-03] use System.fini or Machine.kill instead"]
+        [@@deprecated "[since 2020-03] use System.fini or Machine.kill instead"]
 
       (** [exn_raised exn] occurs every time an abnormal control flow
           is initiated *)
       val exn_raised : exn observation
-
 
       (** [kill id] occurs when the machine [id] is killed.
 
@@ -378,7 +364,6 @@ module Std : sig
           and can be used as a communication channel between the
           clones. The [local] state is duplicated at each clone. *)
       module State : sig
-
         (** ['a t] is a type of state that holds a value of type
             ['a], and can be constructed from the base context of type
             ['c]. *)
@@ -389,7 +374,6 @@ module Std : sig
         (** a type that has no values *)
         type void
 
-
         (** [uuid] is a string literal representing an UUID.
 
             It should have the form:
@@ -399,9 +383,7 @@ module Std : sig
             where [X] is a hex-digit, e.g.,
 
             [53dcf68a-c7c8-4915-ae38-9f5b6f574201] *)
-        type uuid = (void,void,void) format
-
-
+        type uuid = (void, void, void) format
 
         (** [declare ~inspect ~uuid ~name make] declares a state with
             the given [uuid] and [name]. The name is not required to be
@@ -411,23 +393,20 @@ module Std : sig
             new [uuid] can be obtained in the Linux system is provided
             by the [uuidgen] command.*)
         val declare :
-          ?inspect:('a -> Sexp.t) ->
-          uuid:uuid ->
-          name:string ->
-          (project -> 'a) -> 'a t
-
+             ?inspect:('a -> Sexp.t)
+          -> uuid:uuid
+          -> name:string
+          -> (project -> 'a)
+          -> 'a t
 
         (** [inspect state value] introspects given [value] of the state.  *)
         val inspect : 'a t -> 'a -> Sexp.t
-
 
         (** [name state] a state name that was given during the construction.  *)
         val name : 'a t -> string
       end
 
-
       type 'a state = 'a State.t
-
 
       (** An interface to the state.
 
@@ -449,17 +428,14 @@ module Std : sig
 
       (** The Machine interface.*)
       module type S = sig
-
         (** the machine computation  *)
         type 'a t
-
 
         (** an external monad in which the machine computation is wrapped  *)
         type 'a m
 
         (** Observations interface.  *)
         module Observation : sig
-
           (** [observe obs on_observation] subscribes to the given
               observation [obs]. Every time the observation [obs] is
               made a function [on_observation] is called. The
@@ -467,7 +443,6 @@ module Std : sig
               machine monad, e.g., make its own computations, or access
               other components via their interfaces.  *)
           val observe : 'a observation -> ('a -> unit t) -> unit t
-
 
           (** [subscribe obs handler] creates a cancelable
               subscription to the observation [obs].
@@ -485,7 +460,6 @@ module Std : sig
 
               @since 2.1.0  *)
           val cancel : subscription -> unit t
-
 
           (** [watch prov data] watches for the data provider.
 
@@ -533,45 +507,38 @@ module Std : sig
         module Syntax : sig
           include Monad.Syntax.S with type 'a t := 'a t
 
-
           (** [event >>> action] is the same as
               [Observation.observe event action] *)
-          val (>>>) : 'a observation -> ('a -> unit t) -> unit t
+          val ( >>> ) : 'a observation -> ('a -> unit t) -> unit t
         end
 
-
-
-        include Monad.State.Multi.S with type 'a t := 'a t
-                                     and type 'a m := 'a m
-                                     and type env := project
-                                     and type id := id
-                                     and module Syntax := Syntax
-                                     and type 'a e =
-                                           ?boot:unit t ->
-                                           ?init:unit t ->
-                                           ?fini:unit t ->
-                                           (exit_status * project) m effect
+        include
+          Monad.State.Multi.S
+            with type 'a t := 'a t
+             and type 'a m := 'a m
+             and type env := project
+             and type id := id
+             and module Syntax := Syntax
+             and type 'a e =
+                     ?boot:unit t
+                  -> ?init:unit t
+                  -> ?fini:unit t
+                  -> (exit_status * project) m effect
 
         (** Local state of the machine.  *)
-        module Local  : State with type 'a m := 'a t
-                               and type 'a t := 'a state
-
+        module Local : State with type 'a m := 'a t and type 'a t := 'a state
 
         (** Global state shared across all machine clones.  *)
-        module Global : State with type 'a m := 'a t
-                               and type 'a t := 'a state
-
+        module Global : State with type 'a m := 'a t and type 'a t := 'a state
 
         (** [raise exn] raises the machine exception [exn], intiating
             an abonormal control flow *)
         val raise : exn -> 'a t
 
-
         (** [catch x f] creates a computation that is equal to [x] if
             it terminates normally, and to [f e] if [x] terminates
             abnormally with the exception [e]. *)
         val catch : 'a t -> (exn -> 'a t) -> 'a t
-
 
         (** [project] is a computation that results with the project
             data structure. Note, that Machine is a State monad
@@ -585,23 +552,19 @@ module Std : sig
             You can use [put project] to update the project data structure.*)
         val project : project t
 
-
         (** [program] program representation.
 
             The same as [gets Project.program].
         *)
         val program : program term t
 
-
         (** [arch] code architecture.
 
             The same as [gets Project.arch].  *)
         val arch : arch t
 
-
         (** [args] program command line arguments.  *)
         val args : string array t
-
 
         (** [envp] program environment variables.   *)
         val envp : string array t
@@ -620,21 +583,16 @@ module Std : sig
           machine monad. But usually, it registers event
           observations.*)
       module type Component = functor (Machine : S) -> sig
-
-
         (** [init ()] component initialization function. *)
         val init : unit -> unit Machine.t
       end
 
-
       (** The Machine component.  *)
       type component = (module Component)
 
-
       (** [Make(Monad)] a monad transformer that wraps the Machine
           into an arbitrary [Monad].  *)
-      module Make(M : Monad.S) : S with type 'a m := 'a M.t
-
+      module Make (M : Monad.S) : S with type 'a m := 'a M.t
 
       (** The Legacy Main System.
 
@@ -651,8 +609,7 @@ module Std : sig
           compatibility. Use the {!System} interface to define and
           run Primus systems.
       *)
-      module Main(M : S) : sig
-
+      module Main (M : S) : sig
         (** [run ?envp ?args proj] returns a computation that will
             run a program represented with the [proj] data structure.
 
@@ -665,12 +622,13 @@ module Std : sig
             modified by the [primus] components, e.g., annotated with
             attributes, etc. *)
         val run :
-          ?envp:string array ->
-          ?args:string array ->
-          project ->
-          unit M.t ->
-          (exit_status * project) M.m
+             ?envp:string array
+          -> ?args:string array
+          -> project
+          -> unit M.t
+          -> (exit_status * project) M.m
       end
+
       [@@@deprecated ["[since 2020-03] use Primus.System instead"]]
 
       (** [add_component comp] registers the machine component [comp] in the
@@ -687,13 +645,10 @@ module Std : sig
           See also a more general [register_component] function.
       *)
       val add_component : component -> unit
-      [@@deprecated "[since 2020-03] use Components.register* instead"]
+        [@@deprecated "[since 2020-03] use Components.register* instead"]
     end
 
-
     module System : sig
-
-
       (** {1 An instance of the Primus Machine}
 
           A collection of components defines a runnable instance of Primus
@@ -834,11 +789,12 @@ module Std : sig
           this system depends.
       *)
       val define :
-        ?desc:string ->
-        ?depends_on:system_specification list ->
-        ?components:component_specification list ->
-        ?package:string -> string -> t
-
+           ?desc:string
+        -> ?depends_on:system_specification list
+        -> ?components:component_specification list
+        -> ?package:string
+        -> string
+        -> t
 
       (** [add_component ?package system name] adds a component to the
           system.
@@ -846,7 +802,6 @@ module Std : sig
           Adds the component designated by the given package and name
           to the [system]. *)
       val add_component : ?package:string -> t -> string -> t
-
 
       (** [add_dependency ?package system name] adds the designated
           system to the list of the [system] depenencies.
@@ -888,14 +843,15 @@ module Std : sig
           (after the [system-start] observation is made).
       *)
       val run :
-        ?envp:string array ->
-        ?args:string array ->
-        ?init:unit Machine.Make(Knowledge).t ->
-        ?fini:unit Machine.Make(Knowledge).t ->
-        ?start:unit Machine.Make(Knowledge).t ->
-        system -> project -> Knowledge.state ->
-        (exit_status * project * Knowledge.state, Knowledge.conflict) result
-
+           ?envp:string array
+        -> ?args:string array
+        -> ?init:unit Machine.Make(Knowledge).t
+        -> ?fini:unit Machine.Make(Knowledge).t
+        -> ?start:unit Machine.Make(Knowledge).t
+        -> system
+        -> project
+        -> Knowledge.state
+        -> (exit_status * project * Knowledge.state, Knowledge.conflict) result
 
       (** [init ()] is posted when all components finished their
           initializations. It is not posted if components failed to
@@ -912,7 +868,6 @@ module Std : sig
           I.e., if the system wasn't initialized then neither [init]
           nor [fini] will happen. *)
       val fini : unit observation
-
 
       (** [stop sys] occurs when the system stops. The observation
           handlers are called in the restricted mode (with
@@ -936,12 +891,10 @@ module Std : sig
       *)
       val component : ?package:string -> string -> component_specification
 
-
       (** [depends_on ?package name] specifies a dependency on a
           system with the given designator.
       *)
       val depends_on : ?package:string -> string -> system_specification
-
 
       (** a parsing error description  *)
       type parse_error
@@ -966,7 +919,7 @@ module Std : sig
           information.
 
       *)
-      val from_file : string -> (system list,parse_error) result
+      val from_file : string -> (system list, parse_error) result
 
       (** prints the parse error  *)
       val pp_parse_error : Format.formatter -> parse_error -> unit
@@ -980,9 +933,7 @@ module Std : sig
           function is a functor parameterized by a monad and returns a
           value wrapped into that monad.
       *)
-      module Generic(Machine : Machine.S) : sig
-
-
+      module Generic (Machine : Machine.S) : sig
         (** [run system project] runs the [system] on the specified [project].
 
             @param envp an array of environment variables that are passed
@@ -999,14 +950,15 @@ module Std : sig
             the [System.start] observation is posted.
         *)
         val run :
-          ?envp:string array ->
-          ?args:string array ->
-          ?init:unit Machine.t ->
-          ?fini:unit Machine.t ->
-          ?start:unit Machine.t ->
-          t -> project -> (exit_status * project) Machine.m
+             ?envp:string array
+          -> ?args:string array
+          -> ?init:unit Machine.t
+          -> ?fini:unit Machine.t
+          -> ?start:unit Machine.t
+          -> t
+          -> project
+          -> (exit_status * project) Machine.m
       end
-
 
       (** The systems repository.
 
@@ -1026,8 +978,6 @@ module Std : sig
           @since 2.1.0
       *)
       module Repository : sig
-
-
         (** [add system] registers the [system] in the repository.
 
             The function fails if a system with the same name is
@@ -1041,14 +991,12 @@ module Std : sig
         *)
         val get : ?package:string -> string -> system
 
-
         (** [update ?package name ~f] calls [f] on the system
             desingated by the name.
 
             The function fails if there is no such system is in the repository.
         *)
         val update : ?package:string -> string -> f:(system -> system) -> unit
-
 
         (** [find name] looks up a system with the given name.
 
@@ -1075,7 +1023,6 @@ module Std : sig
         @since 2.1.0
     *)
     module Info : sig
-
       (** the item name  *)
       val name : info -> Knowledge.Name.t
 
@@ -1097,7 +1044,6 @@ module Std : sig
         @since 2.1.0
     *)
     module Job : sig
-
       (** an abstract type for jobs  *)
       type t
 
@@ -1124,13 +1070,11 @@ module Std : sig
         @since 2.1.0
     *)
     module Jobs : sig
-
       (** an action to take after each job.  *)
       type action = Stop | Continue
 
       (** the final result of running the job queue.  *)
       type result
-
 
       (** [enqueue system] creates a new job and enqueues it for future run.
 
@@ -1142,19 +1086,18 @@ module Std : sig
           @param start runs after machine is initialized
       *)
       val enqueue :
-        ?name:string ->
-        ?desc:string ->
-        ?envp:string array ->
-        ?args:string array ->
-        ?init:unit Machine.Make(Knowledge).t ->
-        ?fini:unit Machine.Make(Knowledge).t ->
-        ?start:unit Machine.Make(Knowledge).t ->
-        system -> unit
-
+           ?name:string
+        -> ?desc:string
+        -> ?envp:string array
+        -> ?args:string array
+        -> ?init:unit Machine.Make(Knowledge).t
+        -> ?fini:unit Machine.Make(Knowledge).t
+        -> ?start:unit Machine.Make(Knowledge).t
+        -> system
+        -> unit
 
       (** [pending ()] is the number of jobs still waiting to be run.  *)
       val pending : unit -> int
-
 
       (** [run project state] runs until there are no more jobs queued
           or until explicitly stopped.
@@ -1185,14 +1128,16 @@ module Std : sig
           unless explicitly stopped.
       *)
       val run :
-        ?on_failure:(Job.t -> Knowledge.conflict -> result -> action) ->
-        ?on_success:(Job.t -> exit_status -> Knowledge.state -> result -> action) ->
-        project -> Knowledge.state -> result
+           ?on_failure:(Job.t -> Knowledge.conflict -> result -> action)
+        -> ?on_success:
+             (Job.t -> exit_status -> Knowledge.state -> result -> action)
+        -> project
+        -> Knowledge.state
+        -> result
 
       (** [knowledge result] is the knowledge obtained from running
           the jobs.  *)
       val knowledge : result -> Knowledge.state
-
 
       (** [project result] is the final static representation of program.  *)
       val project : result -> project
@@ -1206,17 +1151,13 @@ module Std : sig
       *)
       val failures : result -> (Job.t * Knowledge.conflict) list
 
-
       (** [finished result] is the final list of jobs that were run
           in the order in which they were run.  *)
       val finished : result -> Job.t list
-
     end
-
 
     (** The Machine component.  *)
     type component = Machine.component
-
 
     (** A Primus Machine parameterized with the Knowledge monad.
 
@@ -1241,39 +1182,37 @@ module Std : sig
     *)
     module Analysis : sig
       open Knowledge
-      include Machine.S with type 'a m = 'a Knowledge.t
-                         and type 'a t = 'a Machine.Make(Knowledge).t
+
+      include
+        Machine.S
+          with type 'a m = 'a Knowledge.t
+           and type 'a t = 'a Machine.Make(Knowledge).t
 
       (** [collect p x] is lifted [Knowledge.collect].
 
           See also {{!Bap_knowledge.Knowledge.collect}Knowledge.collect}.
       *)
-      val collect : ('a,'p) slot -> 'a obj -> 'p t
-
+      val collect : ('a, 'p) slot -> 'a obj -> 'p t
 
       (** [resove p x] is lifted [Knowledge.resolve].
 
            See also {{!Bap_knowledge.Knowledge.resolve}Knowledge.resolve}.
       *)
-      val resolve : ('a,'p opinions) slot -> 'a obj -> 'p t
-
+      val resolve : ('a, 'p opinions) slot -> 'a obj -> 'p t
 
       (** [provide p x v] is lifted [Knowledge.provide].
 
 
           See also {{!Bap_knowledge.Knowledge.provide}Knowledge.provide}.
       *)
-      val provide : ('a,'p) slot -> 'a obj -> 'p -> unit t
-
+      val provide : ('a, 'p) slot -> 'a obj -> 'p -> unit t
 
       (** [suggest a p x v] is lifted [!Knowledge.suggest].
 
           See also {{!Bap_knowledge.Knowledge.suggest}Knowledge.suggest}.
       *)
-      val suggest : agent -> ('a,'p opinions) slot -> 'a obj -> 'p -> unit t
-
+      val suggest : agent -> ('a, 'p opinions) slot -> 'a obj -> 'p -> unit t
     end
-
 
     (** A registry of machine components.
 
@@ -1297,27 +1236,26 @@ module Std : sig
         @since 2.1.0
     *)
     module Components : sig
-
-
       (** [register name analysis] registers an analysis under given name.
 
           Fails, if there is already a component with the same name.
       *)
       val register :
-        ?internal:bool ->
-        ?desc:string ->
-        ?package:string ->
-        string -> unit Analysis.t ->
-        unit
+           ?internal:bool
+        -> ?desc:string
+        -> ?package:string
+        -> string
+        -> unit Analysis.t
+        -> unit
 
       (** [register_generic name comp] registers a generic component.   *)
       val register_generic :
-        ?internal:bool ->
-        ?desc:string ->
-        ?package:string ->
-        string -> component ->
-        unit
-
+           ?internal:bool
+        -> ?desc:string
+        -> ?package:string
+        -> string
+        -> component
+        -> unit
 
       (** provides information about registered components.  *)
       val list : unit -> info list
@@ -1334,10 +1272,10 @@ module Std : sig
     *)
     module Value : sig
       type id [@@deriving bin_io, compare, sexp]
+
       module Id : Regular.S with type t = id
 
       type t = value [@@deriving bin_io, compare, sexp]
-
 
       (** [to_word x] projects [x] to a machine word  *)
       val to_word : t -> word
@@ -1345,13 +1283,11 @@ module Std : sig
       (** [id value] returns the [value] identifier *)
       val id : t -> id
 
-
       (** [Make(Machine)] provides an interface to the Value type
           lifted into the [Machine] monad.  *)
-      module Make(Machine : Machine.S) : sig
+      module Make (Machine : Machine.S) : sig
         type t = value
         type 'a m = 'a Machine.t
-
 
         (** [id x] is a unique identifier of a value. Every
             evaluation of non-trivial computation produces a value
@@ -1424,7 +1360,6 @@ module Std : sig
         (** [bitwidth] is [lift1 Word.bitwidth]  *)
         val bitwidth : t -> int
 
-
         (** [extracts ?hi ?lo] is [lift1 (Word.extract ?hi ?lo)]  *)
         val extract : ?hi:int -> ?lo:int -> t -> t m
 
@@ -1442,7 +1377,6 @@ module Std : sig
 
         (** [npred] see {!Word.npred}  *)
         val npred : t -> int -> t m
-
 
         (** see {!Word.abs}  *)
         val abs : t -> t m
@@ -1486,12 +1420,10 @@ module Std : sig
         (** see {!Word.arshift}  *)
         val arshift : t -> t -> t m
 
-
         (** Int-like syntax.  *)
         module Syntax : sig
-
           (** see {!Word.(~-)}  *)
-          val ( ~-) : t -> t m
+          val ( ~- ) : t -> t m
 
           (** see {!Word.(+)}  *)
           val ( + ) : t -> t -> t m
@@ -1506,27 +1438,26 @@ module Std : sig
           val ( / ) : t -> t -> t m
 
           (** see {!Word.(mod)}  *)
-          val (mod) : t -> t -> t m
+          val ( mod ) : t -> t -> t m
 
           (** see {!Word.(lor)}  *)
-          val (lor) : t -> t -> t m
+          val ( lor ) : t -> t -> t m
 
           (** see {!Word.(lsl)}  *)
-          val (lsl) : t -> t -> t m
+          val ( lsl ) : t -> t -> t m
 
           (** see {!Word.(lsr)}  *)
-          val (lsr) : t -> t -> t m
+          val ( lsr ) : t -> t -> t m
 
           (** see {!Word.(asr)}  *)
-          val (asr) : t -> t -> t m
+          val ( asr ) : t -> t -> t m
 
           (** see {!Word.(lxor)}  *)
-          val (lxor) : t -> t -> t m
+          val ( lxor ) : t -> t -> t m
 
           (** see {!Word.(land)}  *)
-          val (land) : t -> t -> t m
+          val ( land ) : t -> t -> t m
         end
-
 
         (** Symbol Value Isomorphism.
 
@@ -1547,13 +1478,9 @@ module Std : sig
             enforced by the abstraction.
         *)
         module Symbol : sig
-
-
           (** [to_value sym] returns a value corresponding to the
               provided symbolic representation.  *)
           val to_value : string -> value Machine.t
-
-
 
           (** [of_value v] returns a symbolic representation of the
               value [v].
@@ -1566,17 +1493,15 @@ module Std : sig
         include Regular.S with type t := t
       end
 
-
       (** Indexing strings by values.   *)
       module Index : sig
-
         (** the width of keys in the index.   *)
         val key_width : int
+
         include Strings.Index.Persistent.S with type key := value
       end
 
       include Regular.S with type t := t
-
     end
 
     (** Machine time.
@@ -1605,9 +1530,9 @@ module Std : sig
 
       (** time printer  *)
       val pp : Format.formatter -> t -> unit
+
       include Base.Comparable.S with type t := t
     end
-
 
     (** The Interpreter.
 
@@ -1624,32 +1549,26 @@ module Std : sig
         with the [(x,y,z)] tuple, that in fact corresponds to
         [observation >>> fun (x,y,z)] -> ... *)
     module Interpreter : sig
-
       (** [clock] occurs every time the machine clock changes its value.  *)
       val clock : Time.t observation
 
       (** [pc_change x] happens every time a code at address [x] is executed.  *)
       val pc_change : addr observation
 
-
       (** [loading x] happens before a value from the address [x] is loaded
           by the interpreter from the memory.  *)
       val loading : value observation
-
 
       (** [loaded (addr,value)] happens after the [value] is loaded
           from the address [addr].  *)
       val loaded : (value * value) observation
 
-
       (** [storing x] happens before a value is stored at address [x]  *)
       val storing : value observation
-
 
       (** [stored (addr,value)] happens after the [value] is stored at
           the address [addr] *)
       val stored : (value * value) observation
-
 
       (** [reading x] happens before the variable [x] is read from the
           environment. *)
@@ -1664,7 +1583,6 @@ module Std : sig
 
       (** [written (v,x)] happens after [x] is assigned to [v]  *)
       val written : (var * value) observation
-
 
       (** [jumping (cond,dest)] happens just before a jump to [dest]
           is taken under the specified condition [cond].
@@ -1840,7 +1758,6 @@ module Std : sig
       (** is raised when a memory operation has failed. *)
       type exn += Segmentation_fault of addr
 
-
       (** [pagefault_hanlder] is a trap handler that is invoked when the [Pagefault]
           exception is raised by the machine memory component. If the handler is
           provided via the Linker, then it is invoked, otherwise a segmentation
@@ -1864,8 +1781,6 @@ module Std : sig
       *)
       val division_by_zero_handler : string
 
-
-
       (** [division_by_zero] is the name of a trap handler for the
           [Cfi_violation] exception. If it is linked into the machine,
           then it will be invoked when the cfi-violation trap is signaled.
@@ -1877,7 +1792,6 @@ module Std : sig
           given [Machine].  *)
       module Make (Machine : Machine.S) : sig
         type 'a m = 'a Machine.t
-
 
         (** [time] returns the value of the machine clock.
 
@@ -1967,14 +1881,11 @@ module Std : sig
             [yes] else [no]. *)
         val branch : value -> 'a m -> 'a m -> 'a m
 
-
         (** [repeat cnd body] evaluates [body] until [cnd] evaluates
             to [zero]. Returns the value of [cnd].  *)
         val repeat : value m -> 'a m -> value m
-
       end
     end
-
 
     (** Machine Linker.
 
@@ -1983,17 +1894,12 @@ module Std : sig
         The code is represented as a functor that performs a
         computation using a provided machine.*)
     module Linker : sig
-
       (** A code identifier.
 
           A program code can be identified by a name, address or by a
           term identifier.  *)
-      type name = [
-        | `tid of tid
-        | `addr of addr
-        | `symbol of string
-      ] [@@deriving bin_io, compare, sexp]
-
+      type name = [`tid of tid | `addr of addr | `symbol of string]
+      [@@deriving bin_io, compare, sexp]
 
       (** Call tracing.
 
@@ -2012,7 +1918,6 @@ module Std : sig
           called, e.g., malloc, free.
       *)
       module Trace : sig
-
         (** occurs when a subroutine is called.
             Argument values are specified in the same order in which
             corresponding input arguments of a corresponding subroutine
@@ -2066,12 +1971,10 @@ module Std : sig
 
         (** the statement that makes [lisp-call-return] observations  *)
         val lisp_call_returned : (string * value list) statement
-
       end
 
       (** The Linker error  *)
       type exn += Unbound_name of name
-
 
       (** occurs before a piece of code is executed *)
       val exec : name observation
@@ -2092,18 +1995,15 @@ module Std : sig
 
       module Name : Regular.S with type t = name
 
-
       (** Code representation.
 
           A code representation is abstract and hides how the code
           itself is represented. It is just a function, that takes a
           machine and performs a computation using this machine.*)
       module type Code = functor (Machine : Machine.S) -> sig
-
         (** [exec] computes the code.  *)
         val exec : unit Machine.t
       end
-
 
       (** code representation  *)
       type code = (module Code)
@@ -2117,7 +2017,7 @@ module Std : sig
           state. Thus it is absolutely safe, and correct, to create
           multiple instances of components, as they needed. The
           functor instatiation is totaly side-effect free.*)
-      module Make(Machine : Machine.S) : sig
+      module Make (Machine : Machine.S) : sig
         type 'a m = 'a Machine.t
 
         (** [link ~addr ~name ~tid code] links the given [code]
@@ -2127,11 +2027,7 @@ module Std : sig
             an identifier was already bound to some other code
             fragment, then the old binding will be substituted by the new
             one.  *)
-        val link :
-          ?addr:addr ->
-          ?name:string ->
-          ?tid:tid ->
-          code -> unit m
+        val link : ?addr:addr -> ?name:string -> ?tid:tid -> code -> unit m
 
         (** [unlink name] removes code linked with the provided [name].
 
@@ -2147,11 +2043,9 @@ module Std : sig
             associated with any code fragment.  *)
         val exec : name -> unit m
 
-
         (** [resolve_addr name] returns the address associated with the
             given [name].  *)
         val resolve_addr : name -> addr option m
-
 
         (** [resolve_symbol name] returns the symbolic name associated
             with the given [name].
@@ -2160,14 +2054,12 @@ module Std : sig
         *)
         val resolve_symbol : name -> string option m
 
-
         (** [resolve_tid name] returns the term identifier associated
             with the given [name].
 
             @since 1.5.0
         *)
         val resolve_tid : name -> tid option m
-
 
         (** [is_linked name] computes to [true] if the [name] is
             associated with some code.
@@ -2177,16 +2069,13 @@ module Std : sig
       end
     end
 
-
     (** Iterator is a sequence of values of some domain.
 
         Iterator is a just another abstraction that represent a
         sequence of values.  *)
     module Iterator : sig
-
       (** Base interface of all iterators.  *)
       module type Base = sig
-
         (** iterator type  *)
         type t
 
@@ -2203,18 +2092,15 @@ module Std : sig
         val value : t -> dom
       end
 
-
       (** Finite iterators produce finite sequences of values.  *)
       module type Finite = sig
         include Base
-
 
         (** [next iterator] moves an [iterator] to the next element of
             the sequence, or returns [None] if there are no more
             elements.*)
         val next : t -> t option
       end
-
 
       (** Infinite iterators produces infinite sequences.  *)
       module type Infinite = sig
@@ -2226,11 +2112,9 @@ module Std : sig
       end
     end
 
-
     (** Value generators. *)
     module Generator : sig
       type t = generator [@@deriving sexp_of]
-
 
       (** [of_iterator iter init] creates a generator from a generic
           iterator.
@@ -2242,14 +2126,12 @@ module Std : sig
           @since 2.1.0
       *)
       val of_iterator :
-        ?width:int ->
-        ?seed:(int -> 'a) ->
-        to_bitvec:('d -> Bitvec.t) ->
-        (module Iterator.Infinite
-          with type t = 'a
-           and type dom = 'd) -> 'a ->
-        t
-
+           ?width:int
+        -> ?seed:(int -> 'a)
+        -> to_bitvec:('d -> Bitvec.t)
+        -> (module Iterator.Infinite with type t = 'a and type dom = 'd)
+        -> 'a
+        -> t
 
       (** [create (module Iterator) seed] creates a integer generator
           from the provided [Iterator], and initializes it with the
@@ -2262,11 +2144,10 @@ module Std : sig
           generator.
       *)
       val create :
-        ?width:int ->
-        (module Iterator.Infinite
-          with type t = 'a
-           and type dom = int) -> 'a -> t
-
+           ?width:int
+        -> (module Iterator.Infinite with type t = 'a and type dom = int)
+        -> 'a
+        -> t
 
       (** [static value] returns a generator that always produces the
           same [value].  *)
@@ -2275,17 +2156,20 @@ module Std : sig
       (** [unfold ~min ~max ~seed ~f] creates a generator that
           generates values by applying a function [f] to a pair of
           a generator state and previous value.   *)
-      val unfold : ?width:int -> ?min:int -> ?max:int -> ?seed:int ->
-        f:('a * int -> 'a * int) -> 'a -> t
-
+      val unfold :
+           ?width:int
+        -> ?min:int
+        -> ?max:int
+        -> ?seed:int
+        -> f:('a * int -> 'a * int)
+        -> 'a
+        -> t
 
       (** [width] the size in bits of the generated words.  *)
       val width : t -> int
 
       (** Random Number Generators  *)
       module Random : sig
-
-
         (** [lcg ~min ~max seed] a linear congruential generator, that
             produces a sequence of pseudorandom values that lies in the
             range between [min] and [max] (all inclusive).
@@ -2303,7 +2187,6 @@ module Std : sig
             These generators will be seeded by a value derived from
             the Machine identifier.  *)
         module Seeded : sig
-
           (** [create init] creates a self-seeded generator from a
               regular generator.
 
@@ -2316,25 +2199,20 @@ module Std : sig
           *)
           val create : ?width:int -> (int -> t) -> t
 
-
           (** [lcg ~min ~max ()] a linear congruential generator.  *)
           val lcg : ?width:int -> ?min:int -> ?max:int -> unit -> t
-
 
           (** [byte] is the same as [lcg ~min:0 ~max:255 ()]  *)
           val byte : t
         end
       end
 
-
       (** [Make(Machine)] lifts the generator interface into the
           Machine monad.  *)
-      module Make( Machine : Machine.S) : sig
-
+      module Make (Machine : Machine.S) : sig
         (** [next iter] switches the internal state of [iter] to the
             next state and returns the current value *)
         val next : t -> int Machine.t
-
 
         (** [word iter bitwidth] constructs a word of the given [bitwidth],
             from words obtained from consequitive calls to [next].
@@ -2352,7 +2230,6 @@ module Std : sig
 
         The Environment binds variables to values.*)
     module Env : sig
-
       (** A variable is undefined, if it was never [add]ed to the
           environment.  *)
       type exn += Undefined_var of var
@@ -2360,14 +2237,12 @@ module Std : sig
       val generated : (var * value) observation
 
       (** [Env = Make(Machine)]  *)
-      module Make(Machine : Machine.S) : sig
-
+      module Make (Machine : Machine.S) : sig
         (** [get var] returns a value associated with the variable. *)
         val get : var -> value Machine.t
 
         (** [set var value] binds a variable [var] to the given [value].  *)
         val set : var -> value -> unit Machine.t
-
 
         (** [add var generator] adds a variable [var] to the
             environment. If a variable is read before it was defined
@@ -2376,13 +2251,11 @@ module Std : sig
             variable and returned. *)
         val add : var -> Generator.t -> unit Machine.t
 
-
         (** [del v] deletes the variable [v] from the environment.
 
             The variable [v] will no longer be bound.
         *)
         val del : var -> unit Machine.t
-
 
         (** [has v] evaluates to [true] if [v] is bound.
 
@@ -2396,8 +2269,6 @@ module Std : sig
         val all : var seq Machine.t
       end
     end
-
-
 
     (** Machine Memory.
 
@@ -2414,8 +2285,6 @@ module Std : sig
         implemented via the [pagefault] handlers.
     *)
     module Memory : sig
-
-
       (** abstract memory descriptor, see [Descriptor.t]  *)
       type memory
 
@@ -2434,24 +2303,20 @@ module Std : sig
             the address bus, and [n] bits in data. *)
         val create : addr_size:int -> data_size:int -> string -> memory
 
-
         (** [unknown ~addr_size:m ~data_size:n] constructs a
             memory descriptor for an arbitrary storage with [m] lines in
             the address bus, and [n] bits in data. *)
         val unknown : addr_size:int -> data_size:int -> memory
-
 
         (** [name memory] returns [memory] identifier.
             @since 2.1.0
         *)
         val name : memory -> string
 
-
         (** [addr_size memory] the number of bits in the address bus.
             @since 2.1.0
         *)
         val addr_size : memory -> int
-
 
         (** [data_size memory] is the the number of bits in the data bus.  *)
         val data_size : memory -> int
@@ -2464,18 +2329,14 @@ module Std : sig
 
       val generated : (addr * value) observation
 
-
       (** [Make(Machine)] lifts the memory interface into the
           [Machine] monad.  *)
-      module Make(Machine : Machine.S) : sig
-
-
+      module Make (Machine : Machine.S) : sig
         (** [switch memory] switches the memory module to [memory].
 
             All consecutive operations until the next switch will affect
             only this memory.  *)
         val switch : memory -> unit Machine.t
-
 
         (** [memory] a descriptor of currently active [memory]  *)
         val memory : memory Machine.t
@@ -2486,7 +2347,6 @@ module Std : sig
         *)
         val get : addr -> value Machine.t
 
-
         (** [set a x] stores the byte [x] at the address [a].
 
             raises the [Pagefault] machine exception if [a] is not mapped,
@@ -2496,7 +2356,6 @@ module Std : sig
             datum match with the current [memory] sizes.
         *)
         val set : addr -> value -> unit Machine.t
-
 
         (** [del p] removes the value associated with the pointer [p].  *)
         val del : addr -> unit Machine.t
@@ -2542,42 +2401,41 @@ module Std : sig
             @since 2.1.0
         *)
         val add_region :
-          ?readonly:bool ->
-          ?executable:bool ->
-          ?init:(addr -> word Machine.t) ->
-          ?generator:Generator.t ->
-          lower:addr -> upper:addr -> unit -> unit Machine.t
+             ?readonly:bool
+          -> ?executable:bool
+          -> ?init:(addr -> word Machine.t)
+          -> ?generator:Generator.t
+          -> lower:addr
+          -> upper:addr
+          -> unit
+          -> unit Machine.t
 
         (** [allocate addr size] allocates a segment of the specified
             [size]. This function uses {!add_region} underneath the
             hood, please refer to it for more information.
         *)
         val allocate :
-          ?readonly:bool ->
-          ?executable:bool ->
-          ?init:(addr -> word Machine.t) ->
-          ?generator:Generator.t ->
-          addr -> int -> unit Machine.t
-
+             ?readonly:bool
+          -> ?executable:bool
+          -> ?init:(addr -> word Machine.t)
+          -> ?generator:Generator.t
+          -> addr
+          -> int
+          -> unit Machine.t
 
         (** [map mem] maps a memory chunk [mem] to a segment with the
             given permissions. See also {!add_text} and {!add_data}. *)
-        val map :
-          ?readonly:bool ->
-          ?executable:bool ->
-          mem -> unit Machine.t
+        val map : ?readonly:bool -> ?executable:bool -> mem -> unit Machine.t
 
         (** [is_mapped addr] a computation that evaluates to true,
             when the value is mapped, i.e., it is readable.  *)
         val is_mapped : addr -> bool Machine.t
-
 
         (** [is_writable addr] is a computation that evaluates to
             [true] if [addr] is writable.  *)
         val is_writable : addr -> bool Machine.t
       end
     end
-
 
     (** Lisp machine.
 
@@ -3312,19 +3170,15 @@ ident ::= ?any atom that is not recognized as a <word>?
         v}
     *)
     module Lisp : sig
-
       (** an abstract type representing a lisp program  *)
       type program
-
 
       (** an abstract type that represents messages send with the
           [msg] form. *)
       type message
 
-
       (** Primus Lisp program loader  *)
       module Load : sig
-
         (** abstract error type *)
         type error
 
@@ -3340,21 +3194,21 @@ ident ::= ?any atom that is not recognized as a <word>?
             be linked into the Lisp machine, or an error if the program
             is not well-formed.
         *)
-        val program : ?paths:string list -> project -> string list ->
-          (program,error) result
-
+        val program :
+             ?paths:string list
+          -> project
+          -> string list
+          -> (program, error) result
 
         (** [pp_error ppf err] outputs error information into the
             pretty-printing formatter [ppf].  *)
         val pp_error : Format.formatter -> error -> unit
-
 
         (** [pp_program ppf program] dumps program definitions into the formatter [ppf]   *)
         val pp_program : Format.formatter -> program -> unit
       end
 
       module Doc : sig
-
         (** Abstract Element of a document.
 
             A documentation element is something that can be printed.
@@ -3362,14 +3216,13 @@ ident ::= ?any atom that is not recognized as a <word>?
         *)
         module type Element = sig
           type t
+
           val pp : Format.formatter -> t -> unit
         end
 
         module Category : Element
-        module Name     : Element
-        module Descr    : Element
-
-
+        module Name : Element
+        module Descr : Element
 
         (** Documentation index.
 
@@ -3389,11 +3242,10 @@ ident ::= ?any atom that is not recognized as a <word>?
         *)
         type index = (Category.t * (Name.t * Descr.t) list) list
 
-        module Make(Machine : Machine.S) : sig
+        module Make (Machine : Machine.S) : sig
           val generate_index : index Machine.t
         end
       end
-
 
       (** Lisp Type System.
 
@@ -3401,11 +3253,8 @@ ident ::= ?any atom that is not recognized as a <word>?
           features type inference.
       *)
       module Type : sig
-
-
         (** A type of an expression  *)
         type t
-
 
         (** Typing environemnt is a mapping from expressions to types.  *)
         type env
@@ -3422,12 +3271,7 @@ ident ::= ?any atom that is not recognized as a <word>?
             eDSL. Use the Spec module directly.
 
         *)
-        type parameters = [
-          | `All of t
-          | `Gen of t list * t
-          | `Tuple of t list
-        ]
-
+        type parameters = [`All of t | `Gen of t list * t | `Tuple of t list]
 
         (** Type Specifier DSL.
 
@@ -3461,11 +3305,8 @@ ident ::= ?any atom that is not recognized as a <word>?
 
         *)
         module Spec : sig
-
-
           (** [any] top type which is inhabitated by all Primus values  *)
           val any : t
-
 
           (** [var x] type variable [x]. All variables with the same
               name in the scope of a definition are unified.  *)
@@ -3474,11 +3315,9 @@ ident ::= ?any atom that is not recognized as a <word>?
           (** [sym] symbol type.  *)
           val sym : t
 
-
           (** a machine integer - a word that has the same width as
               [Arch.addr_size] *)
           val int : t
-
 
           (** [bool] a one bit word  *)
           val bool : t
@@ -3501,7 +3340,6 @@ ident ::= ?any atom that is not recognized as a <word>?
           (** [d] shortcut for [var "d"]  *)
           val d : t
 
-
           (** [tuple [args]] specifies that a function accepts
               a tuple of arguments of specified types.*)
           val tuple : t list -> [`Tuple of t list]
@@ -3514,45 +3352,39 @@ ident ::= ?any atom that is not recognized as a <word>?
               of type [t] *)
           val one : t -> [`Tuple of t list]
 
-
           (** [unit] specifies that a function doesn't have any parameters  *)
           val unit : [`Tuple of t list]
-
 
           (** [params // rest] specifies that a function is variadic,
               but have some number of mandatory arguments, i.e., it
               accepts a tuple of parameters specified by the [params]
               type specifier and a variadic list of arguments
               specified by the [rest] type specifier. *)
-          val (//) : [`Tuple of t list] -> [`All of t] -> parameters
-
+          val ( // ) : [`Tuple of t list] -> [`All of t] -> parameters
 
           (** [params @-> t] constructs a signature from the
               parameter list specifier [params] and the return type
               specifier [t]  *)
-          val (@->) : [< parameters] -> t -> signature
+          val ( @-> ) : [< parameters] -> t -> signature
         end
-
 
         (** [error p] occurs when the typechecker detects an error [p].
             @since 2.1.0
         *)
         val error : error observation
 
-
         (** [errors env] is a list of type errors.
             [@since 2.1.0] *)
         val errors : env -> error list
 
         val check : Var.t seq -> program -> error list
-        [@@deprecated "[since 2020-02] use [Make(Machine).types] [errors] instead"]
-
+          [@@deprecated
+            "[since 2020-02] use [Make(Machine).types] [errors] instead"]
 
         (** [pp_error ppf err] prints a description of the type error
             [err] into the formatter [ppf] *)
         val pp_error : Format.formatter -> error -> unit
       end
-
 
       (** Lisp Machine Message interface.
 
@@ -3562,12 +3394,10 @@ ident ::= ?any atom that is not recognized as a <word>?
       module Message : sig
         type t = message
 
-
         (** [pp ppf msg] prints the message into the specified
             formatter [ppf]. *)
         val pp : Format.formatter -> t -> unit
       end
-
 
       (** Machine independent closure.
 
@@ -3577,21 +3407,18 @@ ident ::= ?any atom that is not recognized as a <word>?
           implemented in OCaml. *)
       module Closure : sig
         module type S = functor (Machine : Machine.S) -> sig
-
           (** [run args] performs the computation.  *)
           val run : value list -> value Machine.t
         end
 
         type t = (module S)
-        module Make(Machine : Machine.S) : sig
+
+        module Make (Machine : Machine.S) : sig
           val name : string Machine.t
         end
-
       end
 
       module type Closure = Closure.S
-
-
 
       (** [(lisp-primitive <name> <arg1> ... <argM> <rval>)] is posted
           when the Lisp primitive with the given <name> is called with
@@ -3608,13 +3435,16 @@ ident ::= ?any atom that is not recognized as a <word>?
       (* dedocumented due to deprecation *)
       module Primitive : sig
         type 'a t
+
         val create : ?docs:string -> string -> (value list -> 'a) -> 'a t
-      end [@@deprecated "[since 2018-03] use [Closure]"]
+      end
+      [@@deprecated "[since 2018-03] use [Closure]"]
 
       (* undocumented since it is deprecated *)
-      module type Primitives = functor (Machine : Machine.S) ->  sig
+      module type Primitives = functor (Machine : Machine.S) -> sig
         val defs : unit -> value Machine.t Primitive.t list [@@warning "-D"]
-      end [@@deprecated "[since 2018-03] use [Closure]"]
+      end
+      [@@deprecated "[since 2018-03] use [Closure]"]
 
       (** a list of primitives.  *)
       type primitives = (module Primitives)
@@ -3629,7 +3459,6 @@ ident ::= ?any atom that is not recognized as a <word>?
       (** Make(Machine) creates a Lisp machine embedded into the
           Primus [Machine].  *)
       module Make (Machine : Machine.S) : sig
-
         (** [link_program p] links the program [p] into the Lisp
             Machine. Previous program, if any, is discarded. *)
         val link_program : program -> unit Machine.t
@@ -3668,9 +3497,12 @@ ident ::= ?any atom that is not recognized as a <word>?
               end
             ]}
         *)
-        val define : ?types:Type.signature ->
-          ?docs:string -> string -> closure -> unit Machine.t
-
+        val define :
+             ?types:Type.signature
+          -> ?docs:string
+          -> string
+          -> closure
+          -> unit Machine.t
 
         (** [signal ?params ?docs obs proj] defines a new signal.
 
@@ -3693,10 +3525,11 @@ ident ::= ?any atom that is not recognized as a <word>?
             @param doc optional documentation string
         *)
         val signal :
-          ?params:[< Type.parameters] ->
-          ?doc:string ->
-          'a observation ->
-          ('a -> value list Machine.t) -> unit Machine.t
+             ?params:[< Type.parameters]
+          -> ?doc:string
+          -> 'a observation
+          -> ('a -> value list Machine.t)
+          -> unit Machine.t
 
         (** [failf msg a1 ... am ()] terminates a lisp machine, and
             correspondingly the Primus machine with the
@@ -3719,22 +3552,21 @@ ident ::= ?any atom that is not recognized as a <word>?
 
         (** [link_primitives prims] provides the primitives [prims]   *)
         val link_primitives : primitives -> unit Machine.t
-        [@@deprecated "[since 2018-03] use link_primitive instead"]
+          [@@deprecated "[since 2018-03] use link_primitive instead"]
       end
 
       (* it's a no-op now. *)
-      val init : ?log:Format.formatter -> ?paths:string list -> string list -> unit
-      [@@deprecated "[since 2018-03] use the Machine interface instead"]
+      val init :
+        ?log:Format.formatter -> ?paths:string list -> string list -> unit
+        [@@deprecated "[since 2018-03] use the Machine interface instead"]
     end
 
     (** Primus error.  *)
     module Exn : sig
       type t = exn = ..
 
-
       (** returns a textual representation of an error  *)
       val to_string : t -> string
-
 
       (** [add_printer to_string] registers a printer.  *)
       val add_printer : (t -> string option) -> unit

@@ -3,9 +3,8 @@ open Bap.Std
 open Mips_utils
 
 type sign = Signed | Unsigned [@@deriving bin_io, compare, equal, sexp]
-
 type binop = Bil.binop [@@deriving bin_io, compare, sexp]
-type unop  = Bil.unop  [@@deriving bin_io, compare, sexp]
+type unop = Bil.unop [@@deriving bin_io, compare, sexp]
 
 type body =
   | Vars of var * var list
@@ -18,11 +17,8 @@ type body =
   | Unop of (unop * body)
 [@@deriving bin_io, compare, sexp]
 
-type exp = {
-  body : body;
-  sign : sign;
-  width : int;
-} [@@deriving bin_io, compare, sexp]
+type exp = {body: body; sign: sign; width: int}
+[@@deriving bin_io, compare, sexp]
 
 type t =
   | Move of exp * exp
@@ -37,22 +33,22 @@ type rtl = t [@@deriving bin_io, compare, sexp]
 
 let store mem addr x endian size = Store (mem, addr, x, endian, size)
 let jmp addr = Jmp addr
-let move x y = Move (x,y)
+let move x y = Move (x, y)
 let if_ cond then_ else_ = If (cond, then_, else_)
-let foreach ~inverse step exp code = Foreach (inverse,step,exp,code)
+let foreach ~inverse step exp code = Foreach (inverse, step, exp, code)
 let message m = Message m
 
 let rec bil_exp = function
   | Vars (v, []) -> Bil.var v
   | Vars (v, vars) ->
-    List.fold vars ~init:(Bil.var v) ~f:(fun e v -> Bil.(e ^ var v))
+      List.fold vars ~init:(Bil.var v) ~f:(fun e v -> Bil.(e ^ var v))
   | Word w -> Bil.int w
   | Load (mem, addr, endian, size) ->
-    Bil.(load (var mem) (bil_exp addr) endian size)
+      Bil.(load (var mem) (bil_exp addr) endian size)
   | Concat (x, y) -> Bil.(bil_exp x ^ bil_exp y)
   | Binop (op, x, y) -> Bil.binop op (bil_exp x) (bil_exp y)
   | Extract (hi, lo, x) -> Bil.extract hi lo (bil_exp x)
-  | Cast (_,1,x) -> Bil.(cast low 1 (bil_exp x))
+  | Cast (_, 1, x) -> Bil.(cast low 1 (bil_exp x))
   | Cast (Signed, width, x) -> Bil.(cast signed width (bil_exp x))
   | Cast (Unsigned, width, x) -> Bil.(cast unsigned width (bil_exp x))
   | Unop (op, x) -> Bil.unop op (bil_exp x)
@@ -60,103 +56,91 @@ let rec bil_exp = function
 let var_bitwidth v =
   match Var.typ v with
   | Type.Imm w -> w
-  | _ ->
-    mips_fail "variable %s doesn't has notion of bitwidth" (Var.name v)
+  | _ -> mips_fail "variable %s doesn't has notion of bitwidth" (Var.name v)
 
-let width_of_vars vs =
-  List.fold ~init:0 ~f:(fun x v -> x + var_bitwidth v) vs
+let width_of_vars vs = List.fold ~init:0 ~f:(fun x v -> x + var_bitwidth v) vs
 
-let var_of_exp e = match e.body with
-  | Vars (v,_) -> v
-  | _ -> mips_fail "variable expected"
+let var_of_exp e =
+  match e.body with Vars (v, _) -> v | _ -> mips_fail "variable expected"
 
 module Exp = struct
-
   let cast x width sign =
-    let same_sign = equal_sign x.sign sign
-    and same_size = x.width = width in
-    match same_sign, same_size with
-    | true,true -> x               (* nothing is changed *)
-    | false,true -> {x with sign}  (* size is preserved - no BIL cast *)
-    | true,false                  (* size is changed, *)
-    | false,false ->               (* possibly with sign *)
-      if x.width = 1
-      then {width; sign; body = Cast (x.sign, width, x.body)}
-      else {width; sign; body = Cast (sign, width, x.body)}
+    let same_sign = equal_sign x.sign sign and same_size = x.width = width in
+    match (same_sign, same_size) with
+    | true, true -> x (* nothing is changed *)
+    | false, true -> {x with sign} (* size is preserved - no BIL cast *)
+    | true, false (* size is changed, *) | false, false ->
+        (* possibly with sign *)
+        if x.width = 1 then {width; sign; body= Cast (x.sign, width, x.body)}
+        else {width; sign; body= Cast (sign, width, x.body)}
 
   let cast_width x width = cast x width x.sign
 
-  let derive_sign s s' = match s, s' with
-    | Signed, _ | _, Signed -> Signed
-    | _ -> Unsigned
+  let derive_sign s s' =
+    match (s, s') with Signed, _ | _, Signed -> Signed | _ -> Unsigned
 
-  let unop op x = { x with body = Unop (op, x.body)}
+  let unop op x = {x with body= Unop (op, x.body)}
 
   let binop_with_signedness sign op lhs rhs =
     let width = max lhs.width rhs.width in
     let lhs = cast lhs width sign in
     let rhs = cast rhs width sign in
-    let body = Binop(op, lhs.body, rhs.body) in
-    {sign; width; body;}
+    let body = Binop (op, lhs.body, rhs.body) in
+    {sign; width; body}
 
-  let unsigned_binop op lhs rhs =
-    binop_with_signedness Unsigned op lhs rhs
-
-  let signed_binop op lhs rhs =
-    binop_with_signedness Signed op lhs rhs
+  let unsigned_binop op lhs rhs = binop_with_signedness Unsigned op lhs rhs
+  let signed_binop op lhs rhs = binop_with_signedness Signed op lhs rhs
 
   let binop_with_cast op lhs rhs =
     let sign = derive_sign lhs.sign rhs.sign in
     binop_with_signedness sign op lhs rhs
 
-  let logop_with_cast op lhs rhs =
-    {(binop_with_cast op lhs rhs) with width = 1}
+  let logop_with_cast op lhs rhs = {(binop_with_cast op lhs rhs) with width= 1}
 
   let concat lhs rhs =
     let width = lhs.width + rhs.width in
     let body = Concat (lhs.body, rhs.body) in
-    { sign = Unsigned; width; body; }
+    {sign= Unsigned; width; body}
 
-
-  let plus  = binop_with_cast Bil.plus
+  let plus = binop_with_cast Bil.plus
   let minus = binop_with_cast Bil.minus
   let times = binop_with_cast Bil.times
-  let divide  = binop_with_cast Bil.divide
+  let divide = binop_with_cast Bil.divide
   let sdivide = binop_with_cast Bil.sdivide
-  let modulo  = binop_with_cast Bil.modulo
+  let modulo = binop_with_cast Bil.modulo
   let smodulo = binop_with_cast Bil.smodulo
-  let lt x y  =  (logop_with_cast Bil.lt x y)
-  let gt x y  =  (logop_with_cast Bil.lt y x)
-  let eq x y  =  (logop_with_cast Bil.eq x y)
-  let le x y  =  (logop_with_cast Bil.le x y)
-  let ge x y  =  (logop_with_cast Bil.le y x)
-  let neq x y =  (logop_with_cast Bil.neq x y)
-  let slt x y =  (logop_with_cast Bil.slt x y)
-  let sgt x y =  (logop_with_cast Bil.slt y x)
-  let slte x y = (logop_with_cast Bil.sle x y)
-  let sgte x y = (logop_with_cast Bil.sle y x)
-
-  let lshift  = unsigned_binop Bil.lshift
-  let rshift  = unsigned_binop Bil.rshift
+  let lt x y = logop_with_cast Bil.lt x y
+  let gt x y = logop_with_cast Bil.lt y x
+  let eq x y = logop_with_cast Bil.eq x y
+  let le x y = logop_with_cast Bil.le x y
+  let ge x y = logop_with_cast Bil.le y x
+  let neq x y = logop_with_cast Bil.neq x y
+  let slt x y = logop_with_cast Bil.slt x y
+  let sgt x y = logop_with_cast Bil.slt y x
+  let slte x y = logop_with_cast Bil.sle x y
+  let sgte x y = logop_with_cast Bil.sle y x
+  let lshift = unsigned_binop Bil.lshift
+  let rshift = unsigned_binop Bil.rshift
   let arshift = binop_with_cast Bil.arshift
   let bit_and = unsigned_binop Bil.bit_and
   let bit_xor = unsigned_binop Bil.bit_xor
-  let bit_or  = unsigned_binop Bil.bit_or
+  let bit_or = unsigned_binop Bil.bit_or
   let not x = unop Bil.not x
 
   let of_var var =
     let width = var_bitwidth var in
-    { sign = Unsigned; width; body = Vars (var, []); }
+    {sign= Unsigned; width; body= Vars (var, [])}
 
-  let of_vars vars = match vars with
+  let of_vars vars =
+    match vars with
     | [] -> mips_fail "can't construct an expression from empty var list"
     | v :: vars ->
-      let width = width_of_vars (v::vars) in
-      { sign = Unsigned; width; body = Vars (v, vars); }
+        let width = width_of_vars (v :: vars) in
+        {sign= Unsigned; width; body= Vars (v, vars)}
 
   let of_word w =
     let width = Word.bitwidth w in
-    {sign = Unsigned; width; body = Word w }
+    {sign= Unsigned; width; body= Word w}
 
   let tmp width =
     let var = Var.create ~is_virtual:true ~fresh:true "tmp" (Type.imm width) in
@@ -165,43 +149,44 @@ module Exp = struct
   let load mem addr endian size =
     let width = Size.in_bits size in
     let sign = Unsigned in
-    let body = Load (mem,addr.body,endian,size) in
-    {sign; width; body;}
+    let body = Load (mem, addr.body, endian, size) in
+    {sign; width; body}
 
   let extract_of_vars e hi lo vars =
     let width = hi - lo + 1 in
-    let bounds,_ =
-      List.fold ~init:([],0)
-        ~f:(fun (acc,n) v ->
-            let len = var_bitwidth v in
-            let hi = e.width - n - 1 in
-            let lo = e.width - n - len in
-            (hi, lo, v) :: acc, n + len) vars in
+    let bounds, _ =
+      List.fold ~init:([], 0)
+        ~f:(fun (acc, n) v ->
+          let len = var_bitwidth v in
+          let hi = e.width - n - 1 in
+          let lo = e.width - n - len in
+          ((hi, lo, v) :: acc, n + len))
+        vars in
     let bounds = List.rev bounds in
-    let has_hi = List.exists ~f:(fun (hi',_,_) -> hi = hi') bounds in
-    let has_lo = List.exists ~f:(fun (_,lo',_) -> lo = lo') bounds in
+    let has_hi = List.exists ~f:(fun (hi', _, _) -> hi = hi') bounds in
+    let has_lo = List.exists ~f:(fun (_, lo', _) -> lo = lo') bounds in
     if has_hi && has_lo then
-      let vars = List.filter_map ~f:(fun (hi', lo', v) ->
-          if hi' <= hi && lo' >= lo then Some v
-          else None) bounds in
+      let vars =
+        List.filter_map
+          ~f:(fun (hi', lo', v) ->
+            if hi' <= hi && lo' >= lo then Some v else None)
+          bounds in
       let v = List.hd_exn vars in
       let vars = List.tl_exn vars in
-      {sign=Unsigned; width; body = Vars (v,vars)}
-    else
-      {sign=Unsigned; width; body = Extract (hi,lo,e.body)}
+      {sign= Unsigned; width; body= Vars (v, vars)}
+    else {sign= Unsigned; width; body= Extract (hi, lo, e.body)}
 
   let extract hi lo e =
     let width = hi - lo + 1 in
     if width = e.width then e
     else
       match e.body with
-      | Vars (v,vars) when Caml.not (List.is_empty vars) ->
-        extract_of_vars e hi lo (v :: vars)
-      | _ ->
-        { sign=Unsigned; width; body = Extract (hi,lo,e.body) }
+      | Vars (v, vars) when Caml.not (List.is_empty vars) ->
+          extract_of_vars e hi lo (v :: vars)
+      | _ -> {sign= Unsigned; width; body= Extract (hi, lo, e.body)}
 
-  let signed e = {e with sign = Signed}
-  let unsigned e = {e with sign = Unsigned}
+  let signed e = {e with sign= Signed}
+  let unsigned e = {e with sign= Unsigned}
   let width e = e.width
   let body e = e.body
   let sign e = e.sign
@@ -210,36 +195,36 @@ end
 
 module Infix = struct
   open Exp
-  let ( := )  = move
-  let ( + )  = plus
-  let ( - )  = minus
-  let ( * )  = times
-  let ( / )  = divide
-  let ( /$)  = sdivide
-  let ( ^ )  = concat
-  let ( % )  = modulo
-  let ( %$)  = smodulo
-  let ( < )  = lt
-  let ( > )  = gt
-  let ( <= )  = le
-  let ( >= )  = ge
+
+  let ( := ) = move
+  let ( + ) = plus
+  let ( - ) = minus
+  let ( * ) = times
+  let ( / ) = divide
+  let ( /$ ) = sdivide
+  let ( ^ ) = concat
+  let ( % ) = modulo
+  let ( %$ ) = smodulo
+  let ( < ) = lt
+  let ( > ) = gt
+  let ( <= ) = le
+  let ( >= ) = ge
   let ( <$ ) = slt
   let ( >$ ) = sgt
   let ( <=$ ) = slte
   let ( >=$ ) = sgte
-  let ( = )   = eq
-  let ( <> )   = neq
-  let ( lsl )  = lshift
-  let ( lsr )  = rshift
-  let ( asr )  = arshift
-  let ( lor )  = bit_or
+  let ( = ) = eq
+  let ( <> ) = neq
+  let ( lsl ) = lshift
+  let ( lsr ) = rshift
+  let ( asr ) = arshift
+  let ( lor ) = bit_or
   let ( land ) = bit_and
   let ( lxor ) = bit_xor
-  let ( lnot ) = not
+  let lnot = not
 end
 
 module Translate = struct
-
   let store mem addr data endian size =
     let addr = bil_exp addr.body in
     let data = bil_exp data.body in
@@ -247,11 +232,12 @@ module Translate = struct
 
   let if_ probe then_ else_ =
     let probe = bil_exp (Exp.body probe) in
-    Bil.[ if_ probe then_ else_ ]
+    Bil.[if_ probe then_ else_]
 
-  let rec expand_vars e = match e with
+  let rec expand_vars e =
+    match e with
     | Vars (v, vs) -> v :: vs
-    | Concat (x,y) ->  expand_vars x @ expand_vars y
+    | Concat (x, y) -> expand_vars x @ expand_vars y
     | Cast _ | Extract _ | Load _ | Word _ | Binop _ | Unop _ -> []
 
   let partial_assign v (hi_var, lo_var) rhs (hi_exp, lo_exp) =
@@ -268,13 +254,13 @@ module Translate = struct
       else Some (Bil.extract (width - 1) (hi_var + 1) var) in
     let middle = bil_exp (Exp.body rhs) in
     let right =
-      if width_right = 0 then None
-      else Some (Bil.extract (lo_var - 1) 0 var) in
-    match left,right with
+      if width_right = 0 then None else Some (Bil.extract (lo_var - 1) 0 var)
+    in
+    match (left, right) with
     | None, None -> Bil.[v := middle]
     | Some left, None -> Bil.[v := left ^ middle]
     | None, Some right -> Bil.[v := middle ^ right]
-    | Some left, Some right -> Bil.[ v := left ^ middle ^ right; ]
+    | Some left, Some right -> Bil.[v := left ^ middle ^ right]
 
   let assign_vars vars ?hi ?lo rhs =
     let in_bounds x left right = x <= left && x >= right in
@@ -288,21 +274,21 @@ module Translate = struct
     let rec assign es assigned vars_lo = function
       | [] -> es
       | v :: vars ->
-        let width = var_bitwidth v in
-        let vars_hi = width + vars_lo - 1 in
-        let var_in_bounds =
-          hi < width
-          || in_bounds vars_lo hi lo
-          || in_bounds vars_hi hi lo in
-        if var_in_bounds then
-          let lo_var = max lo vars_lo  - vars_lo in
-          let hi_var = min (rhs_width + lo - 1) vars_hi - vars_lo in
-          let bits_to_assign = hi_var - lo_var + 1 in
-          let hi_exp = assigned + bits_to_assign - 1 in
-          let lo_exp = assigned in
-          let es = partial_assign v (hi_var, lo_var) rhs (hi_exp,lo_exp) @ es in
-          assign es (assigned + bits_to_assign) (vars_lo + width) vars
-        else assign es assigned (vars_lo + width) vars in
+          let width = var_bitwidth v in
+          let vars_hi = width + vars_lo - 1 in
+          let var_in_bounds =
+            hi < width || in_bounds vars_lo hi lo || in_bounds vars_hi hi lo
+          in
+          if var_in_bounds then
+            let lo_var = max lo vars_lo - vars_lo in
+            let hi_var = min (rhs_width + lo - 1) vars_hi - vars_lo in
+            let bits_to_assign = hi_var - lo_var + 1 in
+            let hi_exp = assigned + bits_to_assign - 1 in
+            let lo_exp = assigned in
+            let es =
+              partial_assign v (hi_var, lo_var) rhs (hi_exp, lo_exp) @ es in
+            assign es (assigned + bits_to_assign) (vars_lo + width) vars
+          else assign es assigned (vars_lo + width) vars in
     assign [] 0 0 vars
 
   (** valid forms of assignment:
@@ -314,56 +300,57 @@ module Translate = struct
   let rec move lhs rhs =
     match Exp.body lhs with
     | Vars (v, []) ->
-      let rhs = Exp.(cast rhs (width lhs) (sign lhs)) in
-      Bil.[v := bil_exp (Exp.body rhs)]
-    | Vars (v, vars) -> assign_vars (v::vars) rhs
-    | Concat (x,y) ->
-      let vars = expand_vars x @ expand_vars y in
-      let width = width_of_vars vars in
-      let rhs = Exp.cast rhs width (Exp.sign rhs) in
-      assign_vars vars rhs
+        let rhs = Exp.(cast rhs (width lhs) (sign lhs)) in
+        Bil.[v := bil_exp (Exp.body rhs)]
+    | Vars (v, vars) -> assign_vars (v :: vars) rhs
+    | Concat (x, y) ->
+        let vars = expand_vars x @ expand_vars y in
+        let width = width_of_vars vars in
+        let rhs = Exp.cast rhs width (Exp.sign rhs) in
+        assign_vars vars rhs
     | Extract (hi, lo, x) ->
-      let vars = expand_vars x in
-      assign_vars vars ~hi ~lo rhs
+        let vars = expand_vars x in
+        assign_vars vars ~hi ~lo rhs
     | _ -> mips_fail "unexpected left side of :="
 
-  let jmp exp = Bil.[ jmp (bil_exp exp.body)]
+  let jmp exp = Bil.[jmp (bil_exp exp.body)]
 
   class move_finder var =
-    object inherit [unit] Stmt.finder
+    object
+      inherit [unit] Stmt.finder
+
       method! enter_move v _ r =
-        if Var.equal var v then r.return (Some ())
-        else r
+        if Var.equal var v then r.return (Some ()) else r
     end
 
   let rec stmt_to_bil = function
-    | Move (x,y) -> move x y
+    | Move (x, y) -> move x y
     | Jmp a -> jmp a
     | If (cond, then_, else_) -> if_ cond (to_bil then_) (to_bil else_)
     | Message m -> [Bil.special m]
     | Store (mem, addr, data, endian, size) ->
-      let bits = Size.in_bits size in
-      let data =
-        if bits = Exp.width data then data
-        else Exp.extract (bits - 1) 0 data in
-      store mem addr data endian size
-    | Foreach (inverse,step_e, e, code) ->
-      let iters = Exp.width e / Exp.width step_e in
-      let stepw = Exp.width step_e in
-      let has_assignments = has_assignments (var_of_exp step_e) code in
-      to_bil @@ List.concat
-        (List.init iters
-           ~f:(fun i ->
-               let i = if inverse then iters - i - 1 else i in
-               let hi = (i + 1) * stepw - 1 in
-               let lo = i * stepw in
-               if has_assignments then
-                 let last = Infix.(Exp.extract hi lo e := step_e) in
-                 Infix.(step_e := Exp.extract hi lo e) :: code @ [last]
-               else
-                 Infix.(step_e := Exp.extract hi lo e) :: code))
-  and to_bil ts =
-    List.concat (List.map ~f:stmt_to_bil ts)
+        let bits = Size.in_bits size in
+        let data =
+          if bits = Exp.width data then data else Exp.extract (bits - 1) 0 data
+        in
+        store mem addr data endian size
+    | Foreach (inverse, step_e, e, code) ->
+        let iters = Exp.width e / Exp.width step_e in
+        let stepw = Exp.width step_e in
+        let has_assignments = has_assignments (var_of_exp step_e) code in
+        to_bil
+        @@ List.concat
+             (List.init iters ~f:(fun i ->
+                  let i = if inverse then iters - i - 1 else i in
+                  let hi = ((i + 1) * stepw) - 1 in
+                  let lo = i * stepw in
+                  if has_assignments then
+                    let last = Infix.(Exp.extract hi lo e := step_e) in
+                    (Infix.(step_e := Exp.extract hi lo e) :: code) @ [last]
+                  else Infix.(step_e := Exp.extract hi lo e) :: code))
+
+  and to_bil ts = List.concat (List.map ~f:stmt_to_bil ts)
+
   and has_assignments var rtl =
     let bil = to_bil rtl in
     Option.is_some ((new move_finder var)#find bil)
@@ -371,16 +358,13 @@ end
 
 let bil_of_t = Translate.to_bil
 
-
 module Op_array = struct
-
   type 'a t = 'a Array.t
 
   exception Invalid_operand_index of int
 
   let get a n =
-    if n >= Array.length a then raise (Invalid_operand_index n)
-    else Array.get a n
+    if n >= Array.length a then raise (Invalid_operand_index n) else a.(n)
 
   let unsafe_get a n = get a n
 end

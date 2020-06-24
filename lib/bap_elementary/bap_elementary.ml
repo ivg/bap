@@ -1,6 +1,5 @@
 open Core_kernel
 open Bap.Std
-
 open Bap_knowledge
 open Bap_core_theory
 open Knowledge.Syntax
@@ -23,67 +22,70 @@ module Elementary (Core : Theory.Core) = struct
     | [name; sort; rank] -> Some (name, sort, rank)
     | _ -> None
 
-  let operation ident = match scheme ident with
-    | Some (name,_,_) -> name
+  let operation ident =
+    match scheme ident with
+    | Some (name, _, _) -> name
     | None -> raise Not_a_table
 
   let table = name
   let is_table ident = Option.is_some (scheme ident)
 
   let bind a body =
-    a >>= fun a ->
+    a
+    >>= fun a ->
     let sort = Theory.Value.sort a in
-    Theory.Var.scoped sort @@ fun v ->
-    let_ v !!a (body v)
+    Theory.Var.scoped sort @@ fun v -> let_ v !!a (body v)
 
-  let (>>>=) = bind
+  let ( >>>= ) = bind
+  let ( >>-> ) x f = x >>= fun x -> f (Theory.Value.sort x) x
 
-  let (>>->) x f =
-    x >>= fun x ->
-    f (Theory.Value.sort x) x
+  include struct
+    open Theory
 
-
-  include struct open Theory
-    let approximate
-      : rank : int ->
-        reduce : (('a,'s) format float -> 'r bitv) ->
-        extract : (int -> 'd bitv -> 's bitv) ->
-        coefs : ('r, 'd) Mem.t var ->
-        ('a,'s) format float ->
-        rmode ->
-        ('a,'s) format float
-      = fun ~rank ~reduce ~extract ~coefs x rmode ->
-        x >>-> fun fsort x ->
-        reduce !!x >>>= fun key ->
-        load (var coefs) (var key) >>>= fun value ->
-        let coef i = float fsort (extract i (var value)) in
-        let rec sum i y =
-          if i >= 0 then
-            fmul rmode !!x y >>>= fun y ->
-            coef i >>>= fun c ->
-            fadd rmode (var y) (var c) >>>= fun y ->
-            sum (i - 1) (var y)
-          else y in
-        coef rank >>>= fun cr ->
-        if rank = 0 then var cr
-        else sum (rank - 1) (var cr)
+    let approximate :
+           rank:int
+        -> reduce:(('a, 's) format float -> 'r bitv)
+        -> extract:(int -> 'd bitv -> 's bitv)
+        -> coefs:('r, 'd) Mem.t var
+        -> ('a, 's) format float
+        -> rmode
+        -> ('a, 's) format float =
+     fun ~rank ~reduce ~extract ~coefs x rmode ->
+      x
+      >>-> fun fsort x ->
+      reduce !!x
+      >>>= fun key ->
+      load (var coefs) (var key)
+      >>>= fun value ->
+      let coef i = float fsort (extract i (var value)) in
+      let rec sum i y =
+        if i >= 0 then
+          fmul rmode !!x y
+          >>>= fun y ->
+          coef i
+          >>>= fun c ->
+          fadd rmode (var y) (var c) >>>= fun y -> sum (i - 1) (var y)
+        else y in
+      coef rank
+      >>>= fun cr -> if rank = 0 then var cr else sum (rank - 1) (var cr)
   end
 
   let of_int sort x =
-    let m = Bitvec.modulus (Theory.Bitv.size sort)in
+    let m = Bitvec.modulus (Theory.Bitv.size sort) in
     int sort Bitvec.(int x mod m)
 
   let nth fsort n bitv =
-    bitv >>-> fun sort bitv ->
+    bitv
+    >>-> fun sort bitv ->
     let index = of_int sort (n * Theory.Bitv.size (bits fsort)) in
-    lshift !!bitv index >>>= fun bitv ->
-    high (bits fsort) (var bitv)
+    lshift !!bitv index >>>= fun bitv -> high (bits fsort) (var bitv)
 
   let tabulate op ~rank ~size x rmode =
-    x >>-> fun fsort x ->
+    x
+    >>-> fun fsort x ->
     let keys = Theory.Bitv.define size in
-    let values = Theory.Bitv.define
-        ((rank + 1) * Theory.Bitv.size (bits fsort)) in
+    let values =
+      Theory.Bitv.define ((rank + 1) * Theory.Bitv.size (bits fsort)) in
     let mems = Theory.Mem.define keys values in
     let name = name op fsort rank in
     let coefs = Theory.Var.define mems name in
@@ -95,12 +97,12 @@ module Elementary (Core : Theory.Core) = struct
     type 'a t = 'a Theory.Value.sort -> int -> string
 
     let pow s = name "pow" s
-    let compound  s = name "compound" s
+    let compound s = name "compound" s
     let rootn s = name "rootn" s
     let pown s = name "pown" s
     let rsqrt s = name "rsqrt" s
     let hypot s = name "hypot" s
-    let exp  s = name "exp" s
+    let exp s = name "exp" s
     let expm1 s = name "expm1" s
     let exp2 s = name "exp2" s
     let exp2m1 s = name "exp2m1" s
@@ -130,5 +132,4 @@ module Elementary (Core : Theory.Core) = struct
     let acosh s = name "acosh" s
     let atanh s = name "atanh" s
   end
-
 end

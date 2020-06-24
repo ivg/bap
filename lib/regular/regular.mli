@@ -51,13 +51,10 @@ open Core_kernel
     Core Kernel Documentation
 *)
 module Std : sig
-
   (** {3 Type definitions}  *)
 
   (** bytes is a mutable sequence of bytes that has a fixed length.*)
-  type bytes = Bytes.t
-  [@@deriving bin_io, compare, sexp]
-
+  type bytes = Bytes.t [@@deriving bin_io, compare, sexp]
 
   (** {4 Reader and Writer type classes}
 
@@ -68,7 +65,6 @@ module Std : sig
 
   (** an interface for writing a value to the output.  *)
   type 'a writer
-
 
   (** a string that digests data  *)
   type digest [@@deriving bin_io, compare, sexp]
@@ -81,7 +77,6 @@ module Std : sig
 
   (** Printable data structures.  *)
   module Printable : sig
-
     (** Interface for printing data.
 
         Printable interface is implemented by a significant amount of BAP
@@ -97,7 +92,6 @@ module Std : sig
         v}
     *)
     module type S = sig
-
       (** type of printable  *)
       type t
 
@@ -125,11 +119,10 @@ module Std : sig
       (** prints a sequence of values of type [t] *)
       val pp_seq : Format.formatter -> t Sequence.t -> unit
 
-
       (** this will include [pp] function from [Core] that has type
           {{!printer}[t printer]}, and can be used in [Format.printf]
           family of functions *)
-      include Pretty_printer.S     with type t := t
+      include Pretty_printer.S with type t := t
     end
 
     (** Implement [Printable] interface from the minimum implementation.
@@ -141,9 +134,10 @@ module Std : sig
 
     *)
     module Make (M : sig
-        include Pretty_printer.S
-        val module_name : string option
-      end) : S with type t := M.t
+      include Pretty_printer.S
+
+      val module_name : string option
+    end) : S with type t := M.t
   end
 
   (** Lazy sequence.
@@ -157,18 +151,16 @@ module Std : sig
   *)
   module Seq : sig
     type 'a t = 'a Sequence.t [@@deriving bin_io, compare, sexp]
+
     include module type of Sequence with type 'a t := 'a t
 
     (** for compatibility with Core <= 111.28  *)
     val filter : 'a t -> f:('a -> bool) -> 'a t
+
     val compare : ('a -> 'b -> int) -> 'a t -> 'b t -> int
-
     val of_array : 'a array -> 'a t
-
     val cons : 'a -> 'a t -> 'a t
-
     val is_empty : 'a t -> bool
-
     val pp : 'a printer -> 'a t printer
   end
 
@@ -176,8 +168,7 @@ module Std : sig
   type 'a seq = 'a Seq.t [@@deriving bin_io, compare, sexp]
 
   (** [x ^:: xs] is a consing operator for sequences  *)
-  val (^::) : 'a -> 'a seq -> 'a seq
-
+  val ( ^:: ) : 'a -> 'a seq -> 'a seq
 
   (** Data types support module.
 
@@ -194,33 +185,27 @@ module Std : sig
       interface, that is useful for caching data that is hard to
       obtain.*)
   module Data : sig
-
-
     (** [copy buf obj pos] is a method to copy object [obj] into a buffer
         [buf], starting from a position [pos] and will return the number
         of bytes written.  XXX: we need the amount of bytes beforehand.
     *)
-    type ('a,'b) copy = 'b -> 'a -> int -> unit
-
+    type ('a, 'b) copy = 'b -> 'a -> int -> unit
 
     (** [dump out obj] a type of functions that outputs a value [obj]
         into output [out] *)
-    type ('a,'b) dump = 'b -> 'a -> unit
+    type ('a, 'b) dump = 'b -> 'a -> unit
 
-    type lexbuf  = Lexing.lexbuf
+    type lexbuf = Lexing.lexbuf
     type scanbuf = Scanf.Scanning.scanbuf
-
     type 'a cls
     type info = string * [`Ver of string] * string option
 
     val all_readers : unit -> (string * info list) list
     val all_writers : unit -> (string * info list) list
-
     val set_module_name : 'a cls -> string -> unit
 
     (** Versioned interfaces  *)
     module Versioned : sig
-
       (** a data type with a version  *)
       module type S = sig
         (** type of data  *)
@@ -237,11 +222,12 @@ module Std : sig
 
     (** [marshal_writer (module T)] returns a writer in OCaml
         [Marshal] format.  *)
-    val marshal_writer : (module T with type t = 'a) ->
-      'a writer
+    val marshal_writer : (module T with type t = 'a) -> 'a writer
 
     (** [sexp_reader (module T)] returns a reader in  sexp format.  *)
     val sexp_reader : (module Sexpable with type t = 'a) -> 'a reader
+    (** [sexp_writer (module T)] returns a writer in  sexp format.  *)
+
     (** [sexp_writer (module T)] returns a writer in  sexp format.  *)
     val sexp_writer : (module Sexpable with type t = 'a) -> 'a writer
 
@@ -254,7 +240,6 @@ module Std : sig
     (** [pretty_printer (module T] creates a writer that uses [T.pp]
         function for outputting.  *)
     val pretty_writer : (module Pretty_printer.S with type t = 'a) -> 'a writer
-
 
     (** Data type interface.
 
@@ -283,7 +268,6 @@ module Std : sig
         ]}
     *)
     module type S = sig
-
       (** type constructor  *)
       type t
 
@@ -329,7 +313,8 @@ module Std : sig
       (** [blit_to_bytes ?ver ?fmt buffer datum offset] copies a
           serialized representation of datum into a [buffer], starting from
           the [offset].  *)
-      val blit_to_bytes : ?ver:string -> ?fmt:string -> bytes -> t -> int -> unit
+      val blit_to_bytes :
+        ?ver:string -> ?fmt:string -> bytes -> t -> int -> unit
 
       (** [of_bigstring ?ver ?fmt buf] deserializes a datum from bigstring  *)
       val of_bigstring : ?ver:string -> ?fmt:string -> bigstring -> t
@@ -341,51 +326,57 @@ module Std : sig
       (** [blit_to_bigstring ?ver ?fmt buffer datum offset] copies a
           serialized representation of datum into a [buffer], starting from
           [offset].  *)
-      val blit_to_bigstring : ?ver:string -> ?fmt:string -> bigstring -> t -> int -> unit
+      val blit_to_bigstring :
+        ?ver:string -> ?fmt:string -> bigstring -> t -> int -> unit
 
       (** Input/Output functions for the given datum.*)
       module Io : sig
-
         (** [read ?ver ?fmt file] reads datum from a [file]  *)
-        val read  : ?ver:string -> ?fmt:string -> string -> t
+        val read : ?ver:string -> ?fmt:string -> string -> t
 
         (** [load ?ver ?fmt channel] loads datum from the input channel  *)
-        val load  : ?ver:string -> ?fmt:string -> In_channel.t -> t
+        val load : ?ver:string -> ?fmt:string -> In_channel.t -> t
 
         (** [read_all ?ver ?fmt ?rev channel] reads a sequence of datums
             stored in the storage accessed via [channel] and returns it as a
             list. If [rev] is [true] (defaults to [false]) then a list will
             be reversed (slightly faster).  *)
-        val load_all : ?ver:string -> ?fmt:string -> ?rev:bool -> In_channel.t -> t list
+        val load_all :
+          ?ver:string -> ?fmt:string -> ?rev:bool -> In_channel.t -> t list
 
         (** [scan ?ver ?fmt channel] creates a stream of data, that
             are loaded consequently from the channel *)
-        val scan  : ?ver:string -> ?fmt:string -> In_channel.t -> (unit -> t option)
+        val scan :
+          ?ver:string -> ?fmt:string -> In_channel.t -> unit -> t option
 
         (** [write ?ver ?fmt file datum] writes the [datum] to the [file] *)
-        val write  : ?ver:string -> ?fmt:string -> string -> t -> unit
+        val write : ?ver:string -> ?fmt:string -> string -> t -> unit
 
         (** [save ?ver ?fmt channel datum] saves the [datum] to the [channel] *)
-        val save  : ?ver:string -> ?fmt:string -> Out_channel.t -> t -> unit
-
+        val save : ?ver:string -> ?fmt:string -> Out_channel.t -> t -> unit
 
         (** [save_all ?ver ?fmt data channel] saves a list of data into
             a [channel] *)
-        val save_all : ?ver:string -> ?fmt:string -> Out_channel.t -> t list -> unit
+        val save_all :
+          ?ver:string -> ?fmt:string -> Out_channel.t -> t list -> unit
 
         (** [dump ?ver ?fmt chan stream] dumps a [stream] (represented
             by a [next] function) into channel.  *)
-        val dump  : ?ver:string -> ?fmt:string -> Out_channel.t -> (unit -> t option) -> unit
+        val dump :
+             ?ver:string
+          -> ?fmt:string
+          -> Out_channel.t
+          -> (unit -> t option)
+          -> unit
 
         (** [show ?ver ?fmt datum] saves datum to standard output
             channel, using a [default_printer] if [fmt] is not
             specified. Does nothing the printer is not set up.  *)
-        val show  : ?ver:string -> ?fmt:string -> t -> unit
+        val show : ?ver:string -> ?fmt:string -> t -> unit
 
         (** [print ?ver ?fmt ppf] prints datum to a given formatter, using
             a [default_printer] if [fmt] is left unspecified.  *)
         val print : ?ver:string -> ?fmt:string -> Format.formatter -> t -> unit
-
       end
 
       (** Data cache.
@@ -432,7 +423,6 @@ module Std : sig
           that take significant amount of time to create.
       *)
       module Cache : sig
-
         (** [load id] load data previously stored under give [id]  *)
         val load : digest -> t option
 
@@ -441,12 +431,10 @@ module Std : sig
         val save : digest -> t -> unit
       end
 
-
       (** [add_reader ?desc ~ver name reader] registers a new [reader]
           with a provided [name], version [ver] and optional description
           [desc] *)
       val add_reader : ?desc:string -> ver:string -> string -> t reader -> unit
-
 
       (** [add_writer ?desc ~ver name writer] registers a new [writer]
           with a provided [name], version [ver] and optional description
@@ -470,7 +458,6 @@ module Std : sig
           reader is restored after [operation] is finished.  *)
       val with_reader : ?ver:string -> string -> (unit -> 'a) -> 'a
 
-
       (** [available_writer ()] lists available writers for the data type  *)
       val available_writers : unit -> info list
 
@@ -488,7 +475,6 @@ module Std : sig
           writer is restored after [operation] is finished.  *)
       val with_writer : ?ver:string -> string -> (unit -> 'a) -> 'a
 
-
       (** [default_writer] optionally returns an information about
           default printer *)
       val default_printer : unit -> info option
@@ -503,7 +489,6 @@ module Std : sig
           printer to a printer with a specified name and version. The default
           printer is restored after [operation] is finished.  *)
       val with_printer : ?ver:string -> string -> (unit -> 'a) -> 'a
-
 
       (** {2 Low level access to serializers}  *)
 
@@ -520,13 +505,14 @@ module Std : sig
 
     module type With_instance = sig
       include Versioned.S
+
       val instance : t cls
+
       include S with type t := t
     end
 
     (** Implements [Data.S] interface from the provided minimal implementation.  *)
     module Make (T : Versioned.S) : With_instance with type t := T.t
-
 
     (** [Read] typeclass.
 
@@ -536,7 +522,6 @@ module Std : sig
         available for a type, then look at the {!Data.S} interface.
     *)
     module Read : sig
-
       (** readable  *)
       type 'a t = 'a reader
 
@@ -547,12 +532,13 @@ module Std : sig
           then [from_channel] function will consume all input and pass it
           to the correspondings function.  *)
       val create :
-        ?of_channel     : (In_channel.t -> 'a) ->
-        ?of_lexbuf      : (lexbuf -> 'a) ->
-        ?of_scanbuf     : (scanbuf -> 'a) ->
-        ?of_bigstring   : (bigstring -> 'a) ->
-        ?of_bytes       : (bytes -> 'a) ->
-        unit -> 'a t
+           ?of_channel:(In_channel.t -> 'a)
+        -> ?of_lexbuf:(lexbuf -> 'a)
+        -> ?of_scanbuf:(scanbuf -> 'a)
+        -> ?of_bigstring:(bigstring -> 'a)
+        -> ?of_bytes:(bytes -> 'a)
+        -> unit
+        -> 'a t
 
       (** [of_bytes readable bytes] reads a value from [bytes] *)
       val of_bytes : 'a t -> bytes -> 'a
@@ -569,14 +555,12 @@ module Std : sig
       val of_bigstring : 'a t -> bigstring -> 'a
     end
 
-
     (** Write typeclass.
 
         Defines a class of writeable (serializable) values. See module
         {!Read} for more information concerning when and why to use
         this module. *)
     module Write : sig
-
       (** a writer type class  *)
       type 'a t = 'a writer
 
@@ -589,15 +573,15 @@ module Std : sig
           - [pp].
       *)
       val create :
-        ?to_bytes  : ('a -> bytes) ->
-        ?to_bigstring : ('a -> bigstring) ->
-        ?dump  : (Out_channel.t -> 'a -> unit) ->
-        ?pp    : (Format.formatter -> 'a -> unit) ->
-        ?size  : ('a -> int) ->
-        ?blit_to_string:('a,bytes) copy ->
-        ?blit_to_bigstring:('a,bigstring) copy ->
-        unit -> 'a t
-
+           ?to_bytes:('a -> bytes)
+        -> ?to_bigstring:('a -> bigstring)
+        -> ?dump:(Out_channel.t -> 'a -> unit)
+        -> ?pp:(Format.formatter -> 'a -> unit)
+        -> ?size:('a -> int)
+        -> ?blit_to_string:('a, bytes) copy
+        -> ?blit_to_bigstring:('a, bigstring) copy
+        -> unit
+        -> 'a t
 
       (** [size writebale value] returns a size in bytes that
           [writeable] will use to write [value] *)
@@ -625,7 +609,7 @@ module Std : sig
           if the [value] doesn't fit into the string [buf].
           @deprecated use the blit_to_bytes instead *)
       val blit_to_string : 'a t -> bytes -> 'a -> int -> unit
-      [@@deprecated "[since 2018-11] use the blit_to_bytes instead"]
+        [@@deprecated "[since 2018-11] use the blit_to_bytes instead"]
 
       (** [blit_to_bytes writeable buf value pos] copies a serialized
           representation of the [value] into existing buffer [buf],
@@ -650,14 +634,12 @@ module Std : sig
         caching.
     *)
     module Cache : sig
-
       (** cacher type class  *)
       type 'a t
 
       (** [create ~load ~save] creates a cache provider.  *)
       val create :
-        load:(digest -> 'a option) ->
-        save:(digest -> 'a -> unit) -> 'a t
+        load:(digest -> 'a option) -> save:(digest -> 'a -> unit) -> 'a t
 
       (** [digest ~namespace fmt x y z ...] a variadic function to
           create data digests. Use it like a printf, e.g.,
@@ -678,9 +660,8 @@ module Std : sig
           all constituting elements. If N is too big (hundreds of
           megabytes) then use [Digest] module for building digests
           incrementally.*)
-      val digest : namespace:string ->
-        ('a,Format.formatter,unit,digest) format4 -> 'a
-
+      val digest :
+        namespace:string -> ('a, Format.formatter, unit, digest) format4 -> 'a
 
       (** Data digesting for caching.*)
       module Digest : sig
@@ -697,7 +678,7 @@ module Std : sig
         (** [add digest fmt x y z ...] is a variadic function that
             builds a string from arguments [x y z ...] using specified
             format [fmt] and adds this string to the digest. *)
-        val add : t -> ('a,Format.formatter,unit,t) format4 -> 'a
+        val add : t -> ('a, Format.formatter, unit, t) format4 -> 'a
 
         (** [add_sexp d sexp_of x] is [add d "%a" Sexp.pp (sexp_of x)] *)
         val add_sexp : t -> ('a -> Sexp.t) -> 'a -> t
@@ -714,9 +695,7 @@ module Std : sig
       val save : 'a t -> digest -> 'a -> unit
 
       (** service signature  *)
-      type service = {
-        create : 'a . 'a reader -> 'a writer -> 'a t
-      }
+      type service = {create: 'a. 'a reader -> 'a writer -> 'a t}
 
       (** Service injection point.
 
@@ -734,7 +713,6 @@ module Std : sig
           then use {!Regular}, {!Opaque} or {!Data.Make} functors (in
           the order of preference).*)
       module Service : sig
-
         (** [provide service] will substitute current caching service
             with a new [service]. *)
         val provide : service -> unit
@@ -770,38 +748,37 @@ module Std : sig
 
   *)
   module Regular : sig
-
     (** Regular interface.  *)
     module type S = sig
       type t [@@deriving bin_io, sexp, compare]
-      include Printable.S            with type t := t
-      include Comparable.S_binable   with type t := t
-      include Hashable.S_binable     with type t := t
-      include Data.S                 with type t := t
+
+      include Printable.S with type t := t
+      include Comparable.S_binable with type t := t
+      include Hashable.S_binable with type t := t
+      include Data.S with type t := t
     end
 
     module type Minimal = sig
       (** type t should be binable, sexpable and provide compare function  *)
       type t [@@deriving bin_io, sexp, compare]
+
       include Pretty_printer.S with type t := t
       include Data.Versioned.S with type t := t
+
       val hash : t -> int
       val module_name : string option
     end
 
     (** In order to implement [Regular] interface you need to provide a
         minimum implementation [M]  *)
-    module Make( M : Minimal) : S with type t := M.t
+    module Make (M : Minimal) : S with type t := M.t
   end
-
 
   (** Opaque type is like regular type, except that we can print or
       examine it in any way. So it can't be serialized or
       pretty-printed. An {!Opaque.Make} can create an instances of
       such type.  *)
   module Opaque : sig
-
-
     (** Opaque type is like regular type, except that we can print or
         examine it in any way. So it can't be serialized or
         pretty-printed.
@@ -816,17 +793,18 @@ module Std : sig
     *)
     module type S = sig
       type t
+
       include Comparable.S with type t := t
-      include Hashable.S   with type t := t
+      include Hashable.S with type t := t
     end
 
     (** creates a module implementing [Opaque] interface.   *)
-    module Make(M : sig
-        type t [@@deriving compare]
-        val hash : t -> int
-      end) : S with type t := M.t
-  end
+    module Make (M : sig
+      type t [@@deriving compare]
 
+      val hash : t -> int
+    end) : S with type t := M.t
+  end
 
   (** Extension of the standard bytes module.
 
@@ -836,28 +814,28 @@ module Std : sig
       of regular (excluding {!Data} module, but bytes indeed do not need
       any specific support for the serialization).*)
   module Bytes : sig
-
     (** bytes  *)
     type t = Bytes.t [@@deriving bin_io, compare, sexp]
 
-    include Container.S0   with type t := t with type elt := char
-    include Blit.S         with type t := t
+    include Container.S0 with type t := t with type elt := char
+    include Blit.S with type t := t
     include Identifiable.S with type t := t
-    module From_string : Blit.S_distinct with type src := string with type dst := t
 
-    module To_string  : sig
+    module From_string :
+      Blit.S_distinct with type src := string with type dst := t
 
+    module To_string : sig
       (** @deprecated use the Bytes.blit instead  *)
       val blit : (t, t) Blit.blit
-      [@@deprecated "[since 2018-11] use the Bytes.blit instead"]
+        [@@deprecated "[since 2018-11] use the Bytes.blit instead"]
 
       (** @deprecated use the Bytes.blito instead *)
       val blito : (t, t) Blit.blito
-      [@@deprecated "[since 2018-11] use the Bytes.blito instead"]
+        [@@deprecated "[since 2018-11] use the Bytes.blito instead"]
 
       (** @deprecated use the Bytes.unsafe_blit instead *)
       val unsafe_blit : (t, t) Blit.blit
-      [@@deprecated "[since 2018-11] use the Bytes.unsafe_blit instead"]
+        [@@deprecated "[since 2018-11] use the Bytes.unsafe_blit instead"]
 
       val sub : (t, string) Blit.sub
       val subo : (t, string) Blit.subo
@@ -883,7 +861,7 @@ module Std : sig
     val empty : t
 
     (** [length t] returns the length (number of bytes) of [t]. *)
-    val length: t -> int
+    val length : t -> int
 
     (** [get s n] returns the byte at index [n] in [s].
         Raise [Invalid_argument] if [n] not a valid index in [s]. *)
@@ -1027,7 +1005,6 @@ module Std : sig
         expert library authors, but for most purposes you should use the
         always-correct {!Bytes.to_string} and {!Bytes.of_string} instead. *)
     module Unsafe : sig
-
       (** [to_string b] - unsafely converts a byte sequence into a string.
 
           To reason about the use of [to_string], it is convenient to
@@ -1146,14 +1123,19 @@ module Std : sig
       val of_string : string -> t
 
       (**/**)
+
       (** The following is for system use only. Do not call directly. *)
-      external get  : t -> int -> char = "%string_unsafe_get"
-      external set  : t -> int -> char -> unit = "%string_unsafe_set"
+      external get : t -> int -> char = "%string_unsafe_get"
+
+      external set : t -> int -> char -> unit = "%string_unsafe_set"
 
       [@@@ocaml.warning "-3"]
 
-      external blit : t -> int -> t -> int -> int -> unit = "caml_blit_string" "noalloc"
-      external fill : t -> int -> int -> char -> unit = "caml_fill_string" "noalloc"
+      external blit : t -> int -> t -> int -> int -> unit
+        = "caml_blit_string" "noalloc"
+
+      external fill : t -> int -> int -> char -> unit
+        = "caml_fill_string" "noalloc"
 
       (**/**)
     end

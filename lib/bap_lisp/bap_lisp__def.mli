@@ -1,9 +1,6 @@
 open Bap_lisp__types
-
 module Attribute = Bap_lisp__attribute
 module Type = Bap_lisp__type
-
-
 
 type 'a spec
 type 'a t = 'a spec indexed
@@ -14,7 +11,6 @@ type subst
 type const
 type primitive
 type para
-
 type attrs = Attribute.set
 
 val name : 'a t -> string

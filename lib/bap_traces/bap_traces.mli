@@ -4,11 +4,8 @@ open Bap.Std
 
 (** Traces of execution. *)
 module Std : sig
-
-
   (** the trace  *)
   type trace
-
 
   (** Trace is a stream of events plus meta data.
 
@@ -32,7 +29,6 @@ module Std : sig
       time of trace creation and is not changed magically in the trace
       lifetime. *)
   module Trace : sig
-
     type event = value [@@deriving bin_io, sexp, compare]
     type monitor
     type proto
@@ -40,16 +36,14 @@ module Std : sig
     type id
     type t = trace
 
-    type io_error = [
-      | `Protocol_error of Error.t   (** Data encoding problem         *)
-      | `System_error of Unix.error  (** System error                  *)
-    ]
+    type io_error =
+      [ `Protocol_error of Error.t  (** Data encoding problem         *)
+      | `System_error of Unix.error  (** System error                  *) ]
 
-    type error = [
-      | io_error
-      | `No_provider    (** No provider for a given URI               *)
-      | `Ambiguous_uri  (** More than one provider for a given URI    *)
-    ]
+    type error =
+      [ io_error
+      | `No_provider  (** No provider for a given URI               *)
+      | `Ambiguous_uri  (** More than one provider for a given URI    *) ]
 
     (** {2 Serialization}
 
@@ -58,20 +52,19 @@ module Std : sig
         data format and transporting options.
     *)
 
-
     (** [load ~monitor uri] fetches trace from a provided [uri].
         [monitor] is fail_on_error by default. *)
-    val load : ?monitor:monitor -> Uri.t -> (t,error) Result.t
+    val load : ?monitor:monitor -> Uri.t -> (t, error) Result.t
 
     (** [save uri] pushes trace to a provided [uri] *)
-    val save : Uri.t -> t -> (unit,error) Result.t
-
+    val save : Uri.t -> t -> (unit, error) Result.t
 
     (** {2 Creating}  *)
 
     (** [create tool next] creates a new trace from the observer
         [next].  *)
-    val create : ?monitor:monitor -> tool -> (unit -> event Or_error.t option) -> t
+    val create :
+      ?monitor:monitor -> tool -> (unit -> event Or_error.t option) -> t
 
     (** {2 Meta attributes}
 
@@ -111,7 +104,6 @@ module Std : sig
         underlying format support the given feature. *)
     val supports : t -> 'a tag -> bool
 
-
     (** [read_all trace tag] reads all event of the a given type *)
     val read_all : t -> 'a tag -> 'a seq
 
@@ -129,19 +121,15 @@ module Std : sig
     (** [next_event trace] reads next event from the trace  *)
     val next_event : t -> event option
 
-
     (** [next_matching trace matcher] reads and discards trace events
         until an event matching with the [matcher] is found.*)
     val next_matching : t -> 'a Value.Match.t -> 'a option
 
     (** {2 Transformations} *)
 
-
     (** [filter_map t ~f] will return a trace where all events a
         filter-mapped with the provided function [f] *)
     val filter_map : t -> f:(event -> event option) -> t
-
-
 
     (** {2 Extension mechanism}
 
@@ -177,16 +165,17 @@ module Std : sig
     *)
 
     module type S = sig
-      val name: string
-      val supports: 'a tag -> bool
+      val name : string
+      val supports : 'a tag -> bool
     end
 
     module type P = sig
       include S
-      val probe: Uri.t -> bool
+
+      val probe : Uri.t -> bool
     end
 
-    val register_tool  : (module S) -> tool
+    val register_tool : (module S) -> tool
     val register_proto : (module P) -> proto
 
     (** Reader interface.  *)
@@ -195,27 +184,23 @@ module Std : sig
           backend.
       *)
 
-      type t = {
-        tool : tool;                (** a tool descriptor read from trace *)
-        meta : dict;                (** meta information read from trace  *)
-        next : unit -> event Or_error.t option;     (** a stream function  *)
-      }
+      type t =
+        { tool: tool  (** a tool descriptor read from trace *)
+        ; meta: dict  (** meta information read from trace  *)
+        ; next: unit -> event Or_error.t option  (** a stream function  *) }
     end
 
     type reader = Reader.t
 
-    val register_reader : proto -> (Uri.t -> id -> (reader, io_error) Result.t) -> unit
+    val register_reader :
+      proto -> (Uri.t -> id -> (reader, io_error) Result.t) -> unit
 
-    val register_writer : proto -> (Uri.t -> t -> (unit, io_error) Result.t) -> unit
+    val register_writer :
+      proto -> (Uri.t -> t -> (unit, io_error) Result.t) -> unit
 
     module Id : Regular.S with type t = id
 
-    type step = [
-      | `Stop
-      | `Skip
-      | `Fail
-      | `Make of event
-    ]
+    type step = [`Stop | `Skip | `Fail | `Make of event]
 
     (** Monitor defines an error handling policy.*)
     module Monitor : sig
@@ -223,6 +208,9 @@ module Std : sig
 
       (** [ignore_errors] filters good events and silently drops error events  *)
       val ignore_errors : t
+      (** [warn_on_error on_error] same as [ignore_errors] but calls
+          [on_error] function when an error has occurred *)
+
       (** [warn_on_error on_error] same as [ignore_errors] but calls
           [on_error] function when an error has occurred *)
       val warn_on_error : (Error.t -> unit) -> t
@@ -244,7 +232,6 @@ module Std : sig
     end
   end
 
-
   (** Loaded traces.
 
       This is a static container for the traces. Frontends and plugins
@@ -252,14 +239,11 @@ module Std : sig
 
   *)
   module Traces : sig
-
-
     (** [to_list ()] returns a list of currently loaded traces.  *)
     val to_list : unit -> trace list
 
     (** [enum ()] enumerates all currently loaded traces  *)
     val enum : unit -> trace seq
-
 
     (** [add trace] registers a [trace] into the repository  *)
     val add : trace -> unit
@@ -269,91 +253,78 @@ module Std : sig
     val remove : trace -> unit
   end
 
-
   (** {2 Trace Events}
 
       The trace may contain arbitrary events. The events below is a
       good starting point. Other libraries may add more event. *)
 
-
-
-
   (** {3 Supporting data types}  *)
-
 
   (** Represent a movement of data  *)
   module Move : sig
-    type 'a t = {
-      cell : 'a;                 (** source or destination  *)
-      data : word;              (** moved data   *)
-    } [@@deriving bin_io, compare, fields, sexp]
+    type 'a t =
+      {cell: 'a  (** source or destination  *); data: word  (** moved data   *)}
+    [@@deriving bin_io, compare, fields, sexp]
   end
-
 
   (** Represent a memory chunk.  *)
   module Chunk : sig
-    type t = {
-      addr : addr;              (** an address of the first byte *)
-      data : string;            (** the bytes *)
-    } [@@deriving bin_io, compare, fields, sexp]
+    type t =
+      { addr: addr  (** an address of the first byte *)
+      ; data: string  (** the bytes *) }
+    [@@deriving bin_io, compare, fields, sexp]
   end
-
 
   (** a system call  *)
   module Syscall : sig
-    type t = {
-      number : int;             (** system call number *)
-      args : word array;        (** arguments passed to a system call *)
-    } [@@deriving bin_io, compare, fields, sexp]
+    type t =
+      { number: int  (** system call number *)
+      ; args: word array  (** arguments passed to a system call *) }
+    [@@deriving bin_io, compare, fields, sexp]
   end
-
 
   (** hardware exception  *)
   module Exn : sig
-    type t = {
-      number : int;             (** an exception number *)
-      src : addr option;        (** a source address *)
-      dst : addr option;        (** a destination address *)
-    } [@@deriving bin_io, compare, fields, sexp]
+    type t =
+      { number: int  (** an exception number *)
+      ; src: addr option  (** a source address *)
+      ; dst: addr option  (** a destination address *) }
+    [@@deriving bin_io, compare, fields, sexp]
   end
 
   (** A code location *)
   module Location : sig
-    type t = {
-      name : string option;     (** a symbolic name *)
-      addr : addr;              (** a virtual address *)
-    } [@@deriving bin_io, compare, fields, sexp]
+    type t =
+      { name: string option  (** a symbolic name *)
+      ; addr: addr  (** a virtual address *) }
+    [@@deriving bin_io, compare, fields, sexp]
   end
 
   type location = Location.t [@@deriving bin_io, compare, sexp]
 
-
   (** A subroutine call.   *)
   module Call : sig
-    type t = {
-      caller : location;        (** location of a caller *)
-      callee : location;        (** location of a calee *)
-      args : word array;        (** call arguments *)
-    } [@@deriving bin_io, compare, fields, sexp]
+    type t =
+      { caller: location  (** location of a caller *)
+      ; callee: location  (** location of a calee *)
+      ; args: word array  (** call arguments *) }
+    [@@deriving bin_io, compare, fields, sexp]
   end
-
 
   (** A return from a call.  *)
   module Return : sig
-    type t = {
-      caller : string;          (** caller name *)
-      callee : string;          (** calee name *)
-    } [@@deriving bin_io, compare, fields, sexp]
+    type t =
+      {caller: string  (** caller name *); callee: string  (** calee name *)}
+    [@@deriving bin_io, compare, fields, sexp]
   end
-
 
   (** linking event  *)
   module Modload : sig
-    type t = {
-      name : string;            (** a name of linked module *)
-      low : addr;               (** the lowest mapped address *)
-      high : addr;              (** the highest mapped address *)
-    } [@@deriving bin_io, compare, fields, sexp]
+    type t =
+      { name: string  (** a name of linked module *)
+      ; low: addr  (** the lowest mapped address *)
+      ; high: addr  (** the highest mapped address *) }
+    [@@deriving bin_io, compare, fields, sexp]
   end
 
   type 'a move = 'a Move.t [@@deriving bin_io, compare, sexp]
@@ -366,7 +337,6 @@ module Std : sig
 
   (** Types of events.  *)
   module Event : sig
-
     (** an read access to a memory cell  *)
     val memory_load : addr move tag
 
@@ -410,49 +380,45 @@ module Std : sig
     val modload : modload tag
   end
 
-
-
   (** {2 Meta information}  *)
 
   (** Information about a tracer tool. *)
   module Tracer : sig
-    type t = {
-      name : string;            (** name of a tool *)
-      args : string array;      (** the tool arguments *)
-      envp : string array;      (** environment variables *)
-      version : string;         (** tool version *)
-    } [@@deriving bin_io, compare, sexp]
+    type t =
+      { name: string  (** name of a tool *)
+      ; args: string array  (** the tool arguments *)
+      ; envp: string array  (** environment variables *)
+      ; version: string  (** tool version *) }
+    [@@deriving bin_io, compare, sexp]
   end
-
 
   (** Information about a traced binary.  *)
   module Binary : sig
-    type t = {
-      path : string;            (** a path to the binary *)
-      args : string array;      (** arguments passed to the binary *)
-      envp : string array;      (** environment variables *)
-      md5sum : string;          (** digest of the binary contents *)
-    } [@@deriving bin_io, compare, sexp]
+    type t =
+      { path: string  (** a path to the binary *)
+      ; args: string array  (** arguments passed to the binary *)
+      ; envp: string array  (** environment variables *)
+      ; md5sum: string  (** digest of the binary contents *) }
+    [@@deriving bin_io, compare, sexp]
   end
-
 
   (** File information.  *)
   module File_stats : sig
-    type t = {
-      size  : int;              (** size of a file *)
-      atime : float;            (** last access time *)
-      mtime : float;            (** last modification time  *)
-      ctime : float;            (** the creation time *)
-    } [@@deriving bin_io, compare, sexp]
+    type t =
+      { size: int  (** size of a file *)
+      ; atime: float  (** last access time *)
+      ; mtime: float  (** last modification time  *)
+      ; ctime: float  (** the creation time *) }
+    [@@deriving bin_io, compare, sexp]
   end
 
   (** Information about the trace itself  *)
   module Trace_stats : sig
-    type t = {
-      user : string;   (** Name of a trace creator  *)
-      host : string;   (** A host where trace was created *)
-      time : float;   (** Time when tracing started  *)
-    } [@@deriving bin_io, compare, sexp]
+    type t =
+      { user: string  (** Name of a trace creator  *)
+      ; host: string  (** A host where trace was created *)
+      ; time: float  (** Time when tracing started  *) }
+    [@@deriving bin_io, compare, sexp]
   end
 
   type tracer = Tracer.t [@@deriving bin_io, compare, sexp]
@@ -460,11 +426,8 @@ module Std : sig
   type file_stats = File_stats.t [@@deriving bin_io, compare, sexp]
   type trace_stats = Trace_stats.t [@@deriving bin_io, compare, sexp]
 
-
-
   (** Types of meta information.  *)
   module Meta : sig
-
     (** description of a tracer that was used to create the trace  *)
     val tracer : tracer tag
 
@@ -479,7 +442,5 @@ module Std : sig
 
     (** generic information about the trace.  *)
     val trace_stats : trace_stats tag
-
   end
-
 end

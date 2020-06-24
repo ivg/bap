@@ -3,10 +3,9 @@ open Bap.Std
 open Mips_rtl
 
 type 'a ec
-
 type bitwidth
 
-val bit  : bitwidth
+val bit : bitwidth
 val byte : bitwidth
 val halfword : bitwidth
 val word : bitwidth
@@ -14,18 +13,15 @@ val doubleword : bitwidth
 val quadword : bitwidth
 val bitwidth : int -> bitwidth
 val int_of_bitwidth : bitwidth -> int
-
 val imm : (op -> exp) ec
 val var : (bitwidth -> exp) ec
 val reg : (reg -> exp) -> (op -> exp) ec
 val const : (bitwidth -> int -> exp) ec
 val of_string : (string -> exp) ec
-
 val signed : 'a ec -> 'a
 val unsigned : 'a ec -> 'a
-
 val zero : exp
-val one  : exp
+val one : exp
 
 (** [extract e hi lo] extracts portion of [e] starting
     at bit [lo] and ending at bit [hi], all bounds
@@ -79,10 +75,10 @@ type clause
     ]
     ...
 *)
-val switch  : exp -> clause list -> rtl
+val switch : exp -> clause list -> rtl
 
 (** [case exp code] - creates a switch case *)
-val case    : exp -> rtl list -> clause
+val case : exp -> rtl list -> clause
 
 (** [default code] - creates a switch default *)
 val default : rtl list -> clause

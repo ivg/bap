@@ -8,9 +8,7 @@ let crand cpu ops =
   let bt = unsigned cpu.reg ops.(0) in
   let ba = unsigned cpu.reg ops.(1) in
   let bb = unsigned cpu.reg ops.(2) in
-  RTL.[
-    bt := ba land bb;
-  ]
+  RTL.[bt := ba land bb]
 
 (** Conditional Cpu.Register Instructions - NAnd
     Pages 40-41 of IBM Power ISATM Version 3.0 B
@@ -20,9 +18,7 @@ let crnand cpu ops =
   let bt = unsigned cpu.reg ops.(0) in
   let ba = unsigned cpu.reg ops.(1) in
   let bb = unsigned cpu.reg ops.(2) in
-  RTL.[
-    bt := lnot (ba land bb);
-  ]
+  RTL.[bt := lnot (ba land bb)]
 
 (** Conditional Cpu.Register Instructions - Or
     Pages 40-41 of IBM Power ISATM Version 3.0 B
@@ -32,9 +28,7 @@ let cror cpu ops =
   let bt = unsigned cpu.reg ops.(0) in
   let ba = unsigned cpu.reg ops.(1) in
   let bb = unsigned cpu.reg ops.(2) in
-  RTL.[
-    bt := ba lor bb;
-  ]
+  RTL.[bt := ba lor bb]
 
 (** Conditional Cpu.Register Instructions - Xor
     Pages 40-41 of IBM Power ISATM Version 3.0 B
@@ -44,9 +38,7 @@ let crxor cpu ops =
   let bt = unsigned cpu.reg ops.(0) in
   let ba = unsigned cpu.reg ops.(1) in
   let bb = unsigned cpu.reg ops.(2) in
-  RTL.[
-    bt := ba lxor bb;
-  ]
+  RTL.[bt := ba lxor bb]
 
 (** Conditional Cpu.Register Instructions - NOr
     Pages 40-41 of IBM Power ISATM Version 3.0 B
@@ -56,9 +48,7 @@ let crnor cpu ops =
   let bt = unsigned cpu.reg ops.(0) in
   let ba = unsigned cpu.reg ops.(1) in
   let bb = unsigned cpu.reg ops.(2) in
-  RTL.[
-    bt := lnot (ba lor bb);
-  ]
+  RTL.[bt := lnot (ba lor bb)]
 
 (** Conditional Cpu.Register Instructions - Eqv
     Pages 40-41 of IBM Power ISATM Version 3.0 B
@@ -68,9 +58,7 @@ let creqv cpu ops =
   let bt = unsigned cpu.reg ops.(0) in
   let ba = unsigned cpu.reg ops.(1) in
   let bb = unsigned cpu.reg ops.(2) in
-  RTL.[
-    bt := ba lxor (lnot bb);
-  ]
+  RTL.[bt := ba lxor lnot bb]
 
 (** Conditional Cpu.Register Instructions - And with Complement
     Pages 40-41 of IBM Power ISATM Version 3.0 B
@@ -80,9 +68,7 @@ let crandc cpu ops =
   let bt = unsigned cpu.reg ops.(0) in
   let ba = unsigned cpu.reg ops.(1) in
   let bb = unsigned cpu.reg ops.(2) in
-  RTL.[
-    bt := ba land (lnot bb);
-  ]
+  RTL.[bt := ba land lnot bb]
 
 (** Conditional Cpu.Register Instructions - Or with Complement
     Pages 40-41 of IBM Power ISATM Version 3.0 B
@@ -92,9 +78,7 @@ let crorc cpu ops =
   let bt = unsigned cpu.reg ops.(0) in
   let ba = unsigned cpu.reg ops.(1) in
   let bb = unsigned cpu.reg ops.(2) in
-  RTL.[
-    bt := ba lor (lnot bb);
-  ]
+  RTL.[bt := ba lor lnot bb]
 
 (** Conditional Cpu.Register Instructions - Move CR Field
     Pages 40-41 of IBM Power ISATM Version 3.0 B
@@ -103,17 +87,15 @@ let crorc cpu ops =
 let mcrf cpu ops =
   let bt = unsigned cpu.reg ops.(0) in
   let bs = unsigned cpu.reg ops.(1) in
-  RTL.[
-    bt := bs;
-  ]
+  RTL.[bt := bs]
 
 let init () =
-  "CRAND"  >| crand;
-  "CRNAND" >| crnand;
-  "CROR"   >| cror;
-  "CRXOR"  >| crxor;
-  "CRNOR"  >| crnor;
-  "CREQV"  >| creqv;
-  "CRANDC" >| crandc;
-  "CRORC"  >| crorc;
-  "MCRF"   >| mcrf;
+  "CRAND" >| crand ;
+  "CRNAND" >| crnand ;
+  "CROR" >| cror ;
+  "CRXOR" >| crxor ;
+  "CRNOR" >| crnor ;
+  "CREQV" >| creqv ;
+  "CRANDC" >| crandc ;
+  "CRORC" >| crorc ;
+  "MCRF" >| mcrf

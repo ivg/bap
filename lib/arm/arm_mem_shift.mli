@@ -4,30 +4,28 @@ open Arm_types
 
 (** Combine Mem and Shift *)
 
-
-
 val lift_r_exp :
-  dest1:op ->
-  ?dest2:op ->
-  base:op ->
-  offset:exp ->
-  mode_r ->
-  sign ->
-  size ->
-  operation -> stmt list
-
+     dest1:op
+  -> ?dest2:op
+  -> base:op
+  -> offset:exp
+  -> mode_r
+  -> sign
+  -> size
+  -> operation
+  -> stmt list
 
 val lift_r_op :
-  dest1:op ->
-  ?dest2:op ->
-  ?shift:op ->
-  base:op ->
-  offset:op ->
-  mode_r ->
-  sign ->
-  size ->
-  operation -> stmt list
-
+     dest1:op
+  -> ?dest2:op
+  -> ?shift:op
+  -> base:op
+  -> offset:op
+  -> mode_r
+  -> sign
+  -> size
+  -> operation
+  -> stmt list
 
 val lift_m : op list -> op -> mode_m -> update_m -> operation -> stmt list
 
@@ -45,15 +43,11 @@ val repair_imm : word -> sign_mask:int -> imm_mask:int -> repair -> exp
 
 val repair_reg : exp -> word -> sign_mask:int -> repair -> exp
 
-
 (** Decides whether to use the register or immediate as the offset
     value Also performs conversion to remove the negative bit and the *)
-
 
 (** Decides whether to use the register or immediate as the offset
     value Also performs conversion to remove the negative bit and the *)
 
 val mem_offset_reg_or_imm_neg : op -> word -> exp
-
-
 val mem_offset_reg_or_imm_pos : op -> word -> exp

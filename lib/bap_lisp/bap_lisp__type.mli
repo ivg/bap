@@ -1,38 +1,26 @@
 open Core_kernel
 open Bap_core_theory
-
 open Bap_lisp__types
-
 module Context = Bap_lisp__context
 
 type t = typ [@@deriving compare, sexp]
 type context = Context.t
-type signature = {
-  args : typ list;
-  rest : typ option;
-  ret  : typ;
-}
-
+type signature = {args: typ list; rest: typ option; ret: typ}
 type read_error = Empty | Not_sexp | Bad_sort
 
-
 val symbol_size : int
-val read : string -> (t,read_error) result
+val read : string -> (t, read_error) result
 val bool : t
 val word : int -> t
 val any : t
 val sym : t
 val var : string -> t
-
 val signature : ?rest:t -> t list -> t -> signature
-
-
 val pp : Format.formatter -> t -> unit
 
 module Check : sig
   val sort : t -> 'a Theory.Value.sort -> bool
 end
-
 
 (* module Spec : sig
  *   type t

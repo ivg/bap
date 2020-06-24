@@ -365,24 +365,18 @@
 open Core_kernel
 open Caml.Format
 open Bap_knowledge
-
-
 module KB = Knowledge
-
 
 (** The Core Theory.  *)
 module Theory : sig
-
   (** The class index for all Core Theories.  *)
   type cls
-
 
   (** A theory instance.
       To create a new theory instance use the {!instance} function.
       To manifest a theory into an OCaml module, use the {!require}
       function. *)
   type theory = cls KB.obj
-
 
   (** Theory.t is theory.  *)
   type t = theory
@@ -402,22 +396,17 @@ module Theory : sig
       BIL expressions.
   *)
   module Value : sig
-
     (** a type for the value sort *)
     type +'a sort
-
 
     (** the class of the values.  *)
     type cls
 
-
     (** the value type is an instance of Knowledge.value   *)
-    type 'a t = (cls,'a sort) KB.cls KB.value
-
+    type 'a t = (cls, 'a sort) KB.cls KB.value
 
     (** the class of all values.  *)
-    val cls : (cls,unit) KB.cls
-
+    val cls : (cls, unit) KB.cls
 
     (** [empty s] creates an empty value of sort [s].
 
@@ -426,13 +415,11 @@ module Theory : sig
     *)
     val empty : 'a sort -> 'a t
 
-
     (** [sort v] is the value sort.
 
         The value sort holds static information about values of that
         sort. *)
     val sort : 'a t -> 'a sort
-
 
     (** Value Sorts.
 
@@ -543,7 +530,6 @@ module Theory : sig
       type +'a num
       type name
 
-
       (** [sym name] constructs a sort with the given name.
 
           A symbolic sort could represent an abstract data type with
@@ -560,7 +546,6 @@ module Theory : sig
       *)
       val sym : name -> 'a sym sort
 
-
       (** [int x] a numeric sort.
 
           While it is possible to create a standalone numeric sort, it
@@ -571,7 +556,6 @@ module Theory : sig
           section of the module documentation for more information.
       *)
       val int : int -> 'a num sort
-
 
       (** [app s1 s2] constructs a sort of sort [s1] and [s2].
 
@@ -588,24 +572,20 @@ module Theory : sig
       *)
       val app : 'a sort -> 'b sort -> ('a -> 'b) sort
 
-
       (** [s1 @-> s2] is [app s1 s2]  *)
-      val (@->) : 'a sort -> 'b sort -> ('a -> 'b) sort
-
+      val ( @-> ) : 'a sort -> 'b sort -> ('a -> 'b) sort
 
       (** [value s] returns the number associated with the numeric sort.  *)
       val value : 'a num sort -> int
 
       (** [name s] returns the symbol associated with a symbolic sort *)
-      val name :  'a sym sort -> name
+      val name : 'a sym sort -> name
 
       (** [hd s] the first argument of sort [s] *)
       val hd : ('a -> 'b) sort -> 'a sort
 
-
       (** [tl] the list of arguments of sort [s] excluding the first one*)
       val tl : ('a -> 'b) sort -> 'b sort
-
 
       (** [refine witness s] restores the type of the sort.
 
@@ -627,7 +607,6 @@ module Theory : sig
       *)
       val refine : name -> unit sort -> 'a t option
 
-
       (** [forget s] forgets the type index associated with the sort [s].
 
           This is effectively an upcasting function, that could be
@@ -637,14 +616,11 @@ module Theory : sig
       *)
       val forget : 'a t -> unit t
 
-
       (** [same x y] is true if [x] and [y] are of the same structure.  *)
       val same : 'a t -> 'b t -> bool
 
-
       (** prints the sort.  *)
       val pp : formatter -> 'a t -> unit
-
 
       (** Sort without a type index.
 
@@ -659,9 +635,9 @@ module Theory : sig
       *)
       module Top : sig
         type t = unit sort [@@deriving bin_io, compare, sexp]
+
         include Base.Comparable.S with type t := t
       end
-
 
       (** The name registry.
 
@@ -675,7 +651,6 @@ module Theory : sig
       module Name : sig
         type t
 
-
         (** [declare ?package name] declares a new [name].
 
             The declared name must be unique to the [package]. If such
@@ -683,11 +658,11 @@ module Theory : sig
             declaration fails.
         *)
         val declare : ?package:string -> string -> name
+
         include Base.Comparable.S with type t := t
       end
     end
   end
-
 
   (** The denotation of statements.
 
@@ -703,23 +678,17 @@ module Theory : sig
       the BIL statements.
   *)
   module Effect : sig
-
-
     (** a type for the effect sort  *)
     type +'a sort
-
 
     (** the class of effects.  *)
     type cls
 
-
     (** the effect type is an instance of the Knowledge.value  *)
-    type 'a t = (cls,'a sort) KB.cls KB.value
-
+    type 'a t = (cls, 'a sort) KB.cls KB.value
 
     (** the class of all effects.   *)
-    val cls : (cls,unit) KB.cls
-
+    val cls : (cls, unit) KB.cls
 
     (** [empty s] creates an empty effect value.
 
@@ -728,10 +697,8 @@ module Theory : sig
     *)
     val empty : 'a sort -> 'a t
 
-
     (** [sort eff] returns the sort of the effect [eff].  *)
     val sort : 'a t -> 'a sort
-
 
     (** Effect sorts.
 
@@ -750,21 +717,17 @@ module Theory : sig
       type data = private Data
       type ctrl = private Ctrl
 
-
       (** [data kind] defines a data effect of the [kind].  *)
       val data : string -> data t
 
-
       (** [ctrl kind] defines a ctrl effect of the [kind]. *)
       val ctrl : string -> ctrl t
-
 
       (** [top] is a set of all possible effects.
 
           This sort indicates that the statement can have any effect.
       *)
       val top : unit t
-
 
       (** [bot] is an empty set of effects.
 
@@ -774,22 +737,17 @@ module Theory : sig
       *)
       val bot : 'a t
 
-
       (** [both s1 s2] an effect of both [s1] and [s2]  *)
       val both : 'a t -> 'a t -> 'a t
 
-
       (** [s1 && s2] is [both s1 s2].  *)
-      val (&&) : 'a t -> 'a t -> 'a t
-
+      val ( && ) : 'a t -> 'a t -> 'a t
 
       (** [union [s1;...;sN] is [s1 && ... && sN].  *)
       val union : 'a t list -> 'a t
 
-
       (** [join xs ys] is [union [union xs; union ys ]].  *)
       val join : 'a t list -> 'b t list -> unit t
-
 
       (** [order xs ys] orders effects by the order of inclusion.
 
@@ -797,7 +755,6 @@ module Theory : sig
           otherwise.
       *)
       val order : 'a t -> 'b t -> KB.Order.partial
-
 
       (** the register read effect.  *)
       val rreg : data t
@@ -828,7 +785,6 @@ module Theory : sig
   type 'a value = 'a Value.t
   type 'a effect = 'a Effect.t
 
-
   (** The sort for boolean values.
 
       Booleans are one bit values.
@@ -839,11 +795,9 @@ module Theory : sig
     (** the Bool sort.  *)
     val t : t Value.sort
 
-
     (** [refine s] if [s] is [Bool] then returns [Some t].  *)
     val refine : unit Value.sort -> t Value.sort option
   end
-
 
   (** Sorts of bitvectors  *)
   module Bitv : sig
@@ -859,89 +813,74 @@ module Theory : sig
     val size : 'a t Value.sort -> int
   end
 
-
   (** Sorts of memories.
 
       A memory is an associative container of bitvectors indexed with
       bitvector keys.
   *)
   module Mem : sig
-    type ('a,'b) t
-
+    type ('a, 'b) t
 
     (** [define ks vs] a sort of memories with keys of type [ks] and
         data of type [vs].   *)
-    val define : 'a Bitv.t Value.sort -> 'b Bitv.t Value.sort -> ('a,'b) t Value.sort
-
+    val define :
+      'a Bitv.t Value.sort -> 'b Bitv.t Value.sort -> ('a, 'b) t Value.sort
 
     (** [refine s] if [s] is a memory sort then restores its type.  *)
-    val refine : unit Value.sort -> ('a,'b) t Value.sort option
-
+    val refine : unit Value.sort -> ('a, 'b) t Value.sort option
 
     (** [keys s] returns the sort of keys.  *)
-    val keys : ('a,'b) t Value.sort -> 'a Bitv.t Value.sort
+    val keys : ('a, 'b) t Value.sort -> 'a Bitv.t Value.sort
 
     (** [vals s] returns the sort of values.  *)
-    val vals : ('a,'b) t Value.sort -> 'b Bitv.t Value.sort
+    val vals : ('a, 'b) t Value.sort -> 'b Bitv.t Value.sort
   end
-
 
   (** Sorts for floating point numbers.  *)
   module Float : sig
-
-
     (** Sort describing the representation format of a floating point number.  *)
     module Format : sig
-      type ('r,'s) t
-
+      type ('r, 's) t
 
       (** [define r s] defines a sort given interpretation [r] of bitvector [s].   *)
-      val define : 'r Value.sort -> 's Bitv.t Value.sort -> ('r,'s) t Value.sort
-
+      val define :
+        'r Value.sort -> 's Bitv.t Value.sort -> ('r, 's) t Value.sort
 
       (** [bits s] returns the sort of bitvectors that are used by
           floating point numbers of sort [s].  *)
-      val bits : ('r,'s) t Value.sort -> 's Bitv.t Value.sort
-
+      val bits : ('r, 's) t Value.sort -> 's Bitv.t Value.sort
 
       (** [exp s] returns an expression that describes the
           interpretation of the bits of the floating point numbers
           represented by the sort [s].  *)
-      val exp : ('r,'s) t Value.sort -> 'r Value.sort
+      val exp : ('r, 's) t Value.sort -> 'r Value.sort
     end
 
-    type ('r,'s) format = ('r,'s) Format.t
+    type ('r, 's) format = ('r, 's) Format.t
     type 'f t
-
 
     (** [define r s] defines a floating point sort, indexed by the
         floating point format [r] that gives the interpretation to
         the bits of bitvectors of sort [s]. *)
-    val define : ('r,'s) format Value.sort -> ('r,'s) format t Value.sort
-
+    val define : ('r, 's) format Value.sort -> ('r, 's) format t Value.sort
 
     (** [refine s] if [s] is a floating point sort then restores its type.  *)
-    val refine : unit Value.sort -> ('r,'s) format t Value.sort option
-
+    val refine : unit Value.sort -> ('r, 's) format t Value.sort option
 
     (** [format s] returns the format of floating points of sort [s].   *)
-    val format : ('r,'s) format t Value.sort -> ('r,'s) format Value.sort
-
+    val format : ('r, 's) format t Value.sort -> ('r, 's) format Value.sort
 
     (** [bits s] returns the sort of bitvectors that are used to
         represent floating point numbers of sort [s].   *)
-    val bits : ('r,'s) format t Value.sort -> 's Bitv.t Value.sort
+    val bits : ('r, 's) format t Value.sort -> 's Bitv.t Value.sort
   end
-
 
   (** Rounding modes.  *)
   module Rmode : sig
     type t
 
-
     (** The sort of rounding modes.  *)
     val t : t Value.sort
-
 
     (** [refine s] if [s] is the rounding mode sort, then restores its type.*)
     val refine : unit Value.sort -> t Value.sort option
@@ -949,8 +888,7 @@ module Theory : sig
 
   type 'a pure = 'a value knowledge
   type 'a eff = 'a effect knowledge
-  type ('r,'s) format = ('r,'s) Float.format
-
+  type ('r, 's) format = ('r, 's) Float.format
 
   (** Variables.
 
@@ -962,10 +900,8 @@ module Theory : sig
     type ident [@@deriving bin_io, compare, sexp]
     type ord
 
-
     (** [define sort name] a global variable with [name] and [sort].  *)
     val define : 'a Value.sort -> string -> 'a t
-
 
     (** [create s id] a variable with sort [s] and identifier [id].
 
@@ -975,14 +911,11 @@ module Theory : sig
     *)
     val create : 'a Value.sort -> ident -> 'a t
 
-
     (** [forget v] forgets the type index describing the sort of the variable.  *)
     val forget : 'a t -> unit t
 
-
     (** [resort v] changes the sort of the variable.  *)
     val resort : 'a t -> 'b Value.sort -> 'b t
-
 
     (** [versioned v n] creates the [n]th version of the variable [v].
 
@@ -990,8 +923,7 @@ module Theory : sig
         under different context or to ensure some normalization of the
         program, e.g., SSA.
     *)
-    val versioned: 'a t -> int -> 'a t
-
+    val versioned : 'a t -> int -> 'a t
 
     (** [version v] is the version of the variable [v].
 
@@ -1000,18 +932,14 @@ module Theory : sig
         program, e.g., SSA. *)
     val version : 'a t -> int
 
-
     (** [ident v] is variable's identifier.  *)
     val ident : 'a t -> ident
-
 
     (** [name v] is variable's name  *)
     val name : 'a t -> string
 
-
     (** [sort v] is variable's sort.  *)
     val sort : 'a t -> 'a Value.sort
-
 
     (** [is_virtual v] is [true] if [v] is virtual.
 
@@ -1019,30 +947,27 @@ module Theory : sig
     *)
     val is_virtual : 'a t -> bool
 
-
     (** [is_mutable v] is [true] if [v] is mutable.
 
         Only scoped variables are immutable.
     *)
     val is_mutable : 'a t -> bool
 
-
     (** [fresh s] creates a fresh virtual mutable variable of sort [s].  *)
     val fresh : 'a Value.sort -> 'a t knowledge
-
 
     (** [scoped s] creates a fresh immutable variable of sort [s].  *)
     val scoped : 'a Value.sort -> ('a t -> 'b pure) -> 'b pure
 
-
     (** Variable identifiers.  *)
     module Ident : sig
       type t = ident [@@deriving bin_io, compare, sexp]
-      include Stringable.S with type t := t
-      include Base.Comparable.S with type t := t
-                                 and type comparator_witness = ord
-    end
 
+      include Stringable.S with type t := t
+
+      include
+        Base.Comparable.S with type t := t and type comparator_witness = ord
+    end
 
     (** Variables with erased sort index.
 
@@ -1051,6 +976,7 @@ module Theory : sig
     *)
     module Top : sig
       type nonrec t = unit t [@@deriving bin_io, compare, sexp]
+
       include Base.Comparable.S with type t := t
     end
   end
@@ -1070,7 +996,6 @@ module Theory : sig
   (** label is an object of the program class.  *)
   type label = program KB.Object.t
 
-
   (** The denotation of programs.
 
       Values of class [program] are used to express the semantics of
@@ -1080,9 +1005,9 @@ module Theory : sig
       passed to that label.
   *)
   module Program : sig
-    type t = (program,unit) KB.cls KB.value
-    val cls : (program,unit) KB.cls
+    type t = (program, unit) KB.cls KB.value
 
+    val cls : (program, unit) KB.cls
 
     (** The semantics of programs.
 
@@ -1100,11 +1025,12 @@ module Theory : sig
 
       (** the slot to store program semantics.  *)
       val slot : (program, t) Knowledge.slot
+
       include Knowledge.Value.S with type t := t
     end
+
     include Knowledge.Value.S with type t := t
   end
-
 
   (** A program label.
 
@@ -1118,16 +1044,13 @@ module Theory : sig
   module Label : sig
     type t = label
 
-
     (** {3 Properties}  *)
 
     (** the address of the label.  *)
     val addr : (program, Bitvec.t option) KB.slot
 
-
     (** the linkage name of the label  *)
     val name : (program, string option) KB.slot
-
 
     (** the interrupt vector of the label.
 
@@ -1137,13 +1060,11 @@ module Theory : sig
     *)
     val ivec : (program, int option) KB.slot
 
-
     (** possible aliases under which the label might be known.
 
         This may include versioned names, demangled names, etc.
     *)
     val aliases : (program, Set.M(String).t) KB.slot
-
 
     (** a link is valid if it references a valid program.
 
@@ -1152,10 +1073,8 @@ module Theory : sig
     *)
     val is_valid : (program, bool option) KB.slot
 
-
     (** a link is subroutine if it is an entry point to a subroutine.  *)
     val is_subroutine : (program, bool option) KB.slot
-
 
     (** [for_addr x] generates a link to address [x].
 
@@ -1164,14 +1083,12 @@ module Theory : sig
     *)
     val for_addr : Bitvec.t -> t knowledge
 
-
     (** [for_name x] generates a link to program with linkage name [x].
 
         It is guaranteed that every call [for_name x] with the same
         [x] will return the same label.
     *)
     val for_name : string -> t knowledge
-
 
     (** [for_name x] generates a link to an interrupt service number [x].
 
@@ -1183,30 +1100,23 @@ module Theory : sig
     include Knowledge.Object.S with type t := t
   end
 
-
   (** a boolean terms  *)
   type bool = Bool.t pure
-
 
   (** a bitvector term  *)
   type 'a bitv = 'a Bitv.t pure
 
-
   (** a memory term  *)
-  type ('a,'b) mem = ('a,'b) Mem.t pure
-
+  type ('a, 'b) mem = ('a, 'b) Mem.t pure
 
   (** a floating point term  *)
   type 'f float = 'f Float.t pure
 
-
   (** a rounding mode term  *)
   type rmode = Rmode.t pure
 
-
   (** The initial theory. *)
   module type Init = sig
-
     (** [var v] is the value of the variable [v].  *)
     val var : 'a var -> 'a pure
 
@@ -1223,10 +1133,8 @@ module Theory : sig
     val ite : bool -> 'a pure -> 'a pure -> 'a pure
   end
 
-
   (** The theory of booleans.  *)
   module type Bool = sig
-
     (** [b0] is [false] aka [0] bit  *)
     val b0 : bool
 
@@ -1241,14 +1149,10 @@ module Theory : sig
 
     (** [or_ x y] is a disjunction of [x] and [y].  *)
     val or_ : bool -> bool -> bool
-
   end
-
-
 
   (** The theory of bitvectors.  *)
   module type Bitv = sig
-
     (** [int s x] is a bitvector constant [x] of sort [s]. *)
     val int : 's Bitv.t Value.sort -> word -> 's bitv
 
@@ -1259,27 +1163,26 @@ module Theory : sig
     val lsb : 's bitv -> bool
 
     (** [neg x] is two-complement unary minus  *)
-    val neg  : 's bitv -> 's bitv
+    val neg : 's bitv -> 's bitv
 
     (** [not x] is one-complement negation.  *)
-    val not    : 's bitv -> 's bitv
+    val not : 's bitv -> 's bitv
 
     (** [add x y] addition modulo [2^'s]  *)
-    val add  : 's bitv -> 's bitv -> 's bitv
+    val add : 's bitv -> 's bitv -> 's bitv
 
     (** [sub x y] subtraction modulo [2^'s]  *)
-    val sub  : 's bitv -> 's bitv -> 's bitv
+    val sub : 's bitv -> 's bitv -> 's bitv
 
     (** [mul x y] multiplication modulo [2^'s]  *)
-    val mul  : 's bitv -> 's bitv -> 's bitv
+    val mul : 's bitv -> 's bitv -> 's bitv
 
     (** [div x y] unsigned division modulo [2^'s] truncating towards 0.
 
         The division by zero is defined to be a vector of all ones of
         size ['s].
     *)
-    val div  : 's bitv -> 's bitv -> 's bitv
-
+    val div : 's bitv -> 's bitv -> 's bitv
 
     (** [sdiv x y] is signed division of [x] by [y] modulo [2^'s],
 
@@ -1298,7 +1201,6 @@ module Theory : sig
           v}
     *)
     val sdiv : 's bitv -> 's bitv -> 's bitv
-
 
     (** [modulo x y] is the remainder of [div x y] modulo [2^'s].  *)
     val modulo : 's bitv -> 's bitv -> 's bitv
@@ -1324,15 +1226,14 @@ module Theory : sig
     *)
     val smodulo : 's bitv -> 's bitv -> 's bitv
 
-
     (** [logand x y] is a bitwise logical and of [x] and [y].  *)
     val logand : 's bitv -> 's bitv -> 's bitv
 
     (** [logor x y] is a bitwise logical or of [x] and [y].  *)
-    val logor  : 's bitv -> 's bitv -> 's bitv
+    val logor : 's bitv -> 's bitv -> 's bitv
 
     (** [logxor x y] is a bitwise logical xor of [x] and [y].  *)
-    val logxor  : 's bitv -> 's bitv -> 's bitv
+    val logxor : 's bitv -> 's bitv -> 's bitv
 
     (** [shiftr s x m] shifts [x] right by [m] bits filling with [s]. *)
     val shiftr : bool -> 's bitv -> 'b bitv -> 's bitv
@@ -1346,7 +1247,6 @@ module Theory : sig
     (** [ule x y] binary predicate for unsigned less than or equal  *)
     val ule : 'a bitv -> 'a bitv -> bool
 
-
     (** [cast s b x] casts [x] to sort [s] filling with [b].
 
         If [m = size s - size (sort b) > 0] then [m] bits [b] are
@@ -1356,7 +1256,6 @@ module Theory : sig
         value of [b] doesn't affect the result of evaluation.
     *)
     val cast : 'a Bitv.t Value.sort -> bool -> 'b bitv -> 'a bitv
-
 
     (** [concat s xs] concatenates a list of vectors [xs].
 
@@ -1369,7 +1268,6 @@ module Theory : sig
     *)
     val concat : 'a Bitv.t Value.sort -> 'b bitv list -> 'a bitv
 
-
     (** [append s x y] appends [x] and [y] and casts to [s].
 
         Appends [x] and [y] so that in the resulting vector the vector
@@ -1379,37 +1277,29 @@ module Theory : sig
     val append : 'a Bitv.t Value.sort -> 'b bitv -> 'c bitv -> 'a bitv
   end
 
-
   (** The theory of memories.  *)
   module type Memory = sig
-
-
     (** [load m k] is the value associated with the key [k] in the memory [m].   *)
-    val load : ('a,'b) mem -> 'a bitv -> 'b bitv
+    val load : ('a, 'b) mem -> 'a bitv -> 'b bitv
 
     (** [store m k x] a memory [m] in which the key [k] is associated
         with the word [x].     *)
-    val store : ('a,'b) mem -> 'a bitv -> 'b bitv -> ('a,'b) mem
+    val store : ('a, 'b) mem -> 'a bitv -> 'b bitv -> ('a, 'b) mem
   end
-
 
   (** The theory of effects.  *)
   module type Effect = sig
-
     (** [perform s] performs a generic effect of sort [s].  *)
     val perform : 'a Effect.sort -> 'a eff
-
 
     (** [set v x] changes the value stored in [v] to the value of [x]. *)
     val set : 'a var -> 'a pure -> data eff
 
     (** [jmp dst] passes the control to a program located at [dst].  *)
-    val jmp  : _ bitv -> ctrl eff
-
+    val jmp : _ bitv -> ctrl eff
 
     (** [goto lbl] passes the control to a program labeled with [lbl].   *)
     val goto : label -> ctrl eff
-
 
     (** [seq x y] performs effect [x], after that perform effect [y].  *)
     val seq : 'a eff -> 'a eff -> 'a eff
@@ -1417,10 +1307,8 @@ module Theory : sig
     (** [blk lbl data ctrl] a labeled sequence of effects. *)
     val blk : label -> data eff -> ctrl eff -> unit eff
 
-
     (** [repeat c data] repeats data effects until the condition [c] holds. *)
     val repeat : bool -> data eff -> data eff
-
 
     (** [branch c lhs rhs] if [c] holds then performs [lhs] else [rhs].  *)
     val branch : bool -> 'a eff -> 'a eff -> 'a eff
@@ -1443,12 +1331,11 @@ module Theory : sig
   module type Basic = sig
     include Minimal
 
-
     (** [zero s] creates a bitvector of all zeros of sort [s].  *)
     val zero : 'a Bitv.t Value.sort -> 'a bitv
 
     (** [is_zero x] holds if [x] is a bitvector of all zeros  *)
-    val is_zero  : 'a bitv -> bool
+    val is_zero : 'a bitv -> bool
 
     (** [non_zero x] holds if [x] is not a zero bitvector.  *)
     val non_zero : 'a bitv -> bool
@@ -1481,8 +1368,7 @@ module Theory : sig
         else if [m = 0] then [high s x] evaluates to the value of [x];
         else [m] zeros are prepended to the most significant part of [x].
     *)
-    val low  : 'a Bitv.t Value.sort -> 'b bitv -> 'a bitv
-
+    val low : 'a Bitv.t Value.sort -> 'b bitv -> 'a bitv
 
     (** [signed s x = cast s (msb x) x] is the signed cast of [x] to sort [s].
 
@@ -1500,8 +1386,7 @@ module Theory : sig
         else if [m = 0] then [unsigned s x] evaluates to [x]
         else it evaluates to [size s] least significant bits of [x].
     *)
-    val unsigned  : 'a Bitv.t Value.sort -> 'b bitv -> 'a bitv
-
+    val unsigned : 'a Bitv.t Value.sort -> 'b bitv -> 'a bitv
 
     (** [extract s hi lo x] extracts bits of [x] between [hi] and [lo].
 
@@ -1512,8 +1397,8 @@ module Theory : sig
         Note that [hi-lo+1] is taken modulo [2^'b], so this operation
         is defined even if [lo] is greater or equal to [hi].
     *)
-    val extract : 'a Bitv.t Value.sort -> 'b bitv -> 'b bitv -> _ bitv -> 'a bitv
-
+    val extract :
+      'a Bitv.t Value.sort -> 'b bitv -> 'b bitv -> _ bitv -> 'a bitv
 
     (** [loadw s e m k] loads a word from the memory [m].
 
@@ -1531,8 +1416,8 @@ module Theory : sig
         endianess ([e] could be read as [is_big_endian]) with
         arbitrary byte size.
     *)
-    val loadw : 'c Bitv.t Value.sort -> bool -> ('a, _) mem -> 'a bitv -> 'c bitv
-
+    val loadw :
+      'c Bitv.t Value.sort -> bool -> ('a, _) mem -> 'a bitv -> 'c bitv
 
     (** [storew e m k x] stores a word in the memory [m].
 
@@ -1542,10 +1427,8 @@ module Theory : sig
     *)
     val storew : bool -> ('a, 'b) mem -> 'a bitv -> 'c bitv -> ('a, 'b) mem
 
-
     (** [arshift x m = shiftr (msb x) m] arithmetically shifts [x] right by [m] bits.  *)
     val arshift : 'a bitv -> 'b bitv -> 'a bitv
-
 
     (** [rshift x m = shiftr b0 x m] shifts [x] right by [m] bits  *)
     val rshift : 'a bitv -> 'b bitv -> 'a bitv
@@ -1554,7 +1437,7 @@ module Theory : sig
     val lshift : 'a bitv -> 'b bitv -> 'a bitv
 
     (** [eq x y] holds if [x] and [y] are bitwise equal.  *)
-    val eq  : 'a bitv -> 'a bitv -> bool
+    val eq : 'a bitv -> 'a bitv -> bool
 
     (** [eq x y] holds if [x] and [y] are not bitwise equal.  *)
     val neq : 'a bitv -> 'a bitv -> bool
@@ -1578,7 +1461,6 @@ module Theory : sig
     val uge : 'a bitv -> 'a bitv -> bool
   end
 
-
   (** The Basic Theory of Floating Points.
 
       Floating point numbers represent a finite subset of the set of
@@ -1600,12 +1482,12 @@ module Theory : sig
 
   *)
   module type Fbasic = sig
-
     (** [float s x] interprets [x] as a floating point number.  *)
-    val float : ('r,'s) format Float.t Value.sort -> 's bitv -> ('r,'s) format float
+    val float :
+      ('r, 's) format Float.t Value.sort -> 's bitv -> ('r, 's) format float
 
     (** [fbits x] is a bitvector representation of the floating point number [x].  *)
-    val fbits : ('r,'s) format float -> 's bitv
+    val fbits : ('r, 's) format float -> 's bitv
 
     (** [is_finite x] holds if [x] represents a finite number.
 
@@ -1708,8 +1590,7 @@ module Theory : sig
         The bitvector [x] is interpreted as an unsigned integer in the
         two-complement form.
     *)
-    val cast_float  : 'f Float.t Value.sort  -> rmode -> 'a bitv -> 'f float
-
+    val cast_float : 'f Float.t Value.sort -> rmode -> 'a bitv -> 'f float
 
     (** [cast_sfloat s rm x] is the closest to [x] floating point number of sort [x].
 
@@ -1723,62 +1604,60 @@ module Theory : sig
         The resulting bitvector should be interpreted as an unsigned
         two-complement integer.
     *)
-    val cast_int    : 'a Bitv.t Value.sort -> rmode -> 'f float -> 'a bitv
+    val cast_int : 'a Bitv.t Value.sort -> rmode -> 'f float -> 'a bitv
 
     (** [cast_sint s rm x] returns an integer closest to [x].
 
         The resulting bitvector should be interpreted as a signed
         two-complement integer.
     *)
-    val cast_sint   : 'a Bitv.t Value.sort -> rmode -> 'f float -> 'a bitv
-
+    val cast_sint : 'a Bitv.t Value.sort -> rmode -> 'f float -> 'a bitv
 
     (** [fneg x] is [-x]  *)
-    val fneg    : 'f float -> 'f float
+    val fneg : 'f float -> 'f float
 
     (** [fabs x] the absolute value of [x].  *)
-    val fabs    : 'f float -> 'f float
+    val fabs : 'f float -> 'f float
 
     (** [fadd m x y] is the floating point number closest to [x+y].  *)
-    val fadd    : rmode -> 'f float -> 'f float -> 'f float
+    val fadd : rmode -> 'f float -> 'f float -> 'f float
 
     (** [fsub m x y] is the floating point number closest to [x-y].  *)
-    val fsub    : rmode -> 'f float -> 'f float -> 'f float
+    val fsub : rmode -> 'f float -> 'f float -> 'f float
 
     (** [fmul m x y] is the floating point number closest to [x*y].  *)
-    val fmul    : rmode -> 'f float -> 'f float -> 'f float
+    val fmul : rmode -> 'f float -> 'f float -> 'f float
 
     (** [fdiv m x y] is the floating point number closest to [x/y].  *)
-    val fdiv    : rmode -> 'f float -> 'f float -> 'f float
+    val fdiv : rmode -> 'f float -> 'f float -> 'f float
 
     (** [fsqrt m x] is the floating point number closest to [sqrt x].
 
         The denotation is not defined if
     *)
-    val fsqrt   : rmode -> 'f float -> 'f float
+    val fsqrt : rmode -> 'f float -> 'f float
 
     (** [fdiv m x y] is the floating point number closest to the
         remainder of [x/y].  *)
     val fmodulo : rmode -> 'f float -> 'f float -> 'f float
 
     (** [fmad m x y z] is the floating point number closest to [x * y + z].  *)
-    val fmad    : rmode -> 'f float -> 'f float -> 'f float -> 'f float
-
+    val fmad : rmode -> 'f float -> 'f float -> 'f float -> 'f float
 
     (** [fround m x] is the floating point number closest to [x]
         rounded to an integral, using the rounding mode [m].   *)
-    val fround   : rmode -> 'f float -> 'f float
+    val fround : rmode -> 'f float -> 'f float
 
     (** [fconvert f r x] is the closest to [x] floating number in format [f].  *)
-    val fconvert : 'f Float.t Value.sort ->  rmode -> _ float -> 'f float
+    val fconvert : 'f Float.t Value.sort -> rmode -> _ float -> 'f float
 
     (** [fsucc m x] is the least floating point number representable
         in (sort x) that is greater than [x].  *)
-    val fsucc  : 'f float -> 'f float
+    val fsucc : 'f float -> 'f float
 
     (** [fsucc m x] is the greatest floating point number representable
         in (sort x) that is less than [x].  *)
-    val fpred  : 'f float -> 'f float
+    val fpred : 'f float -> 'f float
 
     (** [forder x y] holds if floating point number [x] is less than [y].
 
@@ -1787,7 +1666,6 @@ module Theory : sig
     *)
     val forder : 'f float -> 'f float -> bool
   end
-
 
   (** The theory of floating point numbers modulo transcendental functions.
 
@@ -1812,7 +1690,6 @@ module Theory : sig
   module type Float = sig
     include Fbasic
 
-
     (** [pow m b a] is a floating point number closest to [b^a].
 
         Where [b^a] is [b] raised to the power of [a].
@@ -1822,7 +1699,6 @@ module Theory : sig
         infinity, are not defined.
     *)
     val pow : rmode -> 'f float -> 'f float -> 'f float
-
 
     (** [compound m x n] is the floating point number closest to [(1+x)^n].
 
@@ -1834,7 +1710,6 @@ module Theory : sig
     *)
     val compound : rmode -> 'f float -> 'a bitv -> 'f float
 
-
     (** [rootn m x n] is the floating point number closest to [x^(1/n)].
 
         Where [b^a] is [b] raised to the power of [a].
@@ -1844,8 +1719,7 @@ module Theory : sig
         - [x] is zero and n is less than zero;
         - [x] is not a finite floating point number;
     *)
-    val rootn    : rmode -> 'f float -> 'a bitv -> 'f float
-
+    val rootn : rmode -> 'f float -> 'a bitv -> 'f float
 
     (** [pown m x n] is the floating point number closest to [x^n].
 
@@ -1855,139 +1729,131 @@ module Theory : sig
         zero or if [x] doesn't represent a finite floating point
         number.
     *)
-    val pown    : rmode -> 'f float -> 'a bitv -> 'f float
-
+    val pown : rmode -> 'f float -> 'a bitv -> 'f float
 
     (** [rsqrt m x] is the closest floating point number to [1 / sqrt x].
 
         The denotation is not defined if [x] is less than or equal to
         zero or doesn't represent a finite floating point number.
     *)
-    val rsqrt    : rmode -> 'f float -> 'f float
-
+    val rsqrt : rmode -> 'f float -> 'f float
 
     (** [hypot m x y] is the closest floating point number to [sqrt(x^2 + y^2)].
 
         The denotation is not defined if [x] or [y] do not represent
         finite floating point numbers. *)
-    val hypot    : rmode -> 'f float -> 'f float -> 'f float
+    val hypot : rmode -> 'f float -> 'f float -> 'f float
   end
-
 
   (** The Theory of Transcendental Functions. *)
   module type Trans = sig
-
-
     (** [exp m x] is the floating point number closes to [e^x],
 
         where [b^a] is [b] raised to the power of [a] and [e] is the
         base of natural logarithm.
     *)
-    val exp      : rmode -> 'f float -> 'f float
+    val exp : rmode -> 'f float -> 'f float
 
     (** [expm1 m x] is the floating point number closes to [e^x - 1],
 
         where [b^a] is [b] raised to the power of [a] and [e] is the
         base of natural logarithm.
     *)
-    val expm1    : rmode -> 'f float -> 'f float
+    val expm1 : rmode -> 'f float -> 'f float
 
     (** [exp2 m x] is the floating point number closes to [2^x],
 
         where [b^a] is [b] raised to the power of [a].
     *)
-    val exp2     : rmode -> 'f float -> 'f float
+    val exp2 : rmode -> 'f float -> 'f float
 
     (** [exp2 m x] is the floating point number closes to [2^x - 1],
 
         where [b^a] is [b] raised to the power of [a].
     *)
-    val exp2m1   : rmode -> 'f float -> 'f float
+    val exp2m1 : rmode -> 'f float -> 'f float
 
     (** [exp10 m x] is the floating point number closes to [10^x],
 
         where [b^a] is [b] raised to the power of [a].
     *)
-    val exp10    : rmode -> 'f float -> 'f float
-
+    val exp10 : rmode -> 'f float -> 'f float
 
     (** [exp10m1 m x] is the floating point number closes to [10^x - 1],
 
         where [b^a] is [b] raised to the power of [a].
     *)
-    val exp10m1  : rmode -> 'f float -> 'f float
-
+    val exp10m1 : rmode -> 'f float -> 'f float
 
     (** [log m x] is the floating point number closest to [log x].  *)
-    val log      : rmode -> 'f float -> 'f float
+    val log : rmode -> 'f float -> 'f float
 
     (** [log2 m x] is the floating point number closest to [log x / log 2].  *)
-    val log2     : rmode -> 'f float -> 'f float
+    val log2 : rmode -> 'f float -> 'f float
 
     (** [log10 m x] is the floating point number closest to [log x / log 10].  *)
-    val log10    : rmode -> 'f float -> 'f float
+    val log10 : rmode -> 'f float -> 'f float
 
     (** [logp1 m x] is the floating point number closest to [log (1+x)].  *)
-    val logp1    : rmode -> 'f float -> 'f float
+    val logp1 : rmode -> 'f float -> 'f float
 
     (** [logp1 m x] is the floating point number closest to [log (1+x) / log 2].  *)
-    val log2p1   : rmode -> 'f float -> 'f float
+    val log2p1 : rmode -> 'f float -> 'f float
 
     (** [logp1 m x] is the floating point number closest to [log (1+x) / log 10].  *)
-    val log10p1  : rmode -> 'f float -> 'f float
+    val log10p1 : rmode -> 'f float -> 'f float
 
     (** [sin m x] is the floating point number closest to [sin x].  *)
-    val sin      : rmode -> 'f float -> 'f float
+    val sin : rmode -> 'f float -> 'f float
 
     (** [cos m x] is the floating point number closest to [cos x].  *)
-    val cos      : rmode -> 'f float -> 'f float
+    val cos : rmode -> 'f float -> 'f float
 
     (** [tan m x] is the floating point number closest to [tan x].  *)
-    val tan      : rmode -> 'f float -> 'f float
+    val tan : rmode -> 'f float -> 'f float
 
     (** [sinpi m x] is the floating point number closest to [sin (pi*x)].  *)
-    val sinpi    : rmode -> 'f float -> 'f float
+    val sinpi : rmode -> 'f float -> 'f float
 
     (** [cospi m x] is the floating point number closest to [cos (pi*x)].  *)
-    val cospi    : rmode -> 'f float -> 'f float
+    val cospi : rmode -> 'f float -> 'f float
 
     (** [atanpi m y x] is the floating point number closest to [atan(y/x) / pi].  *)
-    val atanpi   : rmode -> 'f float -> 'f float
+    val atanpi : rmode -> 'f float -> 'f float
 
     (** [atanpi m y x] is the floating point number closest to [atan(y/x) / (2*pi)].  *)
-    val atan2pi  : rmode -> 'f float -> 'f float -> 'f float
+    val atan2pi : rmode -> 'f float -> 'f float -> 'f float
 
     (** [asin m x] is the floating point number closest to [asin x].  *)
-    val asin     : rmode -> 'f float -> 'f float
+    val asin : rmode -> 'f float -> 'f float
 
     (** [acos m x] is the floating point number closest to [acos x].  *)
-    val acos     : rmode -> 'f float -> 'f float
+    val acos : rmode -> 'f float -> 'f float
 
     (** [atan m x] is the floating point number closest to [atan x].  *)
-    val atan     : rmode -> 'f float -> 'f float
+    val atan : rmode -> 'f float -> 'f float
 
     (** [atan2 m y x] is the floating point number closest to [atan (y/x)].  *)
-    val atan2    : rmode -> 'f float -> 'f float -> 'f float
+    val atan2 : rmode -> 'f float -> 'f float -> 'f float
 
     (** [sinh m x] is the floating point number closest to [sinh x].  *)
-    val sinh     : rmode -> 'f float -> 'f float
+    val sinh : rmode -> 'f float -> 'f float
 
     (** [cosh m x] is the floating point number closest to [cosh x].  *)
-    val cosh     : rmode -> 'f float -> 'f float
+    val cosh : rmode -> 'f float -> 'f float
 
     (** [tanh m x] is the floating point number closest to [tanh x].  *)
-    val tanh     : rmode -> 'f float -> 'f float
+    val tanh : rmode -> 'f float -> 'f float
 
     (** [asinh m x] is the floating point number closest to [asinh x].  *)
-    val asinh    : rmode -> 'f float -> 'f float
+    val asinh : rmode -> 'f float -> 'f float
 
     (** [acosh m x] is the floating point number closest to [acosh x].  *)
-    val acosh    : rmode -> 'f float -> 'f float
+    val acosh : rmode -> 'f float -> 'f float
 
     (** [atanh m x] is the floating point number closest to [atanh x].  *)
-    val atanh    : rmode -> 'f float -> 'f float
+    val atanh : rmode -> 'f float -> 'f float
   end
-
 
   (** The Core Theory signature.
 
@@ -2001,10 +1867,8 @@ module Theory : sig
     include Trans
   end
 
-
   (** a type abbreviation for the core theory module type.  *)
   type core = (module Core)
-
 
   (** The Basic Theory.
 
@@ -2012,18 +1876,14 @@ module Theory : sig
       expressing the Basic Theory in terms of the Minimal theory.
   *)
   module Basic : sig
-
-
     (** Expresses Basic operations in terms of the Minimal operations.  *)
-    module Make(S : Minimal) : Basic
-
+    module Make (S : Minimal) : Basic
 
     (** The Empty theory.
 
         All operations have empty denotations. *)
     module Empty : Basic
   end
-
 
   (** The empty theory.  *)
   module Empty : Core
@@ -2053,14 +1913,14 @@ module Theory : sig
       the theory is automatically provided.
   *)
   val declare :
-    ?desc:string ->
-    ?extends:string list ->
-    ?context:string list ->
-    ?provides:string list ->
-    ?package:string ->
-    name:string ->
-    (module Core) knowledge ->
-    unit
+       ?desc:string
+    -> ?extends:string list
+    -> ?context:string list
+    -> ?provides:string list
+    -> ?package:string
+    -> name:string
+    -> (module Core) knowledge
+    -> unit
 
   (** [instance ()] creates an instance of the Core Theory.
 
@@ -2087,9 +1947,7 @@ module Theory : sig
       be loaded.
   *)
   val instance :
-    ?context:string list ->
-    ?requires:string list ->
-    unit -> theory knowledge
+    ?context:string list -> ?requires:string list -> unit -> theory knowledge
 
   (** [require theory] manifests the [theory] as an OCaml structure.
 
@@ -2131,8 +1989,6 @@ module Theory : sig
       other format could be used with the Core Theory.
   *)
   module IEEE754 : sig
-
-
     (** a type for IEEE754 format.
 
         The type is indexed with three indices:
@@ -2140,11 +1996,9 @@ module Theory : sig
         - ['e] the size of the exponent;
         - ['t] the size of the significand.
     *)
-    type ('b,'e,'t) t
+    type ('b, 'e, 't) t
 
-
-    type ('a,'e,'t) ieee754 = ('a,'e,'t) t
-
+    type ('a, 'e, 't) ieee754 = ('a, 'e, 't) t
 
     (** A named tuple of representation parameters.
 
@@ -2161,14 +2015,8 @@ module Theory : sig
         The module provides a set of common predefined formats as well
         as safe constructors to define uncommon formats.
     *)
-    type parameters = private {
-      base : int;
-      bias : int;
-      k : int;
-      p : int;
-      w : int;
-      t : int;
-    }
+    type parameters = private
+      {base: int; bias: int; k: int; p: int; w: int; t: int}
 
     (** Parameters for the binary16 IEEE754 format.  *)
     val binary16 : parameters
@@ -2194,7 +2042,6 @@ module Theory : sig
     (** Parameters for the decimal128 IEEE754 format.  *)
     val decimal128 : parameters
 
-
     (** [binary N] are parameters for the binary<N> IEEE754 format.
 
         Where [N] is the storage width in bits, and parameters are
@@ -2211,28 +2058,32 @@ module Theory : sig
     *)
     val decimal : int -> parameters option
 
-
     (** IEEE754 sorts.  *)
     module Sort : sig
-
       (** [define p] defines the IEEE754 format sort. *)
-      val define : parameters -> (('b,'e,'t) ieee754,'s) format Float.t Value.sort
+      val define :
+        parameters -> (('b, 'e, 't) ieee754, 's) format Float.t Value.sort
 
       (** [exps s] is the sort of bitvectors for the exponent field.  *)
-      val exps : (('b,'e,'t) ieee754,'s) format Float.t Value.sort -> 'e Bitv.t Value.sort
+      val exps :
+           (('b, 'e, 't) ieee754, 's) format Float.t Value.sort
+        -> 'e Bitv.t Value.sort
 
       (** [sigs s] is the sort of bitvectors for the significand field.  *)
-      val sigs : (('b,'e,'t) ieee754,'s) format Float.t Value.sort -> 't Bitv.t Value.sort
+      val sigs :
+           (('b, 'e, 't) ieee754, 's) format Float.t Value.sort
+        -> 't Bitv.t Value.sort
 
       (** [bits s] is the sort of bitvectors for the storage.  *)
-      val bits : (('b,'e,'t) ieee754,'s) format Float.t Value.sort -> 's Bitv.t Value.sort
+      val bits :
+           (('b, 'e, 't) ieee754, 's) format Float.t Value.sort
+        -> 's Bitv.t Value.sort
 
       (** [spec s] is the encoding parameters of the sort [s].  *)
-      val spec : (('b,'e,'t) ieee754,'s) format Float.t Value.sort -> parameters
+      val spec :
+        (('b, 'e, 't) ieee754, 's) format Float.t Value.sort -> parameters
     end
   end
-
-
 
   (** Generates parsers of untyped ASTs into type Core Theory terms.
 
@@ -2343,7 +2194,6 @@ module Theory : sig
 
   *)
   module Parser : sig
-
     (** An untyped grammar for a subset of Core Theory languages.
 
         This module defines grammars for six sub-languages for each
@@ -2427,21 +2277,16 @@ module Theory : sig
     module Grammar : sig
       type ieee754 = IEEE754.parameters
 
-
       (** Bitvectors.  *)
       module type Bitv = sig
-
         (** an abstract type denoting a Core Theory bitvector term.  *)
         type t
-
 
         (** the type of expressions of the target language.  *)
         type exp
 
-
         (** an abstract type denoting a Core Theory rounding mode term,   *)
         type rmode
-
 
         (** the error term.
 
@@ -2501,7 +2346,7 @@ module Theory : sig
         val logand : exp -> exp -> t
 
         (** [logor x y] is [logor (bitv x) (bitv y)]  *)
-        val logor: exp -> exp -> t
+        val logor : exp -> exp -> t
 
         (** [logxor x y] is [logxor (bitv x) (bitv y)]  *)
         val logxor : exp -> exp -> t
@@ -2521,18 +2366,14 @@ module Theory : sig
         (** [var s m] is [var (ctxt s) (bits m)] *)
         val var : string -> int -> t
 
-
         (** [int x m] is [int (bits m) x]  *)
         val int : word -> int -> t
-
 
         (** [unknown m] is [unk (bits m)]  *)
         val unknown : int -> t
 
-
         (** [ite c x y] is [ite (bool c) (bitv x) (bitv y)]  *)
         val ite : exp -> exp -> exp -> t
-
 
         (** [let_bit s x y] is [scoped @@ fun v -> (bool x) (bitv [y|s->v])].
 
@@ -2568,7 +2409,6 @@ module Theory : sig
         *)
         val append : exp -> exp -> t
 
-
         (** [concat xs] is [concat (bits (size s * n)) xs],
 
             where [s] is the sort of the [xs] element,
@@ -2586,16 +2426,13 @@ module Theory : sig
         val fbits : exp -> t
       end
 
-
       (** Booleans.  *)
       module type Bool = sig
-
         (** an abstract type denoting a Core Theory boolean term.   *)
         type t
 
         (** the type of expressions of the target language  *)
         type exp
-
 
         (** an ill-formed term.  *)
         val error : t
@@ -2674,7 +2511,7 @@ module Theory : sig
         val logand : exp -> exp -> t
 
         (** [logor x y] is [or_ (bool x) (bool y)]  *)
-        val logor: exp -> exp -> t
+        val logor : exp -> exp -> t
 
         (** [logxor x y] is [xor_ (bool x) (bool y)]  *)
         val logxor : exp -> exp -> t
@@ -2704,10 +2541,10 @@ module Theory : sig
               and [r /\ s] is [and_ r s],
               and [not r] is [inv r].
         *)
-        val fle  : exp -> exp -> t
+        val fle : exp -> exp -> t
 
         (** [flt x y] is [forder (float x) (float y)]  *)
-        val flt  : exp -> exp -> t
+        val flt : exp -> exp -> t
 
         (** [feq x y] is [x = y],
 
@@ -2716,12 +2553,10 @@ module Theory : sig
               and [r /\ s] is [and_ r s],
               and [not r] is [inv r].
         *)
-        val feq  : exp -> exp -> t
+        val feq : exp -> exp -> t
       end
 
-
       module type Mem = sig
-
         (** an abstract type denoting a Core Theory memory term.   *)
         type t
 
@@ -2777,7 +2612,6 @@ module Theory : sig
 
       (** Statements.  *)
       module type Stmt = sig
-
         (** an abstract type denoting effects of the Core Theory.  *)
         type t
 
@@ -2793,7 +2627,6 @@ module Theory : sig
         (** an ill-formed term.  *)
         val error : t
 
-
         (** [set_mem s m n x] is [set v (mem x)],
 
             where [v = Var.create (mems (bits m) (bits n) s].
@@ -2806,7 +2639,6 @@ module Theory : sig
         *)
         val set_reg : string -> int -> exp -> t
 
-
         (** [set_bit s x] is [set v (bool x)],
 
             where [v = Var.create Bool.t s].
@@ -2818,7 +2650,6 @@ module Theory : sig
             where [v = Var.create (IEEE754.Sort.define p) s].
         *)
         val set_ieee754 : string -> ieee754 -> exp -> t
-
 
         (** [set_rmode s x] is [set v (rmode x)],
 
@@ -2861,7 +2692,6 @@ module Theory : sig
         *)
         val tmp_float : string -> exp -> t
 
-
         (** [tmp_rmode s x] is [set v (rmode x)],
 
             where [v] is a freshly created variable,
@@ -2870,7 +2700,6 @@ module Theory : sig
             statements.
         *)
         val tmp_rmode : string -> rmode -> t
-
 
         (** [let_mem s x p] is [seq (set v (mem x)) (stmt p)],
 
@@ -2912,7 +2741,6 @@ module Theory : sig
         *)
         val let_rmode : string -> rmode -> stmt -> t
 
-
         (** [jmp x] is [jmp (bitv x)],
 
             where [x] is a non-constant expression.
@@ -2921,13 +2749,11 @@ module Theory : sig
         *)
         val jmp : exp -> t
 
-
         (** [goto x] is [goto lbl],
 
             where [lbl = Label.for_addr x].
         *)
-        val goto :  word -> t
-
+        val goto : word -> t
 
         (** [call x] is [goto lbl],
 
@@ -2947,7 +2773,6 @@ module Theory : sig
         (** [while_ c ps] is [repet (bool c) (map stmt ps)].  *)
         val while_ : exp -> stmt list -> t
 
-
         (** [if_ c xs ys] is [branch (bool c) (map stmt xs) (map stmt ys)]. *)
         val if_ : exp -> stmt list -> stmt list -> t
 
@@ -2955,10 +2780,8 @@ module Theory : sig
         val seq : stmt list -> t
       end
 
-
       (** Floating point expressions.  *)
       module type Float = sig
-
         (** an abstract type denoting a Core Theory floating point term.  *)
         type t
 
@@ -3039,13 +2862,11 @@ module Theory : sig
         *)
         val fmax : exp -> exp -> t
 
-
         (** [fabs x] is [fabs (float x)].  *)
         val fabs : exp -> t
 
         (** [fneg x] is [fneg (float x)].  *)
         val fneg : exp -> t
-
 
         (** [fsqrt x] is [fsqrt (float x)].  *)
         val fsqrt : rmode -> exp -> t
@@ -3082,21 +2903,16 @@ module Theory : sig
         val let_float : string -> exp -> exp -> t
       end
 
-
       (** Rounding modes.  *)
       module type Rmode = sig
-
         (** an abstract type denoting a Core Theory rounding mode term.   *)
         type t
-
 
         (** the type for representing rounding modes in the target language.  *)
         type exp
 
-
         (** an ill-formed rounding mode term.  *)
         val error : t
-
 
         (** [rne] is [rne].  *)
         val rne : t
@@ -3116,54 +2932,52 @@ module Theory : sig
     end
 
     (** [bitv grammar exp] parses [exp] using [grammar]. *)
-    type ('a,'e,'r) bitv_parser =
-      (module Grammar.Bitv with type t = 'a
-                            and type exp = 'e
-                            and type rmode = 'r) ->
-      'e -> 'a
+    type ('a, 'e, 'r) bitv_parser =
+         (module Grammar.Bitv
+            with type t = 'a
+             and type exp = 'e
+             and type rmode = 'r)
+      -> 'e
+      -> 'a
 
     (** [bool grammar exp] parses [exp] using [grammar]. *)
-    type ('a,'e,'r) bool_parser =
-      (module Grammar.Bool with type t = 'a
-                            and type exp = 'e) ->
-      'e -> 'a
+    type ('a, 'e, 'r) bool_parser =
+      (module Grammar.Bool with type t = 'a and type exp = 'e) -> 'e -> 'a
 
     (** [mem grammar exp] parses [exp] using [grammar]. *)
-    type ('a,'e) mem_parser =
-      (module Grammar.Mem with type t = 'a
-                           and type exp = 'e) ->
-      'e -> 'a
+    type ('a, 'e) mem_parser =
+      (module Grammar.Mem with type t = 'a and type exp = 'e) -> 'e -> 'a
 
     (** [stmt grammar stmt] parses [stmt] using [grammar]. *)
-    type ('a,'e,'r,'s) stmt_parser =
-      (module Grammar.Stmt with type t = 'a
-                            and type exp = 'e
-                            and type stmt = 's
-                            and type rmode = 'r) ->
-      's -> 'a
+    type ('a, 'e, 'r, 's) stmt_parser =
+         (module Grammar.Stmt
+            with type t = 'a
+             and type exp = 'e
+             and type stmt = 's
+             and type rmode = 'r)
+      -> 's
+      -> 'a
 
     (** [float grammar exp] parses [exp] using [grammar]. *)
-    type ('a,'e,'r) float_parser =
-      (module Grammar.Float with type t = 'a
-                             and type exp = 'e
-                             and type rmode = 'r) ->
-      'e -> 'a
+    type ('a, 'e, 'r) float_parser =
+         (module Grammar.Float
+            with type t = 'a
+             and type exp = 'e
+             and type rmode = 'r)
+      -> 'e
+      -> 'a
 
     (** [rmode grammar exp] parses [exp] using [grammar]. *)
-    type ('a,'e) rmode_parser =
-      (module Grammar.Rmode with type t = 'a
-                             and type exp = 'e) ->
-      'e -> 'a
+    type ('a, 'e) rmode_parser =
+      (module Grammar.Rmode with type t = 'a and type exp = 'e) -> 'e -> 'a
 
-    type ('e,'r,'s) t = {
-      bitv : 'a. ('a,'e,'r) bitv_parser;
-      bool : 'a. ('a,'e,'r) bool_parser;
-      mem  : 'a. ('a,'e) mem_parser;
-      stmt : 'a. ('a,'e,'r,'s) stmt_parser;
-      float : 'a . ('a,'e,'r) float_parser;
-      rmode : 'a . ('a,'r) rmode_parser;
-    }
-
+    type ('e, 'r, 's) t =
+      { bitv: 'a. ('a, 'e, 'r) bitv_parser
+      ; bool: 'a. ('a, 'e, 'r) bool_parser
+      ; mem: 'a. ('a, 'e) mem_parser
+      ; stmt: 'a. ('a, 'e, 'r, 's) stmt_parser
+      ; float: 'a. ('a, 'e, 'r) float_parser
+      ; rmode: 'a. ('a, 'r) rmode_parser }
 
     (** [parser] is a tuple of top-level parsing routines.
 
@@ -3171,26 +2985,21 @@ module Theory : sig
         with expressions of type ['e], statements of type ['s] and
         rounding modes represented with type ['r].
     *)
-    type ('e,'r,'s) parser = ('e,'r,'s) t
+    type ('e, 'r, 's) parser = ('e, 'r, 's) t
 
     (** [Make(Theory)] parses AST to the specified [Theory] terms.  *)
-    module Make(S : Core) : sig
-
-
+    module Make (S : Core) : sig
       (** [run parser program] the starting rule of the parser.
 
           Applies the parser to a sequence of statements and computes
           a denotation of [program] in a Core Theory terms.
       *)
-      val run : ('e,'r,'s) parser -> 's list -> unit eff
+      val run : ('e, 'r, 's) parser -> 's list -> unit eff
     end
   end
 
-
   (** Documents all declared theories. *)
   module Documentation : sig
-
-
     (** Theory documentation.  *)
     module Theory : sig
       (** the documentation  *)

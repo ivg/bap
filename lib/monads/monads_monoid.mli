@@ -2,22 +2,24 @@ open Core_kernel
 
 module type Base = sig
   type t
+
   val zero : t
   val plus : t -> t -> t
 end
 
-
 module type S = sig
   include Base
+
   val concat : t list -> t
-  val (@@) : t -> t -> t
+  val ( @@ ) : t -> t -> t
 end
 
-module Make(M : Base) : S with type t := M.t
-
+module Make (M : Base) : S with type t := M.t
 module Unit : S with type t = unit
 
-module TList(T : T) : sig type t = T.t list end
+module TList (T : T) : sig
+  type t = T.t list
+end
 
 module Stack : sig
   module Make (T : T) : S with type t := TList(T).t
@@ -30,7 +32,7 @@ end
 module String : S with type t = string
 
 module Set : sig
-  module Make(S : Set.S) : S with type t := S.t
+  module Make (S : Set.S) : S with type t := S.t
 end
 
 module Int : sig

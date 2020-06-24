@@ -20,7 +20,6 @@
     will move it into a separate library, along with the index and
     location modules. *)
 
-
 module Index = Bap_lisp__index
 module Loc = Bap_lisp__loc
 module Id : Index.S
@@ -28,15 +27,14 @@ module Eq : Index.S
 
 type error
 type t
-type 'a indexed = ('a,Id.t,Eq.t) Index.interned
+type 'a indexed = ('a, Id.t, Eq.t) Index.interned
+
 type tree = token indexed
+
 and token = Atom of string | List of tree list
-
-
 
 (** [empty] source repository  *)
 val empty : t
-
 
 (** [load source filename] loads the source code from the given
     [filename]. The source code should be a sequence of well-formed
@@ -44,13 +42,11 @@ val empty : t
 
     The [filename] should be an explicit path.
 *)
-val load : t -> string -> (t,error) result
-
+val load : t -> string -> (t, error) result
 
 (** [find source filename] returns a list of trees loaded from a file
     with the given [filename]. *)
 val find : t -> string -> tree list option
-
 
 (** [loc source id] returns a location information for the identity
     with the provided [id].
@@ -70,18 +66,12 @@ val has_loc : t -> Id.t -> bool
     a bogus filename is returned. *)
 val filename : t -> Id.t -> string
 
-
 (** [fold source ~init ~f] iterates over all files loaded into the
     [source] repository.  *)
 val fold : t -> init:'a -> f:(string -> tree list -> 'a -> 'a) -> 'a
 
 val derived : t -> from:Id.t -> Id.t -> t
-
 val lastid : t -> Id.t
-
 val lasteq : t -> Eq.t
-
-
 val pp_error : Format.formatter -> error -> unit
-
 val pp_tree : Format.formatter -> tree -> unit

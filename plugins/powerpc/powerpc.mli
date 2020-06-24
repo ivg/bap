@@ -1,4 +1,3 @@
-
 (**
 
     {2 Intro}
@@ -334,11 +333,10 @@ open Core_kernel
 open Bap.Std
 
 module Std : sig
-
   (** Operands and registers bitwidth.  *)
   type bitwidth
 
-  val bit  : bitwidth
+  val bit : bitwidth
   val byte : bitwidth
   val word : bitwidth
   val halfword : bitwidth
@@ -353,39 +351,36 @@ module Std : sig
   type 'a ec
 
   (** CPU model  *)
-  type cpu = {
-    load :  exp -> bitwidth -> exp; (** usage: [cpu.load address size] *)
-    store : exp -> exp -> bitwidth -> rtl; (** usage: [cpu.store address data size] *)
-
-    jmp        : exp -> rtl; (** usage: [cpu.jmp address]       *)
-    pc         : exp;       (** address of current instruction *)
-    word_width : bitwidth;  (** word width for current arch    *)
-
-    (** registers  *)
-    reg       : (op -> exp) ec; (** constructs a register from operand *)
-    gpr       : int -> exp; (** general purpose registers 0..31 *)
-    fpr       : int -> exp; (** floating-point registers 0..31  *)
-    vr        : int -> exp; (** vector register 0..31           *)
-    ctr       : exp;       (** count register      *)
-    lr        : exp;       (** link register       *)
-    tar       : exp;       (** target register     *)
-    cr        : exp;       (** condition register  *)
-    cr0       : exp;       (** condition register field 0 *)
-    cr1       : exp;       (** condition register field 1 *)
-    cr2       : exp;       (** condition register field 2 *)
-    cr3       : exp;       (** condition register field 3 *)
-    cr4       : exp;       (** condition register field 4 *)
-    cr5       : exp;       (** condition register field 5 *)
-    cr6       : exp;       (** condition register field 6 *)
-    cr7       : exp;       (** condition register field 7 *)
-
-    (** fixed precision flags *)
-    so        : exp; (** summary overflow        *)
-    ca        : exp; (** carry flag              *)
-    ov        : exp; (** overflow flag           *)
-    ca32      : exp; (** carry out of 32 bits    *)
-    ov32      : exp; (** overflow of 32 bits     *)
-  }
+  type cpu =
+    { load: exp -> bitwidth -> exp  (** usage: [cpu.load address size] *)
+    ; store: exp -> exp -> bitwidth -> rtl
+          (** usage: [cpu.store address data size] *)
+    ; jmp: exp -> rtl  (** usage: [cpu.jmp address]       *)
+    ; pc: exp  (** address of current instruction *)
+    ; word_width: bitwidth  (** word width for current arch    *)
+    ; (** registers  *)
+      reg: (op -> exp) ec  (** constructs a register from operand *)
+    ; gpr: int -> exp  (** general purpose registers 0..31 *)
+    ; fpr: int -> exp  (** floating-point registers 0..31  *)
+    ; vr: int -> exp  (** vector register 0..31           *)
+    ; ctr: exp  (** count register      *)
+    ; lr: exp  (** link register       *)
+    ; tar: exp  (** target register     *)
+    ; cr: exp  (** condition register  *)
+    ; cr0: exp  (** condition register field 0 *)
+    ; cr1: exp  (** condition register field 1 *)
+    ; cr2: exp  (** condition register field 2 *)
+    ; cr3: exp  (** condition register field 3 *)
+    ; cr4: exp  (** condition register field 4 *)
+    ; cr5: exp  (** condition register field 5 *)
+    ; cr6: exp  (** condition register field 6 *)
+    ; cr7: exp  (** condition register field 7 *)
+    ; (** fixed precision flags *)
+      so: exp  (** summary overflow        *)
+    ; ca: exp  (** carry flag              *)
+    ; ov: exp  (** overflow flag           *)
+    ; ca32: exp  (** carry out of 32 bits    *)
+    ; ov32: exp  (** overflow of 32 bits     *) }
 
   (** The type of lifter functions *)
   type lift = cpu -> op array -> rtl list
@@ -422,7 +417,6 @@ module Std : sig
       - math operators: +, -, *, \, %, <, >, <= , >= , =, <>
       - logical operators: lsl, lsr, lnot, land, lor, lxor  *)
   module RTL : sig
-
     (** [x := y] - assignment *)
     val ( := ) : exp -> exp -> rtl
 
@@ -463,13 +457,13 @@ module Std : sig
     val ( <> ) : exp -> exp -> exp
 
     (** [x << y] - shift left *)
-    val ( << )  : exp -> exp -> exp
+    val ( << ) : exp -> exp -> exp
 
     (** [x >> y] - shift right *)
-    val ( >> )  : exp -> exp -> exp
+    val ( >> ) : exp -> exp -> exp
 
     (** [x lor y] - logical or *)
-    val ( lor )  : exp -> exp -> exp
+    val ( lor ) : exp -> exp -> exp
 
     (** [x land y] - logical and *)
     val ( land ) : exp -> exp -> exp
@@ -517,14 +511,13 @@ module Std : sig
 
     (** [message m] - embeds a string [m] in code *)
     val message : string -> rtl
-
   end
 
   (** [zero] is a one bit length expression set to zero *)
   val zero : exp
 
   (** [one] is a one bit length expression set to one *)
-  val one  : exp
+  val one : exp
 
   (** [ones bitwidth] - returns an expression of [bitwidth]
       with all bits set to one *)
@@ -582,7 +575,7 @@ module Std : sig
         default [rs := zero];
       ]
       ...  *)
-  val switch  : exp -> clause list -> rtl
+  val switch : exp -> clause list -> rtl
 
   (** [case exp code] - creates a switch case *)
   val case : exp -> rtl list -> clause
@@ -601,32 +594,37 @@ module Std : sig
   val concat : lift -> lift -> lift
 
   (** [^] same as concat  *)
-  val (^) : lift -> lift -> lift
+  val ( ^ ) : lift -> lift -> lift
 
   (** Registration *)
 
   (** [name >| lift]  - registers a lifter for instruction [name]  *)
-  val (>|) : string -> lift -> unit
+  val ( >| ) : string -> lift -> unit
 
   (** [name >. lift] - registers a lifter for dot version of instruction
       [name], but also extend an RTL code with signed comparison of the
       result to a zero and writing CR0 field according to this
       comparison. It's also assumed that a first instruction operand
       is used for storing of a result. *)
-  val (>.) : string -> lift -> unit
+  val ( >. ) : string -> lift -> unit
 
   module type Model = sig
-    type t
     (** all general purpose registers *)
-    val gpr  : t String.Map.t
+    type t
+
+    (** all general purpose registers *)
+    val gpr : t String.Map.t
+
     val gpri : t Int.Map.t
 
     (** all floating point registers *)
     val fpr : t String.Map.t
+
     val fpri : t Int.Map.t
 
     (** all vector registers *)
     val vr : t String.Map.t
+
     val vri : t Int.Map.t
 
     (** count register  *)
@@ -645,20 +643,36 @@ module Std : sig
     val crn : t String.Map.t
 
     (** fixed precision flags *)
-    val so : t   (** summary overflow        *)
-    val ca : t   (** carry flag              *)
-    val ov : t   (** overflow flag           *)
-    val ca32 : t (** carry out of 32 bits    *)
-    val ov32 : t (** overflow of 32 bits     *)
+    val so : t
+    (** summary overflow        *)
+
+    (** summary overflow        *)
+    val ca : t
+    (** carry flag              *)
+
+    (** carry flag              *)
+    val ov : t
+    (** overflow flag           *)
+
+    (** overflow flag           *)
+    val ca32 : t
+    (** carry out of 32 bits    *)
+
+    (** carry out of 32 bits    *)
+    val ov32 : t
+    (** overflow of 32 bits     *)
   end
 
   module type Model_exp = sig
+    (** condition register  *)
     include Model with type t := exp
+
     (** condition register  *)
     val cr : exp
 
     (** condition register fields *)
-    val cr_fields  : exp String.Map.t
+    val cr_fields : exp String.Map.t
+
     val cri_fields : exp Int.Map.t
   end
 
@@ -668,24 +682,20 @@ module Std : sig
 
     val gpr_bitwidth : int
     val fpr_bitwidth : int
-    val lr_bitwidth  : int
+    val lr_bitwidth : int
     val ctr_bitwidth : int
     val tar_bitwidth : int
-    val cr_bitwidth  : int
-    val vr_bitwidth  : int
-
+    val cr_bitwidth : int
+    val vr_bitwidth : int
     val mem : var
     val flags : Var.Set.t
   end
 
   module PowerPC_32 : PowerPC
   module PowerPC_64 : PowerPC
-
   module PowerPC_32_cpu : CPU
   module PowerPC_64_cpu : CPU
-
   module T32 : Target
   module T64 : Target
   module T64_le : Target
-
 end

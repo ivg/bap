@@ -14,5 +14,5 @@ fi
 
 git ls-files | grep -e $files_to_indent | while read file
 do
-    ocp-indent -i $file
+    ocamlformat --doc-comments=before --no-comment-check --profile=compact -i $file
 done

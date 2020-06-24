@@ -11,29 +11,22 @@ let rlwinm cpu ops =
   let sh = unsigned imm ops.(2) in
   let mb = unsigned imm ops.(3) in
   let me = unsigned imm ops.(4) in
-  let tmp   = unsigned var word in
+  let tmp = unsigned var word in
   let start = unsigned var cpu.word_width in
-  let stop  = unsigned var cpu.word_width in
-  let mask  = unsigned var cpu.word_width in
+  let stop = unsigned var cpu.word_width in
+  let mask = unsigned var cpu.word_width in
   let w32 = unsigned const word 32 in
   let ones = unsigned const cpu.word_width (-1) in
-  RTL.[
-    if_ (width ra <> w32) [
-      start := mb + w32;
-      stop  := me + w32;
-    ] [
-      start := mb;
-      stop  := me;
-    ];
-    mask := ones;
-    if_ (mb <= me) [
-      mask := (mask >> start) land (mask << (width ra - stop - one));
-    ] [
-      mask := (mask << (width ra - stop)) lor (mask >> (start + one));
-    ];
-    tmp := nth word rs 1;
-    ra := (nth cpu.word_width ((tmp ^ tmp ^ tmp) << sh) 0) land mask;
-  ]
+  RTL.
+    [ if_
+        (width ra <> w32)
+        [start := mb + w32; stop := me + w32]
+        [start := mb; stop := me]; mask := ones
+    ; if_ (mb <= me)
+        [mask := (mask >> start) land (mask << width ra - stop - one)]
+        [mask := (mask << width ra - stop) lor (mask >> start + one)]
+    ; tmp := nth word rs 1
+    ; ra := nth cpu.word_width (tmp ^ tmp ^ tmp << sh) 0 land mask ]
 
 (** Fix-point Rotate Left Word then AND with Mask
     Page 103 of IBM Power ISATM Version 3.0 B
@@ -46,29 +39,22 @@ let rlwnm cpu ops =
   let rb = unsigned cpu.reg ops.(2) in
   let mb = unsigned imm ops.(3) in
   let me = unsigned imm ops.(4) in
-  let tmp   = unsigned var word in
+  let tmp = unsigned var word in
   let start = unsigned var cpu.word_width in
-  let stop  = unsigned var cpu.word_width in
-  let mask  = unsigned var cpu.word_width in
-  let w32  = unsigned const word 32 in
+  let stop = unsigned var cpu.word_width in
+  let mask = unsigned var cpu.word_width in
+  let w32 = unsigned const word 32 in
   let ones = unsigned const cpu.word_width (-1) in
-  RTL.[
-    if_ (width ra <> w32) [
-      start := mb + w32;
-      stop  := me + w32;
-    ] [
-      start := mb;
-      stop  := me;
-    ];
-    mask := ones;
-    if_ (mb <= me) [
-      mask := (mask >> start) land (mask << (width ra - stop - one));
-    ] [
-      mask := (mask << (width ra - stop)) lor (mask >> (start + one));
-    ];
-    tmp := nth word rs 1;
-    ra := (nth cpu.word_width ((tmp ^ tmp ^ tmp) << (last rb 5)) 0) land mask;
-  ]
+  RTL.
+    [ if_
+        (width ra <> w32)
+        [start := mb + w32; stop := me + w32]
+        [start := mb; stop := me]; mask := ones
+    ; if_ (mb <= me)
+        [mask := (mask >> start) land (mask << width ra - stop - one)]
+        [mask := (mask << width ra - stop) lor (mask >> start + one)]
+    ; tmp := nth word rs 1
+    ; ra := nth cpu.word_width (tmp ^ tmp ^ tmp << last rb 5) 0 land mask ]
 
 (** Fix-point Rotate Left Word Immediate then Mask Insert
     Page 103 of IBM Power ISATM Version 3.0 B
@@ -81,31 +67,24 @@ let rlwimi cpu ops =
   let sh = unsigned imm ops.(3) in
   let mb = unsigned imm ops.(4) in
   let me = unsigned imm ops.(5) in
-  let tmp1  = unsigned var word in
-  let tmp2  = unsigned var cpu.word_width in
+  let tmp1 = unsigned var word in
+  let tmp2 = unsigned var cpu.word_width in
   let start = unsigned var cpu.word_width in
-  let stop  = unsigned var cpu.word_width in
-  let mask  = unsigned var cpu.word_width in
-  let w32  = unsigned const cpu.word_width 32 in
+  let stop = unsigned var cpu.word_width in
+  let mask = unsigned var cpu.word_width in
+  let w32 = unsigned const cpu.word_width 32 in
   let ones = unsigned const cpu.word_width (-1) in
-  RTL.[
-    if_ (width ra <> w32) [
-      start := mb + w32;
-      stop  := me + w32;
-    ] [
-      start := mb;
-      stop  := me;
-    ];
-    mask := ones;
-    if_ (mb <= me) [
-      mask := (mask >> start) land (mask << (width ra - stop - one));
-    ] [
-      mask := (mask << (width ra - stop)) lor (mask >> (start + one));
-    ];
-    tmp1 := nth word rs 1;
-    tmp2 := nth cpu.word_width ((tmp1 ^ tmp1 ^ tmp1) << sh) 0;
-    ra := (tmp2 land mask) lor (ra land (lnot mask));
-  ]
+  RTL.
+    [ if_
+        (width ra <> w32)
+        [start := mb + w32; stop := me + w32]
+        [start := mb; stop := me]; mask := ones
+    ; if_ (mb <= me)
+        [mask := (mask >> start) land (mask << width ra - stop - one)]
+        [mask := (mask << width ra - stop) lor (mask >> start + one)]
+    ; tmp1 := nth word rs 1
+    ; tmp2 := nth cpu.word_width (tmp1 ^ tmp1 ^ tmp1 << sh) 0
+    ; ra := tmp2 land mask lor (ra land lnot mask) ]
 
 (** Fix-point Rotate Left Doubleword Immediate then Clear Left
     Page 104 of IBM Power ISATM Version 3.0 B
@@ -118,11 +97,9 @@ let rldicl cpu ops =
   let sh = unsigned imm ops.(2) in
   let mb = unsigned imm ops.(3) in
   let mask = unsigned var doubleword in
-  RTL.[
-    mask := zero;
-    mask := (lnot mask) >> mb;
-    ra := (nth doubleword ((rs ^ rs ^ rs) << sh) 0) land mask;
-  ]
+  RTL.
+    [ mask := zero; mask := lnot mask >> mb
+    ; ra := nth doubleword (rs ^ rs ^ rs << sh) 0 land mask ]
 
 (** Fix-point Rotate Left Doubleword Immediate then Clear Right
     Page 104 of IBM Power ISATM Version 3.0 B
@@ -134,13 +111,11 @@ let rldicr cpu ops =
   let rs = unsigned cpu.reg ops.(1) in
   let sh = unsigned imm ops.(2) in
   let me = unsigned imm ops.(3) in
-  let mask  = unsigned var doubleword in
+  let mask = unsigned var doubleword in
   let width = unsigned const doubleword 64 in
-  RTL.[
-    mask := zero;
-    mask := (lnot mask) << (width - me - one);
-    ra := (nth doubleword ((rs ^ rs ^ rs) << sh) 0) land mask;
-  ]
+  RTL.
+    [ mask := zero; mask := lnot mask << width - me - one
+    ; ra := nth doubleword (rs ^ rs ^ rs << sh) 0 land mask ]
 
 (** Fix-point Rotate Left Doubleword Immediate then Clear
     Page 105 of IBM Power ISATM Version 3.0 B
@@ -156,13 +131,10 @@ let rldic cpu ops =
   let mask1 = unsigned var doubleword in
   let mask2 = unsigned var doubleword in
   let ones = unsigned const doubleword (-1) in
-  RTL.[
-    mask := ones;
-    mask1 := mask >> mb;
-    mask2 := mask << sh;
-    mask := mask1 land mask2;
-    ra := (nth doubleword ((rs ^ rs ^ rs) << sh) 0) land mask;
-  ]
+  RTL.
+    [ mask := ones; mask1 := mask >> mb; mask2 := mask << sh
+    ; mask := mask1 land mask2
+    ; ra := nth doubleword (rs ^ rs ^ rs << sh) 0 land mask ]
 
 (** Fix-point Rotate Left Doubleword then Clear Left
     Page 105 of IBM Power ISATM Version 3.0 B
@@ -175,11 +147,9 @@ let rldcl cpu ops =
   let rb = unsigned cpu.reg ops.(2) in
   let mb = unsigned imm ops.(3) in
   let mask = unsigned var doubleword in
-  RTL.[
-    mask := zero;
-    mask := (lnot mask) >> mb;
-    ra := (nth doubleword ((rs ^ rs ^ rs) << (last rb 6)) 0) land mask;
-  ]
+  RTL.
+    [ mask := zero; mask := lnot mask >> mb
+    ; ra := nth doubleword (rs ^ rs ^ rs << last rb 6) 0 land mask ]
 
 (** Fix-point Rotate Left Doubleword then Clear Right
     Page 106 of IBM Power ISATM Version 3.0 B
@@ -193,11 +163,9 @@ let rldcr cpu ops =
   let me = unsigned imm ops.(3) in
   let mask = unsigned var doubleword in
   let width = unsigned const doubleword 64 in
-  RTL.[
-    mask := zero;
-    mask := (lnot mask) << (width - me - one);
-    ra := (nth doubleword ((rs ^ rs ^ rs) << (last rb 6)) 0) land mask;
-  ]
+  RTL.
+    [ mask := zero; mask := lnot mask << width - me - one
+    ; ra := nth doubleword (rs ^ rs ^ rs << last rb 6) 0 land mask ]
 
 (** Fix-point Rotate Left Doubleword Immediate then Mask Insert
     Page 106 of IBM Power ISATM Version 3.0 B
@@ -209,36 +177,32 @@ let rldimi cpu ops =
   let rs = unsigned cpu.reg ops.(2) in
   let sh = unsigned imm ops.(3) in
   let mb = unsigned imm ops.(4) in
-  let tmp   = unsigned var doubleword in
-  let mask  = unsigned var doubleword in
+  let tmp = unsigned var doubleword in
+  let mask = unsigned var doubleword in
   let mask1 = unsigned var doubleword in
   let mask2 = unsigned var doubleword in
   let ones = unsigned const doubleword (-1) in
-  RTL.[
-    mask := ones;
-    mask1 := mask >> mb;
-    mask2 := mask << sh;
-    mask := mask1 land mask2;
-    tmp := nth doubleword ((rs ^ rs ^ rs) << sh) 0;
-    ra := (tmp land mask) lor (ra land (lnot mask));
-  ]
+  RTL.
+    [ mask := ones; mask1 := mask >> mb; mask2 := mask << sh
+    ; mask := mask1 land mask2; tmp := nth doubleword (rs ^ rs ^ rs << sh) 0
+    ; ra := tmp land mask lor (ra land lnot mask) ]
 
 let init () =
-  "RLWINM"  >| rlwinm;
-  "RLWNM"   >| rlwnm;
-  "RLWIMI"  >| rlwimi;
-  "RLDICL"  >| rldicl;
-  "RLDICR"  >| rldicr;
-  "RLDIC"   >| rldic;
-  "RLDCL"   >| rldcl;
-  "RLDCR"   >| rldcr;
-  "RLDIMI"  >| rldimi;
-  "RLWINMo" >. rlwinm;
-  "RLWNMo"  >. rlwnm;
-  "RLWIMIo" >. rlwimi;
-  "RLDICLo" >. rldicl;
-  "RLDICRo" >. rldicr;
-  "RLDICo"  >. rldic;
-  "RLDCLo"  >. rldcl;
-  "RLDCRo"  >. rldcr;
-  "RLDIMIo" >. rldimi;
+  "RLWINM" >| rlwinm ;
+  "RLWNM" >| rlwnm ;
+  "RLWIMI" >| rlwimi ;
+  "RLDICL" >| rldicl ;
+  "RLDICR" >| rldicr ;
+  "RLDIC" >| rldic ;
+  "RLDCL" >| rldcl ;
+  "RLDCR" >| rldcr ;
+  "RLDIMI" >| rldimi ;
+  "RLWINMo" >. rlwinm ;
+  "RLWNMo" >. rlwnm ;
+  "RLWIMIo" >. rlwimi ;
+  "RLDICLo" >. rldicl ;
+  "RLDICRo" >. rldicr ;
+  "RLDICo" >. rldic ;
+  "RLDCLo" >. rldcl ;
+  "RLDCRo" >. rldcr ;
+  "RLDIMIo" >. rldimi

@@ -8,9 +8,7 @@ let mulli cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let si = signed imm ops.(2) in
-  RTL.[
-    rt := ra *  si;
-  ]
+  RTL.[rt := ra * si]
 
 (** Fixed-Point Arithmetic Instructions - Multiply High Word
     Page 73 of IBM Power ISATM Version 3.0 B
@@ -23,11 +21,7 @@ let mulhw cpu ops =
   let rb = signed cpu.reg ops.(2) in
   let tmp1 = signed var doubleword in
   let tmp2 = signed var doubleword in
-  RTL.[
-    tmp1 := low word ra;
-    tmp2 := low word rb;
-    rt := high word (tmp1 * tmp2);
-  ]
+  RTL.[tmp1 := low word ra; tmp2 := low word rb; rt := high word (tmp1 * tmp2)]
 
 (** Fixed-Point Arithmetic Instructions - Multiply High Word Unsigned
     Page 73 of IBM Power ISATM Version 3.0 B
@@ -40,11 +34,7 @@ let mulhwu cpu ops =
   let rb = unsigned cpu.reg ops.(2) in
   let tmp1 = unsigned var doubleword in
   let tmp2 = unsigned var doubleword in
-  RTL.[
-    tmp1 := low word ra;
-    tmp2 := low word rb;
-    rt := high word (tmp1 * tmp2);
-  ]
+  RTL.[tmp1 := low word ra; tmp2 := low word rb; rt := high word (tmp1 * tmp2)]
 
 (** Fixed-Point Arithmetic Instructions - Multiply Low Word
     Page 73 of IBM Power ISATM Version 3.0 B
@@ -57,12 +47,7 @@ let mullw cpu ops =
   let rb = signed cpu.reg ops.(2) in
   let tmp1 = unsigned var doubleword in
   let tmp2 = unsigned var doubleword in
-  RTL.[
-    tmp1 := low word ra;
-    tmp2 := low word rb;
-    rt := tmp1 * tmp2;
-  ]
-
+  RTL.[tmp1 := low word ra; tmp2 := low word rb; rt := tmp1 * tmp2]
 
 (** Fixed-Point Arithmetic Instructions - Multiply low doubleword
     Page 79 of IBM Power ISATM Version 3.0 B
@@ -73,9 +58,7 @@ let mulld cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
-  RTL.[
-    rt := ra * rb;
-  ]
+  RTL.[rt := ra * rb]
 
 (** Fixed-Point Arithmetic Instructions - Multiply high doubleword
     Page 79 of IBM Power ISATM Version 3.0 B
@@ -87,11 +70,7 @@ let mulhd cpu ops =
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
   let tm = signed var quadword in
-  RTL.[
-    tm := ra;
-    tm := tm * rb;
-    rt := high doubleword tm;
-  ]
+  RTL.[tm := ra; tm := tm * rb; rt := high doubleword tm]
 
 (** Fixed-Point Arithmetic Instructions - Multiply high doubleword unsigned
     Page 79 of IBM Power ISATM Version 3.0 B
@@ -103,23 +82,19 @@ let mulhdu cpu ops =
   let ra = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
   let tm = unsigned var quadword in
-  RTL.[
-    tm := ra;
-    tm := tm * rb;
-    rt := high doubleword tm;
-  ]
+  RTL.[tm := ra; tm := tm * rb; rt := high doubleword tm]
 
 let init () =
-  "MULLI"   >| mulli;
-  "MULHW"   >| mulhw;
-  "MULHWo"  >. mulhw;
-  "MULHWU"  >| mulhwu;
-  "MULHWUo" >. mulhwu;
-  "MULLW"   >| mullw;
-  "MULLWo"  >. mullw;
-  "MULLD"   >| mulld;
-  "MULLDo"  >. mulld;
-  "MULHD"   >| mulhd;
-  "MULHDo"  >. mulhd;
-  "MULHDU"  >| mulhdu;
-  "MULHDUo" >. mulhdu;
+  "MULLI" >| mulli ;
+  "MULHW" >| mulhw ;
+  "MULHWo" >. mulhw ;
+  "MULHWU" >| mulhwu ;
+  "MULHWUo" >. mulhwu ;
+  "MULLW" >| mullw ;
+  "MULLWo" >. mullw ;
+  "MULLD" >| mulld ;
+  "MULLDo" >. mulld ;
+  "MULHD" >| mulhd ;
+  "MULHDo" >. mulhd ;
+  "MULHDU" >| mulhdu ;
+  "MULHDUo" >. mulhdu

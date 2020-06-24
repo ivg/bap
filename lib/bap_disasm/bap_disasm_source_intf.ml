@@ -8,6 +8,7 @@ type 'a source = 'a t
 
 module type Factory = sig
   type t
+
   val list : unit -> string list
   val find : string -> t source option
   val register : string -> t source -> unit

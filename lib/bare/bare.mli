@@ -1,6 +1,5 @@
 open Core_kernel
 
-
 (** Binary Analysis Rule Engine (BARE).
 
     The Binary Analysis Rule Engine is a production system (a forward
@@ -190,14 +189,11 @@ open Core_kernel
     v}
 *)
 
-
 (** representation of a tuple  *)
 type tuple = Sexp.t
 
 (** representation of a fact  *)
 type fact = tuple
-
-
 
 (** Matching rule specification.
 
@@ -206,18 +202,13 @@ type fact = tuple
     store the partial matching state and, if some states reached the
     completion, it will also produce a sequence of facts.*)
 module Rule : sig
-
-
   (** [rule abstract type]  *)
   type t [@@deriving sexp_of]
-
-
 
   (** an abstract representation of an error  *)
   type error
 
   (** {3 Rule Parsing}  *)
-
 
   val from_string : string -> (t list, error) Result.t
 
@@ -233,26 +224,20 @@ module Rule : sig
       Precondition: [s] is a well-formed rule specification. *)
   val of_string : string -> t
 
-
   (** {3 Rule introspecting}  *)
-
 
   (** [lhs rule] is the left hand side of the rule.  *)
   val lhs : t -> tuple list
 
-
   (** [rhs rule] is the right hand side of the rule  *)
   val rhs : t -> fact list
-
 
   (** [spec rule] is the human readable and machine parseable
       well-formed rule specification.  *)
   val spec : t -> string
 
-
   (** [pp ppf rule] prints [rule] into the formatter [ppf].  *)
   val pp : Format.formatter -> t -> unit
-
 
   (** {3 Rule transformations}  *)
 

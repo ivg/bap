@@ -46,18 +46,13 @@
 
 *)
 
-
 open Core_kernel
 open Format
-
 
 (** [detector]  *)
 type +'a t
 
 type +'a decision
-
-
-
 
 (** [create alphabet] creates a detector.
 
@@ -71,13 +66,13 @@ type +'a decision
 
 *)
 val create :
-  ?alpha:float ->
-  ?beta:float ->
-  ?p1:float ->
-  ?ps:float ->
-  ?len_pdf:(float -> float) ->
-  Char.Set.t -> 'a t
-
+     ?alpha:float
+  -> ?beta:float
+  -> ?p1:float
+  -> ?ps:float
+  -> ?len_pdf:(float -> float)
+  -> Char.Set.t
+  -> 'a t
 
 (** [run detector trace] runs a [detector] on a sequence on a [trace]
     represented as a sequence of bytes accessed during an execution.
@@ -88,28 +83,15 @@ val create :
 
 val run : 'a t -> ('a * char) Sequence.t -> 'a decision Sequence.t
 
-
-
 (** [step t data char] performs one observation.*)
 val step : 'a t -> 'a -> char -> 'a t
 
-
 val decision : 'a t -> 'a decision option
-
 val when_decided : 'a t -> f:('a decision -> 'b) -> 'b -> 'b
-
 val abort : 'a t -> 'a decision option
-
 val result : 'a decision -> ('a * char) list
-
 val chars : 'a decision -> string
-
 val data : ?rev:bool -> 'a decision -> 'a list
-
-
-
 val pp : formatter -> 'a t -> unit
-
 val pp_decision : formatter -> 'a decision -> unit
-
 val pp_stats : formatter -> 'a t -> unit

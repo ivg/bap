@@ -4,6 +4,7 @@ open Bap.Std
 (** Register representation *)
 module type RR = sig
   type t [@@deriving sexp]
+
   val of_asm : X86_asm.reg -> t option
   val of_asm_exn : X86_asm.reg -> t
   val of_mc : reg -> t option
@@ -19,6 +20,7 @@ end
 (**Imm model*)
 module type IM = sig
   type t
+
   val of_imm : imm -> t
   val get : width:size -> t -> exp
 end
@@ -26,7 +28,10 @@ end
 (** Memory model *)
 module type MM = sig
   type t
-  val of_mem : ?seg:reg -> ?base:reg -> ?scale:imm -> ?index:reg -> disp:imm -> mem -> t
+
+  val of_mem :
+    ?seg:reg -> ?base:reg -> ?scale:imm -> ?index:reg -> disp:imm -> mem -> t
+
   val of_offset : imm -> t
   val addr : t -> exp
   val addr_size : addr_size
@@ -36,31 +41,24 @@ module type MM = sig
   val store : t -> size:size -> exp -> stmt
 end
 
-type cpu_flag = [
-  | `CF
-  | `PF
-  | `AF
-  | `ZF
-  | `SF
-  | `DF
-  | `OF
-]
+type cpu_flag = [`CF | `PF | `AF | `ZF | `SF | `DF | `OF]
 
 (** Flags representation *)
 module type FR = sig
   type t = cpu_flag
+
   val var : t -> var
   val get : t -> exp
   val set : t -> exp -> stmt
   val set_unknown : t -> string -> stmt
   val after_sub : diff:exp -> size -> op1:exp -> op2:exp -> stmt list
-  val after_add : sum:exp -> size ->  op1:exp -> op2:exp -> stmt list
+  val after_add : sum:exp -> size -> op1:exp -> op2:exp -> stmt list
 end
 
-type interrupt_vector = [
-  | `DE  (** Divide-by-Zero-Error *)
+type interrupt_vector =
+  [ `DE  (** Divide-by-Zero-Error *)
   | `DB  (** Debug *)
-  | `NMI (** Non-Maskable-Interrupt *)
+  | `NMI  (** Non-Maskable-Interrupt *)
   | `BP  (** Breakpoint *)
   | `OF  (** Overflow *)
   | `BR  (** Bound-Range *)
@@ -77,9 +75,8 @@ type interrupt_vector = [
   | `MC  (** Machine-Check *)
   | `XF  (** SIMD Floating-Point *)
   | `SX  (** Security Exception  *)
-  | `INTR of int (** External Interrupts (Maskable) *)
-  | `SOFTWARE of int (** Software Interrupts *)
-]
+  | `INTR of int  (** External Interrupts (Maskable) *)
+  | `SOFTWARE of int  (** Software Interrupts *) ]
 
 (** Interrupt Vector *)
 module type IV = sig
@@ -92,9 +89,9 @@ end
 module type PR = sig
   type t = X86_prefix.t
 
-  val lock  : bil -> bil
-  val rep   : mem -> bil -> bil
-  val repe  : mem -> bil -> bil
+  val lock : bil -> bil
+  val rep : mem -> bil -> bil
+  val repe : mem -> bil -> bil
   val repne : mem -> bil -> bil
 end
 
@@ -109,6 +106,7 @@ end
 
 module type X86CPU = sig
   type regs = private [< X86_asm.reg]
+
   val arch : Arch.x86
   val avaliable : X86_asm.reg -> bool
   val cf : var
@@ -118,5 +116,6 @@ module type X86CPU = sig
   val sf : var
   val oF : var
   val df : var
+
   include X86_env.ModeVars
 end

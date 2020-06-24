@@ -4,6 +4,7 @@ open Mips_rtl
 
 module type Model = sig
   type t
+
   val gpr : t String.Map.t
   val gpri : t Int.Map.t
   val fpr : t String.Map.t
@@ -27,6 +28,5 @@ end
 
 module MIPS_32 : MIPS
 module MIPS_64 : MIPS
-
 module MIPS_32_cpu : CPU
 module MIPS_64_cpu : CPU

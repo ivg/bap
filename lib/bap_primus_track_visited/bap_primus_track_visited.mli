@@ -1,7 +1,6 @@
 open Bap.Std
 open Bap_primus.Std
 
-
 (** Tracks program terms evaluated by Primus.
 
     This module provides a component and an interface to the
@@ -28,14 +27,12 @@ open Bap_primus.Std
     the function are added to the visited set).
 *)
 
-
 (** initializes the tracker component.
 
     This function is called by the [primus-mark-visited] component,
     and is not necessary to call, unless this plugin is not used.
 *)
 val init : unit -> unit
-
 
 (** [progress (visited,total)] is posted every time a Primus machine
     makes progress and evaluates a previously unvisited basic block.
@@ -56,9 +53,7 @@ val progress : (int * int) Primus.observation
     ]}
 *)
 module Set : sig
-
-  module Make(Machine : Primus.Machine.S) : sig
-
+  module Make (Machine : Primus.Machine.S) : sig
     (** [mem tid] is if a term with [tid] was visited.
 
         A term with the term identifier [tid] is visited if some
@@ -69,20 +64,17 @@ module Set : sig
     *)
     val mem : tid -> bool Machine.t
 
-
     (** [add tid] forcefully adds [tid] to the set of visited terms.
 
         Does nothing if tid is already visited.
     *)
     val add : tid -> unit Machine.t
 
-
     (** [del tid] forcefully removes [tid] from the set of visited terms.
 
         Does nothing if it wasn't visited.
     *)
     val del : tid -> unit Machine.t
-
 
     (** [all] is the current set of all visited basic blocks. *)
     val all : Tid.Set.t Machine.t

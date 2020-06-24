@@ -54,14 +54,11 @@
     flow of information.
 *)
 
-
 open Core_kernel
 open Bap.Std
 open Bap_primus.Std
 
 module Std : sig
-
-
   (** Abstract value.
 
       Anything isomorphic to the value, is a value. Since we define
@@ -70,7 +67,10 @@ module Std : sig
       value representation. *)
   module type Value = sig
     type t
+
+    (** [to_value x] injects [x] into the [value] domain  *)
     type 'a m
+
     (** [to_value x] injects [x] into the [value] domain  *)
     val to_value : t -> Primus.value m
 
@@ -86,8 +86,6 @@ module Std : sig
       for specifying the taint propagation policies.
   *)
   module Taint : sig
-
-
     (** Each object that the engine tracks has an associated kind,
         that denotes a class of objects that share the same semantic
         properties.
@@ -100,9 +98,7 @@ module Std : sig
     module Kind : sig
       type t
 
-
-      module Make(Machine : Primus.Machine.S) : sig
-
+      module Make (Machine : Primus.Machine.S) : sig
         (** [create name] creates a kind with the given name.  If a
             kind with the given name already exists, then returns that
             kind.
@@ -113,16 +109,16 @@ module Std : sig
             and the set of kinds.   *)
         val create : string -> t Machine.t
 
-
         (** [name k] returns the symbolic name of the kind [k]  *)
         val name : t -> string Machine.t
 
-        include Value with type t := t
-                       and type 'a m := 'a Machine.t
+        include Value with type t := t and type 'a m := 'a Machine.t
       end
-      include Comparable.S_plain
-        with type t := t
-         and type comparator_witness = Primus.Value.comparator_witness
+
+      include
+        Comparable.S_plain
+          with type t := t
+           and type comparator_witness = Primus.Value.comparator_witness
     end
 
     (** Relation between a value and an object that we track.
@@ -136,12 +132,15 @@ module Std : sig
         between the [direct] and [indirect] relation.
     *)
     module Rel : sig
+      (** Denotes the direct relation between a value and the object
+          that we track, e.g., a value contains the runtime
+          representation of the object or a part of it. *)
       type t
+
       (** Denotes the direct relation between a value and the object
           that we track, e.g., a value contains the runtime
           representation of the object or a part of it. *)
       val direct : t
-
 
       (** Denotes the indirect relation between a value and the object
           that we track, e.g., a value is a pointer that points to a
@@ -165,9 +164,7 @@ module Std : sig
       *)
       val t : Primus.Lisp.Type.t
 
-      module Make(Machine : Primus.Machine.S) : sig
-
-
+      module Make (Machine : Primus.Machine.S) : sig
         (** [create kind] creates a fresh new object identifier with
             the specified [kind].
 
@@ -178,18 +175,17 @@ module Std : sig
             kinds, i.e., it partitions the set of objects.  *)
         val create : Kind.t -> t Machine.t
 
-
         (** [kind obj] returns the kind of the object.  *)
         val kind : t -> Kind.t Machine.t
 
-        include Value with type t := t
-                       and type 'a m := 'a Machine.t
+        include Value with type t := t and type 'a m := 'a Machine.t
       end
-      include Comparable.S_plain
-        with type t := t
-         and type comparator_witness = Primus.Value.comparator_witness
-    end
 
+      include
+        Comparable.S_plain
+          with type t := t
+           and type comparator_witness = Primus.Value.comparator_witness
+    end
 
     (** (attached (r,o,v) occurs when the relation [r] is established
         between [o] and [v] *)
@@ -203,10 +199,7 @@ module Std : sig
         [module Tracker = Taint.Tracker(Machine)]
     *)
     module Tracker : sig
-
-      module Make(Machine : Primus.Machine.S) : sig
-
-
+      module Make (Machine : Primus.Machine.S) : sig
         (** {3 The low-level interface}
 
             The low-level interface defines three primitives in terms of
@@ -240,7 +233,6 @@ module Std : sig
         *)
         val attach : Primus.value -> Rel.t -> Object.Set.t -> unit Machine.t
 
-
         (** [lookup v r] returns a set [xs] of objects that are related
             with the value [v] by the relation [r]. The operation
             doesn't change the state of the tracker.
@@ -262,7 +254,6 @@ module Std : sig
         *)
         val detach : Primus.value -> Rel.t -> Object.Set.t -> unit Machine.t
 
-
         (** {3 High-level interface}
 
             The high-level interface provides a set of easy to use (and
@@ -270,7 +261,6 @@ module Std : sig
             could be expressed in terms of the three primitive operations.
 
         *)
-
 
         (** [new_direct v k] introduces a new direct relation between the
             value [v] and a freshly created object of the given kind
@@ -287,10 +277,7 @@ module Std : sig
             [[v,v+n-1]], and a freshly created object of specified
             kind. *)
         val new_indirect :
-          addr:Primus.value ->
-          len:Primus.value ->
-          Kind.t ->
-          Object.t Machine.t
+          addr:Primus.value -> len:Primus.value -> Kind.t -> Object.t Machine.t
 
         (** [Taint.sanitize r k v] detaches all objects related to the
             value [v] by the relation [r] that has the given kind [k].
@@ -322,8 +309,7 @@ module Std : sig
       module Policy : sig
         type t
 
-        module Make(Machine : Primus.Machine.S) : sig
-
+        module Make (Machine : Primus.Machine.S) : sig
           (** [select p k] selects the taint propagation policy [p]
               for objects of kind [k]. If no policy is selected for a
               kind of an object, then objects of that kind will be
@@ -339,7 +325,6 @@ module Std : sig
               for the kind [k]. *)
           val selected : t -> Kind.t -> bool Machine.t
 
-
           (** [propagate p rs rd srcs dst] transfers objects
               associated with [srcs] to [dst] based on the selected
               policy [p].
@@ -349,17 +334,20 @@ module Std : sig
               relation [rs] are attached to the [dst] value using the
               [rd] relation. All associations of the [srcs] values
               remain unaffected. *)
-          val propagate : t -> Rel.t -> Rel.t ->
-            Primus.value list -> Primus.value -> unit Machine.t
+          val propagate :
+               t
+            -> Rel.t
+            -> Rel.t
+            -> Primus.value list
+            -> Primus.value
+            -> unit Machine.t
 
-          include Value with type t := t
-                         and type 'a m := 'a Machine.t
+          include Value with type t := t and type 'a m := 'a Machine.t
         end
       end
     end
 
     module Gc : sig
-
       (** [taint_finalize (t,live)] occurs either when the taint [t]
           is no longer reachable or when when machine that created this
           taint finishes. In the former case [live] would be [true] in

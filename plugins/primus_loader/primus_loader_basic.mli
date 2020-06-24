@@ -1,6 +1,5 @@
 open Bap_primus.Std
 
-
 (** Basic generic loader that works more or less correctly for all
     architectures and abi.
 
@@ -46,4 +45,4 @@ module type Param = sig
   val stack_base : int64
 end
 
-module Make(P : Param) : Primus.Machine.Component
+module Make (P : Param) : Primus.Machine.Component

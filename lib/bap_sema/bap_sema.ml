@@ -1,7 +1,6 @@
 open Core_kernel
 open Graphlib.Std
 open Bap_disasm_std
-
 module Ssa = Bap_sema_ssa
 module Ir_lift = Bap_sema_lift
 module Ir_graph = Bap_ir_graph
@@ -12,6 +11,7 @@ module Std = struct
 
   module Program = struct
     include Ir_program
+
     let lift = Ir_lift.program
     let to_graph = Bap_ir_callgraph.create
   end
@@ -20,13 +20,17 @@ module Std = struct
   module Phi = Ir_phi
   module Jmp = Ir_jmp
   module Def = Ir_def
+
   module Blk = struct
     include Ir_blk
+
     let lift = Ir_lift.blk
     let from_insn = Ir_lift.insn
   end
+
   module Sub = struct
     include Ir_sub
+
     let lift = Ir_lift.sub
     let of_cfg = Ir_graph.to_sub
     let to_cfg = Ir_graph.of_sub
@@ -47,8 +51,7 @@ module Std = struct
 
     let () =
       let reg name =
-        Pretty_printer.register ("Bap.Std.Graphs."^name^".pp") in
+        Pretty_printer.register ("Bap.Std.Graphs." ^ name ^ ".pp") in
       List.iter ~f:reg ["Tid"; "Ir"; "Callgraph"; "Cfg"]
   end
-
 end

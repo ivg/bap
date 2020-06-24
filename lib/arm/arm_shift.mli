@@ -11,7 +11,6 @@ open Arm_types
 *)
 val lift_c : src:exp -> shift -> shift:exp -> typ -> exp * exp
 
-
 (** decodes a register shifted operand
  * src - the operand to be shifted, cannot be the destination
  *        in practice this means it must be a temp variable.
@@ -22,7 +21,6 @@ val lift_c : src:exp -> shift -> shift:exp -> typ -> exp * exp
  **)
 
 val lift_r : src:exp -> op -> shift:exp -> typ -> exp * exp
-
 
 (** decodes an immediate shifted operand
  * src - the operand to be shifted, cannot be the destination
@@ -35,7 +33,6 @@ val lift_r : src:exp -> op -> shift:exp -> typ -> exp * exp
  * t - the type
  **)
 val lift_i : src:exp -> op -> typ -> exp * exp
-
 
 (** decodes a shifted operand for a memory operation
  * src - the operand to be shifted

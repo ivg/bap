@@ -6,20 +6,14 @@ open Bap_disasm_block
 
 type t
 type brancher = t
-
 type dest = addr option * edge [@@deriving sexp]
 type dests = dest list [@@deriving sexp]
 
 val create : (mem -> full_insn -> dests) -> t
-
 val of_bil : arch -> t
-
 val of_image : image -> t
-
 val resolve : t -> mem -> full_insn -> dests
-
 val empty : t
-
 val provide : t -> unit
 
 module Factory : Factory with type t = t

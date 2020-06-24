@@ -2,25 +2,25 @@ open Core_kernel
 open Regular.Std
 open Bap_common
 
-
-let memref ?(disp=0) ?(index=0) ?(scale=`r8)  addr =
+let memref ?(disp = 0) ?(index = 0) ?(scale = `r8) addr =
   let n = Bap_size.in_bytes scale in
-  let off = n * index + disp in
+  let off = (n * index) + disp in
   Bap_bitvector.(addr ++ off)
 
 module type Arith = sig
   include Integer
+
   val create : addr -> t Or_error.t
 end
 
 module type Core_int = sig
   include Int_intf.S
-  val to_bv: t -> Bitvector.t
-  val of_bv: Bitvector.t -> t Or_error.t
+
+  val to_bv : t -> Bitvector.t
+  val of_bv : Bitvector.t -> t Or_error.t
 end
 
-
-module Make(Int : Core_int) = struct
+module Make (Int : Core_int) = struct
   open Or_error
 
   (** [create_modulo_width x] takes a number represented as a
@@ -40,15 +40,16 @@ module Make(Int : Core_int) = struct
 
   module Base = struct
     include Int
+
     let make f a off = f a (to_int_modulo_width off)
-    let lshift  = make shift_left
-    let rshift  = make shift_right_logical
+    let lshift = make shift_left
+    let rshift = make shift_right_logical
     let arshift = make shift_right
-    let modulo  = (%)
-    let lnot    = bit_not
-    let logand  = bit_and
-    let logor   = bit_or
-    let logxor  = bit_xor
+    let modulo = ( % )
+    let lnot = bit_not
+    let logand = bit_and
+    let logor = bit_or
+    let logxor = bit_xor
     let div = ( / )
     let mul = ( * )
     let sub = ( - )
@@ -56,21 +57,23 @@ module Make(Int : Core_int) = struct
   end
 
   let create = Int.of_bv
-  include Integer.Make(Base)
+
+  include Integer.Make (Base)
 end
 
 module I32 = struct
   let of_bv x = Bitvector.to_int32 x
   let to_bv x = Bitvector.of_int32 x
+
   include Int32
 end
 
 module I64 = struct
   let of_bv x = Bitvector.to_int64 x
   let to_bv x = Bitvector.of_int64 x
+
   include Int64
 end
 
-
-module R32 = Make(I32)
-module R64 = Make(I64)
+module R32 = Make (I32)
+module R64 = Make (I64)

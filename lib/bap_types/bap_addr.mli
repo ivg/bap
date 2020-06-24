@@ -10,11 +10,13 @@
 
 open Core_kernel
 open Bap_common
+
 val memref : ?disp:int -> ?index:int -> ?scale:size -> addr -> addr
 
 (** Address arithmetic  *)
 module type Arith = sig
   include Integer
+
   val create : addr -> t Or_error.t
 end
 

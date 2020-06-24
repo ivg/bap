@@ -21,7 +21,6 @@ type api = string
 
 (** Language processor interface.  *)
 module type S = sig
-
   type t
 
   (** [language] a name of a language, e.g., ["C"] *)
@@ -34,7 +33,7 @@ module type S = sig
   val parse : (api -> filename option) -> api list -> t Or_error.t
 
   (** the processor itself  *)
-  val mapper : t  -> Term.mapper
+  val mapper : t -> Term.mapper
 end
 
 (** language processor type  *)

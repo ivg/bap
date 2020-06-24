@@ -1,9 +1,6 @@
 type error
-
 type t
 type param
-
-
 
 (** [load recipe] searches and loads a recipe.
 
@@ -23,9 +20,10 @@ type param
     recipe.
 *)
 val load :
-  ?paths:string list ->
-  ?env:(string * string) list ->
-  string -> (t,error) result
+     ?paths:string list
+  -> ?env:(string * string) list
+  -> string
+  -> (t, error) result
 
 (** [search paths] is a list of recipe names available in [paths].
 
@@ -36,10 +34,8 @@ val load :
 *)
 val search : string list -> string list
 
-
 (** [args recipe] is an array of arguments specified in the recipe. *)
 val args : t -> string array
-
 
 (** [command recipe] returns the [recipe] command, if one exists.  *)
 val command : t -> string option
@@ -58,18 +54,14 @@ val command : t -> string option
 *)
 val argv : ?argv:string array -> t -> string array
 
-
 (** [close recipe] closes the recipe and clears all associated resources.  *)
 val close : t -> unit
-
 
 (** [doc recipe] is the recipe description.  *)
 val doc : t -> string
 
-
 (** [params recipe] is the list of recipe parameters. *)
 val params : t -> param list
-
 
 (** [pp_error ppf err] prints the error message [err].   *)
 val pp_error : Format.formatter -> error -> unit

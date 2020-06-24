@@ -1,20 +1,24 @@
 open Core_kernel
 open Bap.Std
-
 open Powerpc_rtl
 
 module type Model = sig
-  type t
   (** all general purpose registers *)
-  val gpr  : t String.Map.t
+  type t
+
+  (** all general purpose registers *)
+  val gpr : t String.Map.t
+
   val gpri : t Int.Map.t
 
   (** all floating point registers *)
   val fpr : t String.Map.t
+
   val fpri : t Int.Map.t
 
   (** all vector registers *)
   val vr : t String.Map.t
+
   val vri : t Int.Map.t
 
   (** count register  *)
@@ -33,39 +37,55 @@ module type Model = sig
   val crn : t String.Map.t
 
   (** fixed precision flags *)
-  val so : t   (** summary overflow        *)
-  val ca : t   (** carry flag              *)
-  val ov : t   (** overflow flag           *)
-  val ca32 : t (** carry out of 32 bits    *)
-  val ov32 : t (** overflow of 32 bits     *)
+  val so : t
+  (** summary overflow        *)
+
+  (** summary overflow        *)
+  val ca : t
+  (** carry flag              *)
+
+  (** carry flag              *)
+  val ov : t
+  (** overflow flag           *)
+
+  (** overflow flag           *)
+  val ca32 : t
+  (** carry out of 32 bits    *)
+
+  (** carry out of 32 bits    *)
+  val ov32 : t
+  (** overflow of 32 bits     *)
 end
 
 module type Model_exp = sig
+  (** condition register  *)
   include Model with type t := exp
+
   (** condition register  *)
   val cr : exp
 
   (** condition register fields *)
-  val cr_fields  : exp String.Map.t
+  val cr_fields : exp String.Map.t
+
   val cri_fields : exp Int.Map.t
 end
 
 module type PowerPC = sig
   module E : Model_exp
   include Model with type t := var
+
   val gpr_bitwidth : int
   val fpr_bitwidth : int
-  val lr_bitwidth  : int
+  val lr_bitwidth : int
   val ctr_bitwidth : int
   val tar_bitwidth : int
-  val cr_bitwidth  : int
-  val vr_bitwidth  : int
+  val cr_bitwidth : int
+  val vr_bitwidth : int
   val mem : var
   val flags : Var.Set.t
 end
 
 module PowerPC_32 : PowerPC
 module PowerPC_64 : PowerPC
-
 module PowerPC_32_cpu : CPU
 module PowerPC_64_cpu : CPU

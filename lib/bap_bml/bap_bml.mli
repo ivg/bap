@@ -10,7 +10,6 @@ open Bap.Std
     corresponding module.
 *)
 
-
 (** A parser error  *)
 exception Parse_error of string
 
@@ -33,9 +32,10 @@ end
 
 module type Ops = sig
   type t
-  module Nullary  : Registry with type t = t
-  module Unary    : Registry with type t = string -> t
+
+  module Nullary : Registry with type t = t
+  module Unary : Registry with type t = string -> t
 end
 
 module Predicates : Ops with type t = bool Term.visitor
-module Mappers    : Ops with type t = Term.mapper
+module Mappers : Ops with type t = Term.mapper

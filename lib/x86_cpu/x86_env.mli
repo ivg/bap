@@ -3,7 +3,6 @@ open X86_types
 
 (** {2 condition flag bits} *)
 
-
 (** carry flag  *)
 val cf : var
 
@@ -46,11 +45,8 @@ val ss : var
 (** fpu control register  *)
 val fpu_ctrl : var
 
-
 (** mx status control register  *)
-val mxcsr    : var
-
-
+val mxcsr : var
 
 val o_rax : operand
 val o_rcx : operand
@@ -58,13 +54,12 @@ val o_rdx : operand
 val o_rbx : operand
 val o_rsp : operand
 val o_rbp : operand
-val o_fs  : operand
-val o_gs  : operand
-
+val o_fs : operand
+val o_gs : operand
 val pref_lock : int
-val repnz     : int
-val repz      : int
-val hint_bnt  : int
+val repnz : int
+val repz : int
+val hint_bnt : int
 val hint_bt : int
 val pref_cs : int
 val pref_ss : int
@@ -78,7 +73,6 @@ val pref_addrsize : int
 (** Prefixes that we can usually handle automatically *)
 val standard_prefs : int list
 
-
 (** CPU BIL variables.
 
     For simplicity we're using the same names for registers in
@@ -88,7 +82,6 @@ val standard_prefs : int list
 
 *)
 module type ModeVars = sig
-
   (** base pointer *)
   val rbp : var
 
@@ -116,22 +109,19 @@ module type ModeVars = sig
   (** data register *)
   val rdx : var
 
-
   (** RFLAGS register  *)
-  val rflags  : var
-
+  val rflags : var
 
   (** Global Descriptor Table  *)
   val gdt : var
-
 
   (** Local Descriptor Table  *)
   val ldt : var
 
   (** segment registers let bases *)
   val fs_base : var
-  val gs_base : var
 
+  val gs_base : var
   val seg_ss : var option
   val seg_es : var option
   val seg_cs : var option
@@ -139,9 +129,9 @@ module type ModeVars = sig
   val seg_fs : var option
   val seg_gs : var option
 
-
   (** memory  *)
   val mem : var
+
   (* r8 -> r15 *)
 
   (** r8-r15 registers.
@@ -150,20 +140,17 @@ module type ModeVars = sig
 
   (** Legacy version of the `r` array. *)
   val nums : var array
-  [@@deprecated "[since 2018-01] use `r` instead"]
+    [@@deprecated "[since 2018-01] use `r` instead"]
 
   (** array of YMM registers  *)
-  val ymms: var array
-
+  val ymms : var array
 end
-
 
 (** 32-bit mode registers  *)
 module R32 : ModeVars
 
 (** 64-bit mode registers  *)
 module R64 : ModeVars
-
 
 (** [vars_of_mode mode] creates registers for a [mode]  *)
 val vars_of_mode : mode -> (module ModeVars)
