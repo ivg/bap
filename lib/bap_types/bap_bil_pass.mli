@@ -13,5 +13,6 @@ val selected_passes : unit -> (bil -> bil) list
 
 module Pass_pp : sig
   val name : pass -> string
+
   include Printable.S with type t := pass
 end

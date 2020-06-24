@@ -2,33 +2,34 @@ open Core_kernel
 
 module Command = struct
   type 'a t = {
-    script  : string;
+    script : string;
     parser : string -> 'a;
-    language : [`python | `idc ]
-  } [@@deriving fields]
+    language : [ `python | `idc ];
+  }
+  [@@deriving fields]
 
-  type language = [`python | `idc]
+  type language = [ `python | `idc ]
+
   let create language = Fields.create ~language
 end
 
 type 'a command = 'a Command.t
 
 module Service = struct
-  type t = {
-    exec : 'a. 'a command -> 'a;
-    close : unit -> unit
-  }
+  type t = { exec : 'a. 'a command -> 'a; close : unit -> unit }
 
   exception Service_not_provided
 
-  let creator = ref (fun _ -> {
-        exec = (fun x -> raise Service_not_provided);
-        close = (fun () -> raise Service_not_provided);
-      } )
+  let creator =
+    ref (fun _ ->
+        {
+          exec = (fun x -> raise Service_not_provided);
+          close = (fun () -> raise Service_not_provided);
+        })
 
   let create target : t = !creator target
-  let provide (create:string -> t) : unit = creator := create
 
+  let provide (create : string -> t) : unit = creator := create
 end
 
 module Ida = struct
@@ -37,10 +38,13 @@ module Ida = struct
   open Service
 
   exception Failed of string
+
   exception Not_in_path
 
   let create = Service.create
+
   let exec service = service.exec
+
   let close service = service.close ()
 
   let with_file target command =
@@ -51,7 +55,9 @@ end
 
 module Std = struct
   type ida = Ida.t
+
   type 'a command = 'a Command.t
+
   module Ida = Ida
   module Command = Command
   module Service = Service

@@ -45,12 +45,12 @@ let addi cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = unsigned cpu.reg ops.(1) in
   let im = signed imm ops.(2) in
-  RTL.[ rt := ra + im; ]
+  RTL.[ rt := ra + im ]
 
 let li cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let im = unsigned imm ops.(1) in
-  RTL.[ rt := im; ]
+  RTL.[ rt := im ]
 
 (** Fixed-Point Arithmetic Instructions - Add Immediate Shifted
     Page 67 of IBM Power ISATM Version 3.0 B
@@ -62,13 +62,13 @@ let addis cpu ops =
   let ra = unsigned cpu.reg ops.(1) in
   let im = signed imm ops.(2) in
   let sh = unsigned const word 16 in
-  RTL.[ rt := ra + (im << sh); ]
+  RTL.[ rt := ra + (im << sh) ]
 
 let lis cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let im = signed imm ops.(1) in
   let sh = unsigned const word 16 in
-  RTL.[ rt := im << sh; ]
+  RTL.[ rt := im << sh ]
 
 (** Fixed-Point Arithmetic Instructions - Add
     Page 69 of IBM Power ISATM Version 3.0 B
@@ -79,7 +79,7 @@ let add cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
-  RTL.[rt := ra + rb]
+  RTL.[ rt := ra + rb ]
 
 (** Fixed-Point Arithmetic Instructions - Add Immediate Carrying
     Page 69 of IBM Power ISATM Version 3.0 B
@@ -95,12 +95,13 @@ let addic cpu ops =
   let ra = unsigned cpu.reg ops.(1) in
   let im = signed imm ops.(2) in
   let tm = unsigned var cpu.word_width in
-  RTL.[
-    tm := ra;
-    rt := ra + im;
-    cpu.ca := rt < low cpu.word_width tm;
-    cpu.ca32 := low word rt < low word tm;
-  ]
+  RTL.
+    [
+      tm := ra;
+      rt := ra + im;
+      cpu.ca := rt < low cpu.word_width tm;
+      cpu.ca32 := low word rt < low word tm;
+    ]
 
 (** Fixed-Point Arithmetic Instructions - Add Carrying
     Page 70 of IBM Power ISATM Version 3.0 B
@@ -112,12 +113,13 @@ let addc cpu ops =
   let ra = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
   let tm = unsigned var cpu.word_width in
-  RTL.[
-    tm := ra;
-    rt := ra + rb;
-    cpu.ca := rt < low cpu.word_width tm;
-    cpu.ca32 := low word rt < low word tm;
-  ]
+  RTL.
+    [
+      tm := ra;
+      rt := ra + rb;
+      cpu.ca := rt < low cpu.word_width tm;
+      cpu.ca32 := low word rt < low word tm;
+    ]
 
 (** Fixed-Point Arithmetic Instructions - Add Extend
     Page 71 of IBM Power ISATM Version 3.0 B
@@ -129,12 +131,13 @@ let adde cpu ops =
   let ra = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
   let tm = unsigned var cpu.word_width in
-  RTL.[
-    tm := ra;
-    rt := ra + rb + cpu.ca;
-    cpu.ca := rt < low cpu.word_width tm;
-    cpu.ca32 := low word rt < low word tm;
-  ]
+  RTL.
+    [
+      tm := ra;
+      rt := ra + rb + cpu.ca;
+      cpu.ca := rt < low cpu.word_width tm;
+      cpu.ca32 := low word rt < low word tm;
+    ]
 
 (** Fixed-Point Arithmetic Instructions - Add to Minus One Extend
     Page 71 of IBM Power ISATM Version 3.0 B
@@ -145,12 +148,13 @@ let addme cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = unsigned cpu.reg ops.(1) in
   let tm = unsigned var cpu.word_width in
-  RTL.[
-    tm := ra;
-    rt := ra + cpu.ca - one;
-    cpu.ca := rt < low cpu.word_width tm;
-    cpu.ca32 := low word rt < low word tm;
-  ]
+  RTL.
+    [
+      tm := ra;
+      rt := ra + cpu.ca - one;
+      cpu.ca := rt < low cpu.word_width tm;
+      cpu.ca32 := low word rt < low word tm;
+    ]
 
 (** Fixed-Point Arithmetic Instructions - Add to Zero extended
     Page 72 of IBM Power ISATM Version 3.0 B
@@ -161,28 +165,29 @@ let addze cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = unsigned cpu.reg ops.(1) in
   let tm = unsigned var cpu.word_width in
-  RTL.[
-    tm := ra;
-    rt := ra + cpu.ca;
-    cpu.ca := rt < low cpu.word_width tm;
-    cpu.ca32 := low word rt < low word tm;
-  ]
+  RTL.
+    [
+      tm := ra;
+      rt := ra + cpu.ca;
+      cpu.ca := rt < low cpu.word_width tm;
+      cpu.ca32 := low word rt < low word tm;
+    ]
 
 let init () =
-  "ADD4"   >| add;
-  "ADD4o"  >. add;
-  "ADDI"   >| addi;
-  "ADDIS"  >| addis;
-  "ADDIC"  >| addic;
+  "ADD4" >| add;
+  "ADD4o" >. add;
+  "ADDI" >| addi;
+  "ADDIS" >| addis;
+  "ADDIC" >| addic;
   "ADDICo" >. addic;
-  "ADDC"   >| addc;
-  "ADDCo"  >. addc;
-  "ADDE"   >| adde;
-  "ADDEo"  >. adde;
-  "ADDME"  >| addme;
+  "ADDC" >| addc;
+  "ADDCo" >. addc;
+  "ADDE" >| adde;
+  "ADDEo" >. adde;
+  "ADDME" >| addme;
   "ADDMEo" >. addme;
-  "ADDZE"  >| addze;
+  "ADDZE" >| addze;
   "ADDZEo" >. addze;
-  "LI"     >| li;
-  "LIS"    >| lis;
-  "LA"     >| addi;
+  "LI" >| li;
+  "LIS" >| lis;
+  "LA" >| addi

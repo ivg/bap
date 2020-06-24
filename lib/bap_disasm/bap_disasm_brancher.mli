@@ -5,9 +5,11 @@ open Bap_disasm_basic
 open Bap_disasm_block
 
 type t
+
 type brancher = t
 
 type dest = addr option * edge [@@deriving sexp]
+
 type dests = dest list [@@deriving sexp]
 
 val create : (mem -> full_insn -> dests) -> t

@@ -1,15 +1,9 @@
 open Core_kernel
 open Regular.Std
 
-type e_class =
-  | ELFCLASS32
-  | ELFCLASS64
-[@@deriving bin_io, compare, sexp]
+type e_class = ELFCLASS32 | ELFCLASS64 [@@deriving bin_io, compare, sexp]
 
-type e_data =
-  | ELFDATA2LSB
-  | ELFDATA2MSB
-[@@deriving bin_io, compare, sexp]
+type e_data = ELFDATA2LSB | ELFDATA2MSB [@@deriving bin_io, compare, sexp]
 
 type e_osabi =
   | ELFOSABI_SYSV
@@ -29,13 +23,7 @@ type e_osabi =
   | ELFOSABI_EXT of int
 [@@deriving bin_io, compare, sexp]
 
-type e_type =
-  | ET_NONE
-  | ET_REL
-  | ET_EXEC
-  | ET_DYN
-  | ET_CORE
-  | ET_EXT of int
+type e_type = ET_NONE | ET_REL | ET_EXEC | ET_DYN | ET_CORE | ET_EXT of int
 [@@deriving bin_io, compare, sexp]
 
 type e_machine =
@@ -49,7 +37,6 @@ type e_machine =
   | EM_MIPS
   | EM_S370
   | EM_MIPS_RS3_LE
-
   | EM_PARISC
   | EM_VPP500
   | EM_SPARC32PLUS
@@ -57,7 +44,6 @@ type e_machine =
   | EM_PPC
   | EM_PPC64
   | EM_S390
-
   | EM_V800
   | EM_FR20
   | EM_RH32
@@ -86,7 +72,6 @@ type e_machine =
   | EM_TINYJ
   | EM_X86_64
   | EM_PDSP
-
   | EM_FX66
   | EM_ST9PLUS
   | EM_ST7
@@ -134,11 +119,7 @@ type p_type =
   | PT_OTHER of int32
 [@@deriving bin_io, compare, sexp]
 
-type p_flag =
-  | PF_X
-  | PF_W
-  | PF_R
-  | PF_EXT of int
+type p_flag = PF_X | PF_W | PF_R | PF_EXT of int
 [@@deriving bin_io, compare, sexp]
 
 type sh_type =
@@ -157,23 +138,20 @@ type sh_type =
   | SHT_EXT of int32
 [@@deriving bin_io, compare, sexp]
 
-type sh_flag =
-  | SHF_WRITE
-  | SHF_ALLOC
-  | SHF_EXECINSTR
-  | SHF_EXT of int
+type sh_flag = SHF_WRITE | SHF_ALLOC | SHF_EXECINSTR | SHF_EXT of int
 [@@deriving bin_io, compare, sexp]
 
 type segment = {
-  p_type   : p_type;
-  p_flags  : p_flag list;
-  p_vaddr  : int64;
-  p_paddr  : int64;
-  p_align  : int64;
-  p_memsz  : int64;
+  p_type : p_type;
+  p_flags : p_flag list;
+  p_vaddr : int64;
+  p_paddr : int64;
+  p_align : int64;
+  p_memsz : int64;
   p_filesz : int64;
   p_offset : int64;
-} [@@deriving bin_io, compare, fields, sexp]
+}
+[@@deriving bin_io, compare, fields, sexp]
 
 type section = {
   sh_name : int;
@@ -186,8 +164,8 @@ type section = {
   sh_addralign : int64;
   sh_entsize : int64;
   sh_offset : int64;
-} [@@deriving bin_io, compare, fields, sexp]
-
+}
+[@@deriving bin_io, compare, fields, sexp]
 
 type elf = {
   e_class : e_class;
@@ -201,10 +179,8 @@ type elf = {
   e_shstrndx : int;
   e_sections : section seq;
   e_segments : segment seq;
-} [@@deriving bin_io, compare, fields, sexp]
+}
+[@@deriving bin_io, compare, fields, sexp]
 
-type table_info = {
-  table_offset : int64;
-  entry_size : int;
-  entry_num : int;
-} [@@deriving bin_io, compare, fields, sexp]
+type table_info = { table_offset : int64; entry_size : int; entry_num : int }
+[@@deriving bin_io, compare, fields, sexp]

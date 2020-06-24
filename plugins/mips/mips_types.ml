@@ -1,6 +1,5 @@
 open Core_kernel
 open Bap.Std
-
 open Mips_rtl
 open Mips_dsl
 open Mips_utils

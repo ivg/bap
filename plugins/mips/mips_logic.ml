@@ -7,9 +7,7 @@ let mand cpu ops =
   let rd = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let rt = unsigned cpu.reg ops.(2) in
-  RTL.[
-    rd := rs land rt;
-  ]
+  RTL.[ rd := rs land rt ]
 
 (* ANDI rd, rs, imm
  * And Immediate, MIPS32
@@ -18,9 +16,7 @@ let mandi cpu ops =
   let rd = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let im = unsigned imm ops.(2) in
-  RTL.[
-    rd := rs land im;
-  ]
+  RTL.[ rd := rs land im ]
 
 (* TODO: EXT rd, rs, p, s *)
 (* TODO: INS rd, rs, p, s *)
@@ -37,18 +33,14 @@ let nor cpu ops =
   let rd = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let rt = unsigned cpu.reg ops.(2) in
-  RTL.[
-    rd := lnot (rs lor rt);
-  ]
+  RTL.[ rd := lnot (rs lor rt) ]
 
 (* NOT rd, rs
  * Not in the manual *)
 let mnot cpu ops =
   let rd = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
-  RTL.[
-    rd := lnot rs;
-  ]
+  RTL.[ rd := lnot rs ]
 
 (* OR rd, rs, rt
  * Or, MIPS32
@@ -57,9 +49,7 @@ let mor cpu ops =
   let rd = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let rt = unsigned cpu.reg ops.(2) in
-  RTL.[
-    rd := rs lor rt;
-  ]
+  RTL.[ rd := rs lor rt ]
 
 (* ORI rd, rs, imm
  * Or Immediate, MIPS32
@@ -68,9 +58,7 @@ let mori cpu ops =
   let rd = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let im = unsigned imm ops.(2) in
-  RTL.[
-    rd := rs lor im;
-  ]
+  RTL.[ rd := rs lor im ]
 
 (* WSBH rd, rs
  * Word Swap Bytes Within Halfwords, MIPS32 Release 2
@@ -78,10 +66,7 @@ let mori cpu ops =
 let wsbh cpu ops =
   let rd = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
-  RTL.[
-    rd := nth byte rs 2 ^ nth byte rs 3 ^
-          nth byte rs 0 ^ nth byte rs 1;
-  ]
+  RTL.[ rd := nth byte rs 2 ^ nth byte rs 3 ^ nth byte rs 0 ^ nth byte rs 1 ]
 
 (* DSBH rd, rs
  * Doubleword Swap Bytes Within Halfwords, MIPS64 Release 2
@@ -89,12 +74,12 @@ let wsbh cpu ops =
 let dsbh cpu ops =
   let rd = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
-  RTL.[
-    rd := nth byte rs 6 ^ nth byte rs 7 ^
-          nth byte rs 4 ^ nth byte rs 5 ^
-          nth byte rs 2 ^ nth byte rs 3 ^
-          nth byte rs 0 ^ nth byte rs 1;
-  ]
+  RTL.
+    [
+      rd :=
+        nth byte rs 6 ^ nth byte rs 7 ^ nth byte rs 4 ^ nth byte rs 5
+        ^ nth byte rs 2 ^ nth byte rs 3 ^ nth byte rs 0 ^ nth byte rs 1;
+    ]
 
 (* DSHD rd, rs
  * Doubleword Swap Halfword Within Doublewords, MIPS64 Release 2
@@ -102,10 +87,12 @@ let dsbh cpu ops =
 let dshd cpu ops =
   let rd = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
-  RTL.[
-    rd := nth halfword rs 0 ^ nth halfword rs 1 ^
-          nth halfword rs 2 ^ nth halfword rs 3;
-  ]
+  RTL.
+    [
+      rd :=
+        nth halfword rs 0 ^ nth halfword rs 1 ^ nth halfword rs 2
+        ^ nth halfword rs 3;
+    ]
 
 (* XOR rd, rs, rt
  * Exclusive Or, MIPS32
@@ -114,9 +101,7 @@ let mxor cpu ops =
   let rd = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let rt = unsigned cpu.reg ops.(2) in
-  RTL.[
-    rd := rs lxor rt;
-  ]
+  RTL.[ rd := rs lxor rt ]
 
 (* XORI rd, rs, imm
  * Exclusive Or Immediate, MIPS32
@@ -125,9 +110,7 @@ let mxori cpu ops =
   let rd = unsigned cpu.reg ops.(0) in
   let rs = unsigned cpu.reg ops.(1) in
   let im = unsigned imm ops.(2) in
-  RTL.[
-    rd := rs lxor im;
-  ]
+  RTL.[ rd := rs lxor im ]
 
 (* BITSWAP rd, rt
  * Swaps (reverses) bits in each byte, MIPS32 Release 6
@@ -141,15 +124,17 @@ let bitswap cpu ops =
   let pos = unsigned var byte in
   let max_ind = unsigned const byte 7 in
   let byte_ind = unsigned var byte in
-  RTL.[
-    cnt := zero;
-    foreach biti rd [
-      byte_ind := cnt / width;
-      pos := byte_ind * width + (max_ind - (cnt % width));
-      biti := lsb (rt lsr pos);
-      cnt := cnt + one;
-    ];
-  ]
+  RTL.
+    [
+      cnt := zero;
+      foreach biti rd
+        [
+          byte_ind := cnt / width;
+          pos := (byte_ind * width) + (max_ind - (cnt % width));
+          biti := lsb (rt lsr pos);
+          cnt := cnt + one;
+        ];
+    ]
 
 (* DBITSWAP rd, rt  - 64bit instruction
  * Swaps (reverses) bits in each byte, MIPS64 Release 6
@@ -163,15 +148,17 @@ let dbitswap cpu ops =
   let pos = unsigned var byte in
   let max_ind = unsigned const byte 7 in
   let byte_ind = unsigned var byte in
-  RTL.[
-    cnt := zero;
-    foreach biti rd [
-      byte_ind := cnt / width;
-      pos := byte_ind * width + (max_ind - (cnt % width));
-      biti := lsb (rt lsr pos);
-      cnt := cnt + one;
-    ];
-  ]
+  RTL.
+    [
+      cnt := zero;
+      foreach biti rd
+        [
+          byte_ind := cnt / width;
+          pos := (byte_ind * width) + (max_ind - (cnt % width));
+          biti := lsb (rt lsr pos);
+          cnt := cnt + one;
+        ];
+    ]
 
 let () =
   Bap_main.Extension.declare @@ fun _ctxt ->

@@ -1,27 +1,26 @@
-let doc = "
-# DESCRIPTION
-
-Provides the $(b,bap:mark-visited) and $(b,bap:report-visited) components.
-"
+let doc =
+  "\n\
+   # DESCRIPTION\n\n\
+   Provides the $(b,bap:mark-visited) and $(b,bap:report-visited) components.\n"
 
 open Bap_main
 open Bap.Std
 open Bap_primus.Std
-include Self()
 
-module ReportProgress(Machine : Primus.Machine.S) = struct
+include Self ()
+
+module ReportProgress (Machine : Primus.Machine.S) = struct
   open Machine.Syntax
 
-  let report (visited,total) =
-    report_progress ~stage:(visited-1) ~total ();
+  let report (visited, total) =
+    report_progress ~stage:(visited - 1) ~total ();
     Machine.return ()
 
-  let init () =
-    Bap_primus_track_visited.progress >>> report
+  let init () = Bap_primus_track_visited.progress >>> report
 end
 
-
-let () = Extension.declare @@ fun _ ->
+let () =
+  Extension.declare @@ fun _ ->
   Bap_primus_track_visited.init ();
   Primus.Components.register_generic ~package:"bap" "report-visited"
     (module ReportProgress)

@@ -1,6 +1,5 @@
 open Powerpc.Std
 
-
 (** Fixed-Point Arithmetic Instructions - Divide Word
     Page 74 of IBM Power ISATM Version 3.0 B
     example:
@@ -12,11 +11,10 @@ let divw cpu ops =
   let rb = signed cpu.reg ops.(2) in
   let dividend = signed var word in
   let divisor = signed var word in
-  RTL.[
-    dividend := low word ra;
-    divisor := low word rb;
-    rt := dividend / divisor;
-  ]
+  RTL.
+    [
+      dividend := low word ra; divisor := low word rb; rt := dividend / divisor;
+    ]
 
 (** Fixed-Point Arithmetic Instructions - Divide Word Unsigned
     Page 74 of IBM Power ISATM Version 3.0 B
@@ -27,9 +25,7 @@ let divwu cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
-  RTL.[
-    rt := low word ra / low word rb;
-  ]
+  RTL.[ rt := low word ra / low word rb ]
 
 (** Fixed-Point Arithmetic Instructions - Divide Word Extended
     Page 75 of IBM Power ISATM Version 3.0 B
@@ -41,11 +37,8 @@ let divwe cpu ops =
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
   let x = signed var doubleword in
-  RTL.[
-    x := zero;
-    high word x := low word ra;
-    rt := low word (x / low word rb);
-  ]
+  RTL.
+    [ x := zero; high word x := low word ra; rt := low word (x / low word rb) ]
 
 (** Fixed-Point Arithmetic Instructions - Divide Word Extended Unsigned
     Page 75 of IBM Power ISATM Version 3.0 B
@@ -57,11 +50,8 @@ let divweu cpu ops =
   let ra = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
   let x = unsigned var doubleword in
-  RTL.[
-    x := zero;
-    high word x := low word ra;
-    rt := low word (x / low word rb);
-  ]
+  RTL.
+    [ x := zero; high word x := low word ra; rt := low word (x / low word rb) ]
 
 (** Fixed-Point Arithmetic Instructions - Modulo signed word
     Page 77 of IBM Power ISATM Version 3.0 B
@@ -73,11 +63,10 @@ let modsw cpu ops =
   let rb = signed cpu.reg ops.(2) in
   let dividend = signed var word in
   let divisor = signed var word in
-  RTL.[
-    dividend := low word ra;
-    divisor := low word rb;
-    rt := dividend % divisor;
-  ]
+  RTL.
+    [
+      dividend := low word ra; divisor := low word rb; rt := dividend % divisor;
+    ]
 
 (** Fixed-Point Arithmetic Instructions - Modulo unsigned word
     Page 77 of IBM Power ISATM Version 3.0 B
@@ -88,9 +77,7 @@ let moduw cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
-  RTL.[
-    rt := low word ra % low word rb;
-  ]
+  RTL.[ rt := low word ra % low word rb ]
 
 (** Fixed-Point Arithmetic Instructions - Divide doubleword
     Page 81 of IBM Power ISATM Version 3.0 B
@@ -101,9 +88,7 @@ let divd cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
-  RTL.[
-    rt := ra /  rb;
-  ]
+  RTL.[ rt := ra / rb ]
 
 (** Fixed-Point Arithmetic Instructions - Divide doubleword unsigned
     Page 81 of IBM Power ISATM Version 3.0 B
@@ -114,9 +99,7 @@ let divdu cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
-  RTL.[
-    rt := ra / rb;
-  ]
+  RTL.[ rt := ra / rb ]
 
 (** Fixed-Point Arithmetic Instructions - Divide doubleword extended
     Page 82 of IBM Power ISATM Version 3.0 B
@@ -129,12 +112,13 @@ let divde cpu ops =
   let rb = signed cpu.reg ops.(2) in
   let tm1 = signed var quadword in
   let tm2 = signed var quadword in
-  RTL.[
-    tm1 := zero;
-    high doubleword tm1 := ra;
-    tm2 := tm1 / rb;
-    rt := low doubleword tm2;
-  ]
+  RTL.
+    [
+      tm1 := zero;
+      high doubleword tm1 := ra;
+      tm2 := tm1 / rb;
+      rt := low doubleword tm2;
+    ]
 
 (** Fixed-Point Arithmetic Instructions - Divide doubleword extended unsigned
     Page 82 of IBM Power ISATM Version 3.0 B
@@ -147,12 +131,13 @@ let divdeu cpu ops =
   let rb = unsigned cpu.reg ops.(2) in
   let tm1 = unsigned var quadword in
   let tm2 = unsigned var quadword in
-  RTL.[
-    tm1 := zero;
-    high doubleword tm1 := ra;
-    tm2 := tm1 / rb;
-    rt := low doubleword tm2;
-  ]
+  RTL.
+    [
+      tm1 := zero;
+      high doubleword tm1 := ra;
+      tm2 := tm1 / rb;
+      rt := low doubleword tm2;
+    ]
 
 (** Fixed-Point Arithmetic Instructions - Modulo signed doubleword
     Page 83 of IBM Power ISATM Version 3.0 B
@@ -162,9 +147,7 @@ let modsd cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
-  RTL.[
-    rt := ra % rb;
-  ]
+  RTL.[ rt := ra % rb ]
 
 (** Fixed-Point Arithmetic Instructions - Modulo unsigned doubleword
     Page 83 of IBM Power ISATM Version 3.0 B
@@ -174,28 +157,26 @@ let modud cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = unsigned cpu.reg ops.(1) in
   let rb = unsigned cpu.reg ops.(2) in
-  RTL.[
-    rt := ra % rb;
-  ]
+  RTL.[ rt := ra % rb ]
 
 let init () =
-  "DIVW"    >| divw;
-  "DIVWo"   >. divw;
-  "DIVWU"   >| divwu;
-  "DIVWUo"  >. divwu;
-  "DIVWE"   >| divwe;
-  "DIVWEo"  >. divwe;
-  "DIVWEU"  >| divweu;
+  "DIVW" >| divw;
+  "DIVWo" >. divw;
+  "DIVWU" >| divwu;
+  "DIVWUo" >. divwu;
+  "DIVWE" >| divwe;
+  "DIVWEo" >. divwe;
+  "DIVWEU" >| divweu;
   "DIVWEUo" >. divweu;
-  "MODSW"   >| modsw;
-  "MODUW"   >| moduw;
-  "DIVD"    >| divd;
-  "DIVDo"   >. divd;
-  "DIVDU"   >| divdu;
-  "DIVDUo"  >. divdu;
-  "DIVDE"   >| divde;
-  "DIVDEo"  >. divde;
-  "DIVDEU"  >| divdeu;
+  "MODSW" >| modsw;
+  "MODUW" >| moduw;
+  "DIVD" >| divd;
+  "DIVDo" >. divd;
+  "DIVDU" >| divdu;
+  "DIVDUo" >. divdu;
+  "DIVDE" >| divde;
+  "DIVDEo" >. divde;
+  "DIVDEU" >| divdeu;
   "DIVDEUo" >. divdeu;
-  "MODSD"   >| modsd;
-  "MODUD"   >| modud;
+  "MODSD" >| modsd;
+  "MODUD" >| modud

@@ -3,12 +3,8 @@ open Core_kernel
 (* a region in a file *)
 type range = Parsexp.Positions.range [@@deriving sexp_of]
 
-
 (* a region in the specified file  *)
-type loc = {
-  file  : string;
-  range : range;
-} [@@deriving compare, sexp_of]
+type loc = { file : string; range : range } [@@deriving compare, sexp_of]
 
 type t = loc [@@deriving compare, sexp_of]
 

@@ -10,32 +10,34 @@ open Bap.Std
     corresponding module.
 *)
 
-
-(** A parser error  *)
 exception Parse_error of string
+(** A parser error  *)
 
 (** Interface to a registry.
     Registry is a key value storage.*)
 module type Registry = sig
   type t
 
+  val register : string -> t -> unit
   (** [register name value] register [value] with a given [name].
       If [name] was already associated with some other value, then
       it will be superseded with the new binding.   *)
-  val register : string -> t -> unit
 
-  (** [find name] find a value associated with the given [value]  *)
   val find : string -> t option
+  (** [find name] find a value associated with the given [value]  *)
 
-  (** [list ()] list all bindings  *)
   val list : unit -> (string * t) list
+  (** [list ()] list all bindings  *)
 end
 
 module type Ops = sig
   type t
-  module Nullary  : Registry with type t = t
-  module Unary    : Registry with type t = string -> t
+
+  module Nullary : Registry with type t = t
+
+  module Unary : Registry with type t = string -> t
 end
 
 module Predicates : Ops with type t = bool Term.visitor
-module Mappers    : Ops with type t = Term.mapper
+
+module Mappers : Ops with type t = Term.mapper

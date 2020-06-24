@@ -1,3 +1,4 @@
+type t = Bitvec.t
 (** Provides comparators for use with Janestreet Libraries.
 
     A comparator is a comparison function paired with a type that
@@ -83,83 +84,67 @@
 
     {[Set.empty Bitvec_order.Natural.comparator]}
 *)
-type t = Bitvec.t
 
-
-(** [compare x y] orders [x] and [y] in the natural order.  *)
 val compare : t -> t -> int
+(** [compare x y] orders [x] and [y] in the natural order.  *)
 
-
-(** type index for the increasing order  *)
 type ascending
+(** type index for the increasing order  *)
 
-(** type index for the decreasing order  *)
 type descending
+(** type index for the decreasing order  *)
 
-
-(** we use the increasing order as the natural ordering  *)
 type natural = ascending
+(** we use the increasing order as the natural ordering  *)
 
+type ('a, 'b) comparator =
+  (module Base.Comparator.S with type t = 'a and type comparator_witness = 'b)
 (** a type abbreviation for a comparator packed into a module.
 
     See the note about the historical meaning of the word comparator.
 *)
-type ('a,'b) comparator = (module Base.Comparator.S
-                            with type t = 'a
-                             and type comparator_witness = 'b)
 
-
-(** [natural] the packed comparator that sorts in the natural order *)
 val natural : (t, natural) comparator
+(** [natural] the packed comparator that sorts in the natural order *)
 
-(** [ascending] the packed comparator that sorts in the increasing order *)
 val ascending : (t, ascending) comparator
+(** [ascending] the packed comparator that sorts in the increasing order *)
 
-(** [descending] the packed comparator that sorts in the decreasing order  *)
 val descending : (t, descending) comparator
+(** [descending] the packed comparator that sorts in the decreasing order  *)
 
 (** [natural] the comparator that sorts in the natural order  *)
-module Natural : Base.Comparator.S
-  with type t = t
-   and type comparator_witness = natural
+module Natural :
+  Base.Comparator.S with type t = t and type comparator_witness = natural
 
 (** [natural] the comparator that sorts in the natural order  *)
-module Ascending : Base.Comparator.S
-  with type t = t
-   and type comparator_witness = ascending
+module Ascending :
+  Base.Comparator.S with type t = t and type comparator_witness = ascending
 
 (** [natural] the comparator that sorts in the natural order  *)
-module Descending : Base.Comparator.S
-  with type t = t
-   and type comparator_witness = descending
+module Descending :
+  Base.Comparator.S with type t = t and type comparator_witness = descending
 
 (** provides the natural order by default  *)
-include Base.Comparator.S
-  with type t := t
-   and type comparator_witness = natural
-
+include Base.Comparator.S with type t := t and type comparator_witness = natural
 
 (** Open this module to make the following fields available  *)
 module Comparators : sig
-
-  (** the default ordering for bitvectors  *)
   type bitvec_order = natural
+  (** the default ordering for bitvectors  *)
 
-
-  (** [bitvec_compare x y] orders [x] and [y] in the natural order  *)
   val bitvec_compare : t -> t -> int
+  (** [bitvec_compare x y] orders [x] and [y] in the natural order  *)
 
-
-  (** [bitvec_equal x y] is true if [x] is equal to [y]. *)
   val bitvec_equal : t -> t -> bool
+  (** [bitvec_equal x y] is true if [x] is equal to [y]. *)
 
-
+  val bitvec_order : (t, natural) comparator
   (** [natural] the packed comparator that sorts in the natural order *)
-  val bitvec_order  : (t, natural) comparator
 
+  val bitvec_ascending : (t, ascending) comparator
   (** [ascending] the packed comparator that sorts in the increasing order *)
-  val bitvec_ascending  : (t, ascending) comparator
 
-  (** [descending] the packed comparator that sorts in the decreasing order  *)
   val bitvec_descending : (t, descending) comparator
+  (** [descending] the packed comparator that sorts in the decreasing order  *)
 end

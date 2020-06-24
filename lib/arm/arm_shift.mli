@@ -2,6 +2,7 @@ open Core_kernel
 open Bap.Std
 open Arm_types
 
+val lift_c : src:exp -> shift -> shift:exp -> typ -> exp * exp
 (** Need the operand and the carry flag value src - the source, if you
     intend to use the carry bit, this must not be the destination of the
     shift expression.  This means it must be a temp that contains the
@@ -9,8 +10,6 @@ open Arm_types
     of shift shift - must be a exp that is the amount of the shift
     (ignored for rrx)
 *)
-val lift_c : src:exp -> shift -> shift:exp -> typ -> exp * exp
-
 
 (** decodes a register shifted operand
  * src - the operand to be shifted, cannot be the destination
@@ -23,7 +22,7 @@ val lift_c : src:exp -> shift -> shift:exp -> typ -> exp * exp
 
 val lift_r : src:exp -> op -> shift:exp -> typ -> exp * exp
 
-
+val lift_i : src:exp -> op -> typ -> exp * exp
 (** decodes an immediate shifted operand
  * src - the operand to be shifted, cannot be the destination
  *        in practice this means it must be a temp variable.
@@ -34,9 +33,8 @@ val lift_r : src:exp -> op -> shift:exp -> typ -> exp * exp
  *              If the shift type is RRX, a shift amount of 1 is implied.
  * t - the type
  **)
-val lift_i : src:exp -> op -> typ -> exp * exp
 
-
+val lift_mem : src:exp -> op -> typ -> exp
 (** decodes a shifted operand for a memory operation
  * src - the operand to be shifted
  * shift - an int64,
@@ -46,4 +44,3 @@ val lift_i : src:exp -> op -> typ -> exp * exp
  *              are number 1 through 5
  * typ - the type
  **)
-val lift_mem : src:exp -> op -> typ -> exp

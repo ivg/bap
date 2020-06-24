@@ -1,6 +1,5 @@
 open Core_kernel
 
-
 (** Initialize LLVM backend.
 
     So far we keep the interface very tight, though later we may
@@ -8,16 +7,15 @@ open Core_kernel
 
 *)
 module Std : sig
-  type x86_syntax = [`att | `intel] [@@deriving sexp]
+  type x86_syntax = [ `att | `intel ] [@@deriving sexp]
 
-
-  (** [llvm_version] *)
   val llvm_version : string
+  (** [llvm_version] *)
 
-  (** [init_disassembler ()] initializes and registers the LLVM based disassembler.  *)
   val init_disassembler : ?x86_syntax:x86_syntax -> unit -> unit Or_error.t
+  (** [init_disassembler ()] initializes and registers the LLVM based disassembler.  *)
 
-
+  val init_loader : ?base:int64 -> ?pdb_path:string -> unit -> unit
   (** [init-loader ()] initializes and registers the LLVM based
       loader.
 
@@ -29,5 +27,4 @@ module Std : sig
       a folder where it resides (by default, the current working
       directory). In the latter case, the pdb file name will be
       infered from the executable name. *)
-  val init_loader : ?base:int64 -> ?pdb_path:string -> unit -> unit
 end

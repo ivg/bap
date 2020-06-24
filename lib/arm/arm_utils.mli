@@ -2,12 +2,11 @@ open Core_kernel
 open Bap.Std
 open Arm_types
 
-
 val tmp : ?name:string -> typ -> var
 
 val assn : var -> exp -> stmt
 
-val fail : Source_code_position.t -> ('a,unit,string,'b) format4 -> 'a
+val fail : Source_code_position.t -> ('a, unit, string, 'b) format4 -> 'a
 
 val bitlen : typ -> int
 
@@ -18,7 +17,6 @@ val exp_of_op : op -> exp
 val exp_of_reg : reg -> exp
 
 val cast_of_sign : sign -> int -> exp -> exp
-
 
 val assert_reg : Source_code_position.t -> op -> reg
 

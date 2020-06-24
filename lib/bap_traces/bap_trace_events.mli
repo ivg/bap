@@ -8,18 +8,19 @@ open Bap_trace_event_types
     and can hold more or less event types.
 *)
 
-(** an read access to a memory cell  *)
 val memory_load : addr move tag
+(** an read access to a memory cell  *)
 
-(** a write access to a memory cell  *)
 val memory_store : addr move tag
+(** a write access to a memory cell  *)
 
-(** a value was read from a given register  *)
 val register_read : var move tag
+(** a value was read from a given register  *)
 
-(** a value is written to the specified register  *)
 val register_write : var move tag
+(** a value is written to the specified register  *)
 
+val timestamp : int64 tag
 (** this event can used to synchronize traces.
     The semantics is unspecified and remains open, so that a particular
     user can define its own meaning. But, the idea behind it, is that
@@ -37,31 +38,30 @@ val register_write : var move tag
     4. the clock is incremented every realtime second (e.g., obvious)
     5. the clock is incremented every realtime second,  and is initialized
        with the number of second that has passed since the start of the Epoch. *)
-val timestamp : int64 tag
 
-(** CPU PC register changed its value  *)
 val pc_update : addr tag
+(** CPU PC register changed its value  *)
 
+val code_exec : chunk tag
 (** CPU loaded this memory chunk for execution. This event
     occurs just before the execution. All side effects of
     the code execution occurs after this event. *)
-val code_exec : chunk tag
 
+val context_switch : int tag
 (** operating system has performed context switching to a provided
     thread (process) id. *)
-val context_switch : int tag
 
-(** a system call has occurred  *)
 val syscall : syscall tag
+(** a system call has occurred  *)
 
-(** a software exception has occurred.  *)
 val exn : exn tag
+(** a software exception has occurred.  *)
 
-(** a control flow transfer from one procedure to another has occurred  *)
 val call : call tag
+(** a control flow transfer from one procedure to another has occurred  *)
 
-(** a return from a call has occurred  *)
 val return : return tag
+(** a return from a call has occurred  *)
 
-(** represent an executable module being loaded *)
 val modload : modload tag
+(** represent an executable module being loaded *)

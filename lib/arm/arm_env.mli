@@ -2,100 +2,86 @@ open Core_kernel
 open Bap.Std
 open Arm_types
 
-
-(** [spsr]  Saved Processor Status Register *)
 val spsr : var
+(** [spsr]  Saved Processor Status Register *)
 
-
-(** [cpsr] Current Processor Status Register  *)
 val cpsr : var
+(** [cpsr] Current Processor Status Register  *)
 
-
-(** [nf] Negative Flag  *)
 val nf : var
+(** [nf] Negative Flag  *)
 
-(** [zf] Zero Flag  *)
 val zf : var
+(** [zf] Zero Flag  *)
 
-(** [cf] Carry Flag  *)
 val cf : var
+(** [cf] Carry Flag  *)
 
-(** [vf] oVerfrlow Flag  *)
 val vf : var
+(** [vf] oVerfrlow Flag  *)
 
-(** [qf] underflow (saturation) Flag  *)
 val qf : var
+(** [qf] underflow (saturation) Flag  *)
 
-
-(** [ge] array of general registers  *)
 val ge : var array
+(** [ge] array of general registers  *)
 
-
-(** [itstate] ITSTATE register  *)
 val itstate : var
+(** [itstate] ITSTATE register  *)
 
-
-(** [lr] Link Register   *)
 val lr : var
+(** [lr] Link Register   *)
 
-
-(** [pc] Program Counter  *)
 val pc : var
+(** [pc] Program Counter  *)
 
-(** [sp] Stack Pointer  *)
 val sp : var
+(** [sp] Stack Pointer  *)
 
-
-(** general purpose register  *)
 val r0 : var
-
 (** general purpose register  *)
+
 val r1 : var
-
 (** general purpose register  *)
+
 val r2 : var
-
 (** general purpose register  *)
+
 val r3 : var
-
 (** general purpose register  *)
+
 val r4 : var
-
 (** general purpose register  *)
+
 val r5 : var
-
 (** general purpose register  *)
+
 val r6 : var
-
-
 (** general purpose register  *)
+
 val r7 : var
-
-
 (** general purpose register  *)
+
 val r8 : var
-
-
 (** general purpose register  *)
+
 val r9 : var
-
 (** general purpose register  *)
+
 val r10 : var
-
 (** general purpose register  *)
+
 val r11 : var
-
 (** general purpose register  *)
+
 val r12 : var
+(** general purpose register  *)
 
-
-(** [of_reg arm_reg] lifts arm register into BIL variable  *)
 val of_reg : reg -> var
+(** [of_reg arm_reg] lifts arm register into BIL variable  *)
 
-
-(** [new_var name] creates a freshly new variable prefixed with [name]  *)
 val new_var : string -> var
+(** [new_var name] creates a freshly new variable prefixed with [name]  *)
 
-
-(** [mem] BIL variable that denotes the system memory.  *)
 val mem : var
+(** [mem] BIL variable that denotes the system memory.  *)

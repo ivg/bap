@@ -7,9 +7,7 @@ let sb cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let base = signed cpu.reg ops.(1) in
   let off = signed imm ops.(2) in
-  RTL.[
-    cpu.store (base + off) rt byte;
-  ]
+  RTL.[ cpu.store (base + off) rt byte ]
 
 (* SBE rt, offset(base)
  * Store Byte EVA, MIPS32
@@ -18,9 +16,7 @@ let sbe cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let base = signed cpu.reg ops.(1) in
   let off = signed imm ops.(2) in
-  RTL.[
-    cpu.store (base + off) rt byte;
-  ]
+  RTL.[ cpu.store (base + off) rt byte ]
 
 (* SC rt, offset(base)
  * Store Conditional Word, MIPS32
@@ -29,9 +25,7 @@ let sc cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let base = signed cpu.reg ops.(1) in
   let off = signed imm ops.(2) in
-  RTL.[
-    cpu.store (base + off) rt word;
-  ]
+  RTL.[ cpu.store (base + off) rt word ]
 
 (* SCD rt, offset(base)
  * Store Conditional Doubleword, MIPS64
@@ -40,9 +34,7 @@ let scd cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let base = signed cpu.reg ops.(1) in
   let off = signed imm ops.(2) in
-  RTL.[
-    cpu.store (base + off) rt doubleword;
-  ]
+  RTL.[ cpu.store (base + off) rt doubleword ]
 
 (* SCE rt, offset(base)
  * Store Conditional Word EVA, MIPS32
@@ -51,9 +43,7 @@ let sce cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let base = signed cpu.reg ops.(1) in
   let off = signed imm ops.(2) in
-  RTL.[
-    cpu.store (base + off) rt word;
-  ]
+  RTL.[ cpu.store (base + off) rt word ]
 
 (* SCX rt, offset(base)
  * Store Conditional Word Extended, MIPS32 Release 6
@@ -62,9 +52,7 @@ let scx cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let base = signed cpu.reg ops.(1) in
   let off = signed imm ops.(2) in
-  RTL.[
-    cpu.store (base + off) rt word;
-  ]
+  RTL.[ cpu.store (base + off) rt word ]
 
 (* SCDX rt, offset(base)
  * Store Conditional Doubleword Extended, MIPS64 Release 6
@@ -73,9 +61,7 @@ let scdx cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let base = signed cpu.reg ops.(1) in
   let off = signed imm ops.(2) in
-  RTL.[
-    cpu.store (base + off) rt doubleword;
-  ]
+  RTL.[ cpu.store (base + off) rt doubleword ]
 
 (* SCXE rt, offset(base)
  * Store Conditional Word EVA Extended, MIPS32 Release 6
@@ -84,9 +70,7 @@ let scxe cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let base = signed cpu.reg ops.(1) in
   let off = signed imm ops.(2) in
-  RTL.[
-    cpu.store (base + off) rt word;
-  ]
+  RTL.[ cpu.store (base + off) rt word ]
 
 (* SD rt, offset(base)
  * Store Doubleword, MIPS64
@@ -95,9 +79,7 @@ let sd cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let base = signed cpu.reg ops.(1) in
   let off = signed imm ops.(2) in
-  RTL.[
-    cpu.store (base + off) rt doubleword;
-  ]
+  RTL.[ cpu.store (base + off) rt doubleword ]
 
 (* TODO: SDL rt, offset(base) *)
 (* TODO: SDR rt, offset(base) *)
@@ -109,9 +91,7 @@ let sh cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let base = signed cpu.reg ops.(1) in
   let off = signed imm ops.(2) in
-  RTL.[
-    cpu.store (base + off) rt halfword;
-  ]
+  RTL.[ cpu.store (base + off) rt halfword ]
 
 (* SHE rt, offset(base)
  * Store Halfword EVA, MIPS32
@@ -120,9 +100,7 @@ let she cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let base = signed cpu.reg ops.(1) in
   let off = signed imm ops.(2) in
-  RTL.[
-    cpu.store (base + off) rt halfword;
-  ]
+  RTL.[ cpu.store (base + off) rt halfword ]
 
 (* SW rt, offset(base)
  * Store Word, MIPS32
@@ -131,9 +109,7 @@ let sw cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let base = signed cpu.reg ops.(1) in
   let off = signed imm ops.(2) in
-  RTL.[
-    cpu.store (base + off) rt word;
-  ]
+  RTL.[ cpu.store (base + off) rt word ]
 
 (* SWE rt, offset(base)
  * Store Word EVA, MIPS32
@@ -142,9 +118,7 @@ let swe cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let base = signed cpu.reg ops.(1) in
   let off = signed imm ops.(2) in
-  RTL.[
-    cpu.store (base + off) rt word;
-  ]
+  RTL.[ cpu.store (base + off) rt word ]
 
 (* TODO: SWL rt, offset(base) *)
 (* TODO: SWLE rt, offset(base) *)

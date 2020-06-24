@@ -119,48 +119,43 @@ open Format
     outputted. Otherwise, [id] and [title] has the same behavior.
 *)
 
+type mode = string
 (** A name of mode, by default the following modes ares supported
     [html], [blocks], [attr] and [none]
 *)
-type mode = string
+
 exception Unknown_mode of string
 
-
-
+val install : Format.formatter -> mode -> unit
 (** [install ppf mode] switch formatter [ppf] into a [mode].
     In a default [mode] (named [none]), the semantics tags are
     ignored. Once a [mode] is installed, all tags will be rendered
     according to the mode.
 *)
-val install : Format.formatter -> mode -> unit
 
-
+val with_mode : Format.formatter -> mode -> f:(unit -> 'a) -> 'a
 (** [with_mode ppf mode f] installs [mode], calls [f], and then
     reinstalls the previous mode.  *)
-val with_mode : Format.formatter -> mode -> f:(unit -> 'a) -> 'a
 
-
+val register_mode : mode -> (formatter -> unit) -> unit
 (** [register_mode mode init] installs new mode.
     The [init] function must install all mode hooks using
     {!Format} interface.  *)
-val register_mode : mode -> (formatter -> unit) -> unit
 
-
-(** [available_modes ()] lists all currently installed modes.  *)
 val available_modes : unit -> mode list
+(** [available_modes ()] lists all currently installed modes.  *)
 
 (** Attributes mode.
 
     See {!colors} for the description of the mode.
 *)
 module Attr : sig
-
-  (** [show name] enable attribute with the [name].  *)
   val show : string -> unit
+  (** [show name] enable attribute with the [name].  *)
 
-  (** [hide name] disable attribute with the [name].  *)
   val hide : string -> unit
+  (** [hide name] disable attribute with the [name].  *)
 
-  (** [print_colors yesno] enable/disable color submode. *)
   val print_colors : bool -> unit
+  (** [print_colors yesno] enable/disable color submode. *)
 end

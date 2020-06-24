@@ -2,17 +2,18 @@ open Core_kernel
 open Bap.Std
 open Format
 
-include Self()
-
+include Self ()
 
 let run options project =
   let arch = Project.arch project in
   let module Target = (val target_of_arch arch) in
-  let module Phoenix = Phoenix_output.Make(struct
-      let project = project
-      let options = options
-      module Target = Target
-    end) in
+  let module Phoenix = Phoenix_output.Make (struct
+    let project = project
+
+    let options = options
+
+    module Target = Target
+  end) in
   let dest = Phoenix.store () in
   printf "Stored data to %s@." dest
 
@@ -25,21 +26,22 @@ let dep_label_with x y =
   Config.(flag ~deprecated:"Use --label-with=.. instead." name ~doc)
 
 let with_name = dep_label_with "name" "block name"
-let with_asm  = dep_label_with "asm"  "assembler instructions"
-let with_bil  = dep_label_with "bil"  "bil instructions"
+
+let with_asm = dep_label_with "asm" "assembler instructions"
+
+let with_bil = dep_label_with "bil" "bil instructions"
 
 let labels_with : _ Config.param =
   let doc =
-    "Put block name, assembler instructions, or bil instructions on
-     graph labels using `name', `asm', or `bil' respectively. Can be
-     specified as a list of multiple elements separated by commas." in
-  let possibilities = [
-    "name", `with_name;
-    "asm",  `with_asm;
-    "bil",  `with_bil;
-  ] in
-  Config.(param (list (enum possibilities)) ~default:[`with_name]
-            "labels-with" ~doc)
+    "Put block name, assembler instructions, or bil instructions on\n\
+    \     graph labels using `name', `asm', or `bil' respectively. Can be\n\
+    \     specified as a list of multiple elements separated by commas."
+  in
+  let possibilities =
+    [ ("name", `with_name); ("asm", `with_asm); ("bil", `with_bil) ]
+  in
+  Config.(
+    param (list (enum possibilities)) ~default:[ `with_name ] "labels-with" ~doc)
 
 let output_folder : string Config.param =
   let doc = "Output data into the specified folder" in
@@ -65,38 +67,37 @@ let no_optimizations : bool Config.param =
   let doc = "Disable all kinds of optimizations" in
   Config.(flag "no-optimizations" ~doc)
 
-let create
-    a b c d e f g = Phoenix_options.Fields.create
-    a b c d e f g
+let create a b c d e f g = Phoenix_options.Fields.create a b c d e f g
 
-let man = [
-  `S "DESCRIPTION";
-  `P "Output information about processed binary in a human readable
-      format. This will emit CFG for each format in dot format. It
-      will also store BIL and ASM code in html format.Output folder
-      can be optionally specified. If omitted, the basename of the
-      target file will be used as a directory name.";
-  `S "SEE ALSO";
-  `P "$(b,bap-plugin-print)(1), $(b,text-tags)(3)"
-]
+let man =
+  [
+    `S "DESCRIPTION";
+    `P
+      "Output information about processed binary in a human readable\n\
+      \      format. This will emit CFG for each format in dot format. It\n\
+      \      will also store BIL and ASM code in html format.Output folder\n\
+      \      can be optionally specified. If omitted, the basename of the\n\
+      \      target file will be used as a directory name.";
+    `S "SEE ALSO";
+    `P "$(b,bap-plugin-print)(1), $(b,text-tags)(3)";
+  ]
 
 let () =
   Config.manpage man;
-  Config.when_ready (fun {Config.get=(!)} ->
+  Config.when_ready (fun { Config.get = ( ! ) } ->
       let cfg_format =
         let deprecated_options =
-          [`with_name, !with_name;
-           `with_asm,  !with_asm;
-           `with_bil,  !with_bil] |>
-          List.filter ~f:snd |>
-          List.map ~f:fst in
-        deprecated_options @ !labels_with in
-      let options = create
-          !output_folder
-          cfg_format
-          !no_resolve
-          !keep_alive
-          !no_inline
-          !keep_consts
-          !no_optimizations in
+          [
+            (`with_name, !with_name);
+            (`with_asm, !with_asm);
+            (`with_bil, !with_bil);
+          ]
+          |> List.filter ~f:snd |> List.map ~f:fst
+        in
+        deprecated_options @ !labels_with
+      in
+      let options =
+        create !output_folder cfg_format !no_resolve !keep_alive !no_inline
+          !keep_consts !no_optimizations
+      in
       Project.register_pass' (run options))

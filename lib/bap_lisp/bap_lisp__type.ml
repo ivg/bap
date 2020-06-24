@@ -2,19 +2,21 @@ open Core_kernel
 open Bap_core_theory
 open Bap_lisp__types
 module Context = Bap_lisp__context
+
 type context = Context.t
 
-type signature = {
-  args : typ list;
-  rest : typ option;
-  ret  : typ;
-}
+type signature = { args : typ list; rest : typ option; ret : typ }
 
 let symbol_size = 63
+
 let sort s = Type (Theory.Value.Sort.forget s)
+
 let bool = sort Theory.Bool.t
+
 let word n = sort (Theory.Bitv.define n)
+
 let sym = Symbol
+
 let var n = Name n
 
 type read_error = Empty | Not_sexp | Bad_sort
@@ -30,34 +32,28 @@ type read_error = Empty | Not_sexp | Bad_sort
  *   | Atom x when Char.is_digit x.[0] -> Ok (Index (int_of_string x))
  *   | x -> Result.map (parse_sort x) ~f:(fun x -> Sort.Sort x) *)
 
-
 let read s =
   if String.length s < 1 then Error Empty
+  else if Char.is_lowercase s.[0] then Ok (Name s)
   else
-  if Char.is_lowercase s.[0]
-  then Ok (Name s)
-  else match Sexp.of_string s with
+    match Sexp.of_string s with
     | exception _ -> Error Not_sexp
-    | s ->
-      failwith "Sort parsing is not implemented yet"
+    | s -> failwith "Sort parsing is not implemented yet"
+
 (* Result.map (parse_sort s) ~f:(fun s -> Type s) *)
 
 let any = Any
 
-
-let signature ?rest args ret = {
-  ret;
-  rest;
-  args;
-}
+let signature ?rest args ret = { ret; rest; args }
 
 module Check = struct
-  let sort typ s = match typ with
+  let sort typ s =
+    match typ with
     | Any | Name _ -> true
     | Symbol -> false
     | Type s' ->
-      let s = Theory.Value.Sort.forget s in
-      Theory.Value.Sort.Top.compare s s' = 0
+        let s = Theory.Value.Sort.forget s in
+        Theory.Value.Sort.Top.compare s s' = 0
 end
 
 module Spec = struct
@@ -107,17 +103,16 @@ module Spec = struct
    *
    *   end
    * end *)
-
 end
 
-let pp ppf t = match t with
+let pp ppf t =
+  match t with
   | Any | Symbol -> ()
   | Name s -> Format.fprintf ppf "%s" s
   | Type _ -> ()
 
+include Comparable.Make (struct
+  type t = typ [@@deriving sexp, compare]
+end)
 
-include Comparable.Make(struct
-    type t = typ [@@deriving sexp, compare]
-  end)
-
-type t = typ [@@deriving sexp,compare]
+type t = typ [@@deriving sexp, compare]

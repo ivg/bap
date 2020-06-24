@@ -18,12 +18,10 @@ module Scheme = struct
   (** relocation file offset  *)
   let rel_off = "rel-off" %: int
 
-  let file_type () =
-    Ogre.declare ~name:"file-type" (scheme name) ident
+  let file_type () = Ogre.declare ~name:"file-type" (scheme name) ident
 
   (** entry point  *)
-  let entry () =
-    Ogre.declare ~name:"entry" (scheme rel_addr) ident
+  let entry () = Ogre.declare ~name:"entry" (scheme rel_addr) ident
 
   let default_base_address () =
     Ogre.declare ~name:"default-base-address" (scheme addr) ident
@@ -40,8 +38,9 @@ module Scheme = struct
   let is_relocatable () = Ogre.declare ~name:"relocatable" (scheme flag) ident
 
   let section_entry () =
-    Ogre.declare ~name:"section-entry" (scheme name $ rel_addr $ size $ off)
-      (fun name addr size off -> name, addr, size, off)
+    Ogre.declare ~name:"section-entry"
+      (scheme name $ rel_addr $ size $ off)
+      (fun name addr size off -> (name, addr, size, off))
 
   (** named entry that contains code *)
   let code_entry () =
@@ -51,15 +50,18 @@ module Scheme = struct
   let symbol_entry () =
     Ogre.declare ~name:"symbol-entry"
       (scheme name $ rel_addr $ size $ off)
-      (fun name addr size off -> name, addr, size, off)
-
+      (fun name addr size off -> (name, addr, size, off))
 end
 
 module type S = sig
   type 'a m
+
   val segments : unit m
+
   val sections : unit m
-  val symbols  : unit m
+
+  val symbols : unit m
+
   val code_regions : unit m
 end
 
@@ -69,5 +71,6 @@ end
 
 module type Loader_target = sig
   include Rules
+
   module Relocatable : Rules
 end

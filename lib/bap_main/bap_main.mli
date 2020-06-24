@@ -337,14 +337,28 @@
 
 open Bap_future.Std
 
-(** describes an error condition. *)
 type error = ..
+(** describes an error condition. *)
 
-
-(** captures the evaluation context. *)
 type ctxt
+(** captures the evaluation context. *)
 
-
+val init :
+  ?features:string list ->
+  ?requires:string list ->
+  ?library:string list ->
+  ?argv:string array ->
+  ?env:(string -> string option) ->
+  ?log:[ `Formatter of Format.formatter | `Dir of string ] ->
+  ?out:Format.formatter ->
+  ?err:Format.formatter ->
+  ?man:string ->
+  ?name:string ->
+  ?version:string ->
+  ?default:(ctxt -> (unit, error) result) ->
+  ?default_command:string ->
+  unit ->
+  (unit, error) result
 (** [init ()] initializes the BAP framework.
 
     Attention: function is only needed when BAP framework is
@@ -444,31 +458,18 @@ type ctxt
     be used when command line arguments are provided but do not
     specify a command. @since 2.1.0.
 *)
-val init :
-  ?features:string list ->
-  ?requires:string list ->
-  ?library:string list ->
-  ?argv:string array ->
-  ?env:(string -> string option) ->
-  ?log:[`Formatter of Format.formatter | `Dir of string] ->
-  ?out:Format.formatter ->
-  ?err:Format.formatter ->
-  ?man:string ->
-  ?name:string ->
-  ?version:string ->
-  ?default:(ctxt -> (unit,error) result) ->
-  ?default_command:string ->
-  unit -> (unit, error) result
-
 
 (** Writing and declaring BAP extensions.  *)
 module Extension : sig
-
-
-  (** defines a data type for a parameter.  *)
   type 'a typ
+  (** defines a data type for a parameter.  *)
 
-
+  val declare :
+    ?features:string list ->
+    ?provides:string list ->
+    ?doc:string ->
+    (ctxt -> (unit, error) result) ->
+    unit
   (** [declare extension] declares the [extension] function.
 
       The function is run when one of the features [provided] by the
@@ -507,14 +508,8 @@ module Extension : sig
       full manual written in the markdown syntax. See the
       corresponding [man] parameter of the [Bap_main.init] function.
   *)
-  val declare :
-    ?features:string list ->
-    ?provides:string list ->
-    ?doc:string ->
-    (ctxt -> (unit,error) result) -> unit
 
-
-
+  val documentation : string -> unit
   (** [documentation s] specifies plugin documentation.
 
       A non-declarative way of specifying documentation. Each
@@ -526,11 +521,10 @@ module Extension : sig
       !{Bap_main.init} functions for more information on the accepted
       formats.
   *)
-  val documentation : string -> unit
 
   (** Interface for specifying commands.*)
   module Command : sig
-
+    type ('f, 'r) t
     (** description of the command line syntax.
 
         The ['f] parameter is the type of function that is evaluated
@@ -550,12 +544,18 @@ module Extension : sig
         [int] and [ctxt] respectively, and must evaluate to a value of type
         [unit,error] result
     *)
-    type ('f,'r) t
 
+    type 'a param
     (** ['a param] command line parameter represented with the OCaml
         value of type ['a].  *)
-    type 'a param
 
+    val declare :
+      ?doc:string ->
+      ?requires:string list ->
+      string ->
+      ('f, ctxt -> (unit, error) result) t ->
+      'f ->
+      unit
     (** [declare grammar name command] declares a [command].
 
         Declares to BAP that a command with the given [name] should be
@@ -637,24 +637,18 @@ module Extension : sig
         the configuration parameters of extensions on which the
         command depends didn't change.
     *)
-    val declare :
-      ?doc:string ->
-      ?requires:string list -> string ->
-      ('f,ctxt -> (unit,error) result) t -> 'f -> unit
 
-
+    val args : ('a, 'a) t
     (** [args] is the empty grammar.
         Useful to define commands that do not take arguments or
         as the initial grammar which is later extended with parameters
         using the [$] operator (see below).
     *)
-    val args : ('a, 'a) t
 
-
+    val ( $ ) : ('a, 'b -> 'c) t -> 'b param -> ('a, 'c) t
     (** [args t $ t'] extends the grammar specification [t] with [t'].*)
-    val ($) : ('a,'b -> 'c) t -> 'b param -> ('a,'c) t
 
-
+    val argument : ?doc:string -> 'a typ -> 'a param
     (** [argument t] declares a positional argument of type [t].
 
         The grammar of [args $ term $ argument t]:
@@ -663,9 +657,8 @@ module Extension : sig
         v}
 
     *)
-    val argument : ?doc:string -> 'a typ -> 'a param
 
-
+    val arguments : ?doc:string -> 'a typ -> 'a list param
     (** [arguments t] declares an infinite number of positional
         arguments of type [t].
 
@@ -691,9 +684,13 @@ module Extension : sig
               (String.concat ~sep:" " inputs) output
         ]}
     *)
-    val arguments : ?doc:string -> 'a typ -> 'a list param
 
-
+    val switch :
+      ?doc:('a -> string) ->
+      ?aliases:('a -> string list) ->
+      'a list ->
+      ('a -> string) ->
+      'a option param
     (** [switch values name] declares a switch-type parameter.
 
         The grammar of {args $ term $ switch values name}:
@@ -717,14 +714,13 @@ module Extension : sig
         line keys, i.e., non-empty strings that do not contain
         whitespaces.
     *)
-    val switch :
+
+    val switches :
       ?doc:('a -> string) ->
       ?aliases:('a -> string list) ->
       'a list ->
       ('a -> string) ->
-      'a option param
-
-
+      'a list param
     (** [switches values name] is multiple choice switch-type parameter.
 
         The grammar of [args $ term $ switches values name] is
@@ -753,13 +749,15 @@ module Extension : sig
         line keys, i.e., non-empty strings that do not contain
         whitespaces.
     *)
-    val switches :
-      ?doc:('a -> string) ->
-      ?aliases:('a -> string list) ->
-      'a list ->
-      ('a -> string) ->
-      'a list param
 
+    val dictionary :
+      ?doc:('k -> string) ->
+      ?as_flag:('k -> 'd) ->
+      ?aliases:('k -> string list) ->
+      'k list ->
+      'd typ ->
+      ('k -> string) ->
+      ('k * 'd) list param
     (** [dictionary keys t name] declares a dictionary-style parameter.
 
         The grammar of [args $ term $ dictionary keys t name] is
@@ -811,15 +809,14 @@ module Extension : sig
         @parameter doc if specified then [doc k] will be the
         documentation string for the [--<key k>] parameter.
     *)
-    val dictionary :
-      ?doc:('k -> string) ->
-      ?as_flag:('k -> 'd) ->
-      ?aliases:('k -> string list) ->
-      'k list ->
-      'd typ ->
-      ('k -> string) ->
-      ('k * 'd) list param
 
+    val parameter :
+      ?doc:string ->
+      ?as_flag:'a ->
+      ?aliases:string list ->
+      'a typ ->
+      string ->
+      'a param
     (** [parameter t name] declares a generic command line parameter.
 
         The grammar of [args $ term $ parameter t name]
@@ -865,15 +862,14 @@ module Extension : sig
         parameter.
 
     *)
-    val parameter :
+
+    val parameters :
       ?doc:string ->
       ?as_flag:'a ->
       ?aliases:string list ->
       'a typ ->
-      string -> 'a param
-
-
-
+      string ->
+      'a list param
     (** [parameters] declares a generic command line parameter.
 
         The grammar of [args $ term $ parameters t name]
@@ -890,15 +886,8 @@ module Extension : sig
 
         See the {!parameter} function for more details.
     *)
-    val parameters :
-      ?doc:string ->
-      ?as_flag:'a ->
-      ?aliases:string list ->
-      'a typ ->
-      string ->
-      'a list param
 
-
+    val flag : ?doc:string -> ?aliases:string list -> string -> bool param
     (** [flag name] declares a flag-style parameter.
 
         The flag-style parameter is like a normal [parameter], except
@@ -918,14 +907,8 @@ module Extension : sig
         The rest of parameters of the [flag] function have the same
         meaning as described in the {!parameter} function.
     *)
-    val flag :
-      ?doc:string ->
-      ?aliases:string list ->
-      string ->
-      bool param
 
-
-
+    val flags : ?doc:string -> ?aliases:string list -> string -> int param
     (** [flags] declares a muti-occurring flag-style parameter.
 
         The grammar of [args $ term $ flag name] is
@@ -939,13 +922,7 @@ module Extension : sig
         make occur more than once on the command line. The number of
         occurrences will be passed to the command.
     *)
-    val flags :
-      ?doc:string ->
-      ?aliases:string list ->
-      string ->
-      int param
   end
-
 
   (** Configuration Parameters.
 
@@ -962,18 +939,16 @@ module Extension : sig
         plugin name.
   *)
   module Configuration : sig
-
-    (** a configuration parameter  *)
     type 'a param
+    (** a configuration parameter  *)
 
-
-    (** the current configuration.  *)
     type t = ctxt
+    (** the current configuration.  *)
 
-    (** a piece of information about a system component. *)
     type info
+    (** a piece of information about a system component. *)
 
-
+    val get : ctxt -> 'a param -> 'a
     (** [get ctxt parameter] gets the value of the [parameter].
 
         Accesses the value of the previously defined [parameter].
@@ -981,9 +956,14 @@ module Extension : sig
         The [Extension.Syntax] module also provides an infix version
         of this function under the [-->] name.
     *)
-    val get : ctxt -> 'a param -> 'a
 
-
+    val parameter :
+      ?doc:string ->
+      ?as_flag:'a ->
+      ?aliases:string list ->
+      'a typ ->
+      string ->
+      'a param
     (** [parameter t name] declares a configuration parameter.
 
         This declaration extends the [common-options] grammar by
@@ -1060,13 +1040,14 @@ module Extension : sig
             printf "Will dive to depth %d\n" (ctxt-->depth)
         ]}
     *)
-    val parameter :
+
+    val parameters :
       ?doc:string ->
       ?as_flag:'a ->
       ?aliases:string list ->
-      'a typ -> string -> 'a param
-
-
+      'a typ ->
+      string ->
+      'a list param
     (** [parameters t name] declares a multi-occurring parameter.
 
         This declaration extends the [common-options] grammar by
@@ -1091,13 +1072,8 @@ module Extension : sig
         The rest of the parameters have the same meaning as in
         the {!parameter} function.
     *)
-    val parameters :
-      ?doc:string ->
-      ?as_flag:'a ->
-      ?aliases:string list ->
-      'a typ -> string -> 'a list param
 
-
+    val flag : ?doc:string -> ?aliases:string list -> string -> bool param
     (** [flag name] declares a parameter that can be used as a flag.
 
         This is a specialization of a more general {!parameter}
@@ -1120,35 +1096,26 @@ module Extension : sig
         line, or in the environment, then [get ctxt p] will evaluate
         to [true], where [p] is the declared parameter.
     *)
-    val flag :
-      ?doc:string ->
-      ?aliases:string list ->
-      string -> bool param
 
-
+    val determined : 'a param -> 'a future
     (** [determined p] is a future that becomes determined when
         context is ready.  *)
-    val determined : 'a param -> 'a future
 
-
-    (** [version] is the preconfigured application version.*)
     val version : string
+    (** [version] is the preconfigured application version.*)
 
-
-    (** [datadir] a directory for BAP readonly data. *)
     val datadir : string
+    (** [datadir] a directory for BAP readonly data. *)
 
-
+    val libdir : string
     (** [libdir] a directory for BAP object files,
         libraries, and internal binaries that are not intended to be
         executed directly.  *)
-    val libdir : string
 
-
-    (** [confdir] a directory for BAP specific configuration files *)
     val confdir : string
+    (** [confdir] a directory for BAP specific configuration files *)
 
-
+    val refine : ?provides:string list -> ?exclude:string list -> ctxt -> ctxt
     (** [refine ~provides ~exclude ctxt] refines the context.
 
         Refine the context by excluding from it all parameters of the
@@ -1161,11 +1128,8 @@ module Extension : sig
         @parameter exclude (defaults to the empty set) the set of
         features that should be excluded.
     *)
-    val refine :
-      ?provides:string list ->
-      ?exclude:string list ->
-      ctxt -> ctxt
 
+    val plugins : ctxt -> info list
     (** [plugins ctxt] enumerates all enabled plugins.
 
         If [provides] is specified, then enumerates only plugins
@@ -1176,21 +1140,20 @@ module Extension : sig
         [exclude] list.
 
     *)
-    val plugins : ctxt -> info list
 
-
+    val commands : ctxt -> info list
     (** [commands ctxt] enumerates all available commands.
 
         If [features] and/or [exclude] are specified, then they have
         the same meaning as in {!plugins ~features ~exclude}.*)
-    val commands : ctxt -> info list
 
-    (** [name info] returns the name of a plugin or command. *)
     val info_name : info -> string
+    (** [name info] returns the name of a plugin or command. *)
 
-    (** [doc info] returns the short documentation.  *)
     val info_doc : info -> string
+    (** [doc info] returns the short documentation.  *)
 
+    val digest : ctxt -> string
     (** [digest context] returns the [context] digest.
 
         The digest is a 128-bit MD5 sum of all options of
@@ -1204,14 +1167,12 @@ module Extension : sig
         Note: the digest doesn't include the command options and
         arguments only plugins configuration options.
     *)
-    val digest : ctxt -> string
 
     val features : ctxt -> string list
 
-    (** prints the context  *)
     val pp : Format.formatter -> ctxt -> unit
+    (** prints the context  *)
   end
-
 
   (** A lightweight syntax for accessing configuration parameters.
 
@@ -1219,9 +1180,8 @@ module Extension : sig
       parameter value using the infix notation, e.g., [ctxt-->arch].
   *)
   module Syntax : sig
-    val (-->) : ctxt -> 'a Configuration.param -> 'a
+    val ( --> ) : ctxt -> 'a Configuration.param -> 'a
   end
-
 
   (** Data types for parameters.
 
@@ -1248,7 +1208,13 @@ module Extension : sig
   module Type : sig
     type 'a t = 'a typ
 
-
+    val define :
+      ?name:string ->
+      ?digest:('a -> string) ->
+      parse:(string -> 'a) ->
+      print:('a -> string) ->
+      'a ->
+      'a t
     (** [define ~parse ~print default] defines a data type.
 
         The [print x] is the textual representation of the value
@@ -1272,39 +1238,30 @@ module Extension : sig
         @parameter name is the variable name which is used to
         reference to elements of the type [t]. (defaults to ["VAL"]).
     *)
-    val define :
-      ?name:string ->
-      ?digest:('a -> string) ->
-      parse:(string -> 'a) ->
-      print:('a -> string) -> 'a -> 'a t
 
-
-
+    val refine : 'a t -> ('a -> unit) -> 'a t
     (** [refine t valid] narrows the set of [t], to those that [valid].
         The [valid] function shall raise the [Invalid_arg] exception,
         for all values that are not members of the newly defined data type.
     *)
-    val refine : 'a t -> ('a -> unit) -> 'a t
 
-
-    (** [renam t var] denotes elements of [t] with the new [var].  *)
     val rename : 'a t -> string -> 'a t
+    (** [renam t var] denotes elements of [t] with the new [var].  *)
 
-
-    (** [digest t x] is the digest of [x].  *)
     val digest : 'a t -> 'a -> string
+    (** [digest t x] is the digest of [x].  *)
 
+    val ( =? ) : 'a t -> 'a -> 'a t
     (** [t =? x] defines a new type with different default.
 
         The new type has the same definition as [t] except the default
         value is [x].
     *)
-    val (=?) : 'a t -> 'a -> 'a t
 
-
+    val ( |= ) : 'a t -> ('a -> unit) -> 'a t
     (** [t |? guard] is [refine t guard] *)
-    val (|=) : 'a t -> ('a -> unit) -> 'a t
 
+    val ( %: ) : string -> 'a t -> 'a t
     (** [name %: t] is [rename t name].
 
         Note, operators [(=?)], [|?], and [(%:)] are designed to be
@@ -1315,72 +1272,62 @@ module Extension : sig
         ]}
 
     *)
-    val (%:) : string -> 'a t -> 'a t
 
-
-    (** [print t x] is the textual representation of [x].  *)
     val print : 'a t -> 'a -> string
+    (** [print t x] is the textual representation of [x].  *)
 
-
+    val parse : 'a t -> string -> 'a
     (** [parse t s] is the OCaml value representing [s].
 
         Of those [s] which are not valid, raises the [Invalid_arg] exception.*)
-    val parse : 'a t -> string -> 'a
 
-
-    (** [name t] is the name of the var that ranges of [t].  *)
     val name : 'a t -> string
+    (** [name t] is the name of the var that ranges of [t].  *)
 
-
-    (** [default t] is the default value of [t].  *)
     val default : 'a t -> 'a
+    (** [default t] is the default value of [t].  *)
 
     (** {3 Predefined data types}  *)
 
-    (** [bool] is ["true" | "false"]  *)
     val bool : bool t
+    (** [bool] is ["true" | "false"]  *)
 
-
-    (** [char] is a single character.  *)
     val char : char t
+    (** [char] is a single character.  *)
 
+    val int : int t
     (** [int] is a sequence of digits.
 
         Common OCaml syntax is supported, with binary, decimal,
         and hexadecimal literals.
     *)
-    val int : int t
 
-
+    val nativeint : nativeint t
     (** [nativeint] is a sequence of digit.
 
         This type uses processor-native integer as OCaml representation so it
         is one bit wider than the [int] type.
     *)
-    val nativeint : nativeint t
 
-
-    (** [int32] is a sequence of digits. *)
     val int32 : int32 t
+    (** [int32] is a sequence of digits. *)
 
-    (** [int64] is a sequence of digits. *)
     val int64 : int64 t
+    (** [int64] is a sequence of digits. *)
 
-    (** [float] is a floating point number. *)
     val float : float t
+    (** [float] is a floating point number. *)
 
-
+    val string : string t
     (** [string] is a sequence of bytes.
 
         When the sequence contains whitespaces, delimit the whole
         sequence with double or single quotes.*)
-    val string : string t
 
-
-    (** [some t] extends [t] with an empty string. *)
     val some : 'a t -> 'a option t
+    (** [some t] extends [t] with an empty string. *)
 
-
+    val enum : (string * 'a) list -> 'a t
     (** [enum repr] defines a type from the given representation.
 
         Defines a type with such [print] and [parse], that for each
@@ -1392,17 +1339,15 @@ module Extension : sig
         representation there are different values, then the result is
         undefined.
     *)
-    val enum : (string * 'a) list -> 'a t
 
-
+    val path : string t
     (** [path] denotes a file path.
 
         The path is suitable for denoting output paths and its digest
         is the digest of the characters, which constitute the path.
     *)
-    val path : string t
 
-
+    val file : string t
     (** [file] the name of an input file or directory.
 
         The file denoted by the name must exist and must be
@@ -1434,59 +1379,52 @@ module Extension : sig
             new random digest is created from the directory name and
             the current time.
     *)
-    val file : string t
 
-
+    val dir : string t
     (** [dir] denotes a file which must be a directory.
 
         The directory denoted by the name must exist. See the [file]
         type for more information about computing the digest.
     *)
-    val dir : string t
 
+    val non_dir_file : string t
     (** [dir] denotes a file which must not be a directory.
 
         The directory denoted by the name must exist. See the [file]
         type for more information about computing the digest.
     *)
-    val non_dir_file : string t
 
-
-    (** [list ~sep t] is a list of [t] elements, separated with [sep].   *)
     val list : ?sep:char -> 'a t -> 'a list t
+    (** [list ~sep t] is a list of [t] elements, separated with [sep].   *)
 
-
+    val array : ?sep:char -> 'a t -> 'a array t
     (** [array ~sep t] is an array of [t] elements, separated with [sep].
         @parameter sep defaults to [','].
     *)
-    val array : ?sep:char -> 'a t -> 'a array t
 
+    val pair : ?sep:char -> 'a t -> 'b t -> ('a * 'b) t
     (** [pair ~sep t1 t2] is a pair [t1] and [t2], separated with [sep].
 
         @parameter sep defaults to [',']. *)
-    val pair : ?sep:char -> 'a t -> 'b t -> ('a * 'b) t
 
+    val t2 : ?sep:char -> 'a t -> 'b t -> ('a * 'b) t
     (** [t2 ~sep t1 t2] is a pair [t1] and [t2], separated with [sep].
 
         @parameter sep defaults to [','].
     *)
-    val t2 : ?sep:char -> 'a t -> 'b t -> ('a * 'b) t
 
-
+    val t3 : ?sep:char -> 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
     (** [t3 ~sep t1 t2 t3] is ([t1],[t2],[t3]), separated with [sep].
         @parameter sep defaults to [',']. *)
-    val t3 : ?sep:char -> 'a t -> 'b t -> 'c t -> ('a * 'b * 'c) t
 
+    val t4 : ?sep:char -> 'a t -> 'b t -> 'c t -> 'd t -> ('a * 'b * 'c * 'd) t
     (** [t4 ~sep t1 t2 t3 t4] is ([t1],[t2],[t3],[t4), separated with [sep].
         @parameter sep defaults to [',']. *)
-    val t4 : ?sep:char -> 'a t -> 'b t -> 'c t -> 'd t -> ('a * 'b * 'c * 'd) t
   end
-
 
   (** An extensible set of possible errors  *)
   module Error : sig
     type t = error = ..
-
 
     type t += Configuration
 
@@ -1498,12 +1436,11 @@ module Extension : sig
 
     type t += Bug of exn * string
 
-
-    (** [pp ppf err] outputs a human readable description of [err]  *)
     val pp : Format.formatter -> t -> unit
+    (** [pp ppf err] outputs a human readable description of [err]  *)
 
+    val register_printer : (t -> string option) -> unit
     (** [register_printer to_string] registers a printer for a subset
         of the errors. *)
-    val register_printer : (t -> string option) -> unit
   end
 end

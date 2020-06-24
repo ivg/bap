@@ -11,19 +11,19 @@ let stb cpu ops =
   let rs = unsigned cpu.reg ops.(0) in
   let im = signed imm ops.(1) in
   let ra = signed cpu.reg ops.(2) in
-  RTL.[ cpu.store (ra + im) rs byte; ]
+  RTL.[ cpu.store (ra + im) rs byte ]
 
 let sth cpu ops =
   let rs = unsigned cpu.reg ops.(0) in
   let im = signed imm ops.(1) in
   let ra = signed cpu.reg ops.(2) in
-  RTL.[ cpu.store (ra + im) rs halfword; ]
+  RTL.[ cpu.store (ra + im) rs halfword ]
 
 let stw cpu ops =
   let rs = unsigned cpu.reg ops.(0) in
   let im = signed imm ops.(1) in
   let ra = signed cpu.reg ops.(2) in
-  RTL.[ cpu.store (ra + im) rs word; ]
+  RTL.[ cpu.store (ra + im) rs word ]
 
 (** Fixed-point Store Byte/Halfword/Word/Doubleword Indexed
     Pages 54-57 of IBM Power ISATM Version 3.0 B
@@ -36,25 +36,25 @@ let stbx cpu ops =
   let rs = unsigned cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
-  RTL.[ cpu.store (ra + rb) rs byte; ]
+  RTL.[ cpu.store (ra + rb) rs byte ]
 
 let sthx cpu ops =
   let rs = unsigned cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
-  RTL.[ cpu.store (ra + rb) rs halfword; ]
+  RTL.[ cpu.store (ra + rb) rs halfword ]
 
 let stwx cpu ops =
   let rs = unsigned cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
-  RTL.[ cpu.store (ra + rb) rs word; ]
+  RTL.[ cpu.store (ra + rb) rs word ]
 
 let stdx cpu ops =
   let rs = unsigned cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
-  RTL.[ cpu.store (ra + rb) rs doubleword; ]
+  RTL.[ cpu.store (ra + rb) rs doubleword ]
 
 (** fixed-point Store Byte/Halfword/Word with Update
     Pages 54-56 of IBM Power ISATM Version 3.0 B
@@ -66,28 +66,19 @@ let stbu cpu ops =
   let rs = unsigned cpu.reg ops.(1) in
   let im = signed imm ops.(2) in
   let ra = signed cpu.reg ops.(3) in
-  RTL.[
-    cpu.store (ra + im) rs byte;
-    ra := ra + im;
-  ]
+  RTL.[ cpu.store (ra + im) rs byte; ra := ra + im ]
 
 let sthu cpu ops =
   let rs = unsigned cpu.reg ops.(1) in
   let im = signed imm ops.(2) in
   let ra = signed cpu.reg ops.(3) in
-  RTL.[
-    cpu.store (ra + im) rs halfword;
-    ra := ra + im;
-  ]
+  RTL.[ cpu.store (ra + im) rs halfword; ra := ra + im ]
 
 let stwu cpu ops =
   let rs = unsigned cpu.reg ops.(1) in
   let im = signed imm ops.(2) in
   let ra = signed cpu.reg ops.(3) in
-  RTL.[
-    cpu.store (ra + im) rs word;
-    ra := ra + im;
-  ]
+  RTL.[ cpu.store (ra + im) rs word; ra := ra + im ]
 
 (** Fixed-point Store Byte/Halfword/Word/Doubleword with Update Indexed
     Pages 54-57 of IBM Power ISATM Version 3.0 B
@@ -100,37 +91,25 @@ let stbux cpu ops =
   let rs = unsigned cpu.reg ops.(1) in
   let ra = signed cpu.reg ops.(2) in
   let rb = signed cpu.reg ops.(3) in
-  RTL.[
-    cpu.store (ra + rb) rs byte;
-    ra := ra + rb;
-  ]
+  RTL.[ cpu.store (ra + rb) rs byte; ra := ra + rb ]
 
 let sthux cpu ops =
   let rs = unsigned cpu.reg ops.(1) in
   let ra = signed cpu.reg ops.(2) in
   let rb = signed cpu.reg ops.(3) in
-  RTL.[
-    cpu.store (ra + rb) rs halfword;
-    ra := ra + rb;
-  ]
+  RTL.[ cpu.store (ra + rb) rs halfword; ra := ra + rb ]
 
 let stwux cpu ops =
   let rs = unsigned cpu.reg ops.(1) in
   let ra = signed cpu.reg ops.(2) in
   let rb = signed cpu.reg ops.(3) in
-  RTL.[
-    cpu.store (ra + rb) rs word;
-    ra := ra + rb;
-  ]
+  RTL.[ cpu.store (ra + rb) rs word; ra := ra + rb ]
 
 let stdux cpu ops =
   let rs = unsigned cpu.reg ops.(1) in
   let ra = signed cpu.reg ops.(2) in
   let rb = signed cpu.reg ops.(3) in
-  RTL.[
-    cpu.store (ra + rb) rs doubleword;
-    ra := ra + rb;
-  ]
+  RTL.[ cpu.store (ra + rb) rs doubleword; ra := ra + rb ]
 
 (** Fixed-point Store Doubleword
     Page 57 of IBM Power ISATM Version 3.0 B
@@ -140,9 +119,7 @@ let std cpu ops =
   let rs = unsigned cpu.reg ops.(0) in
   let im = signed imm ops.(1) in
   let ra = signed cpu.reg ops.(2) in
-  RTL.[
-    cpu.store (ra + im) rs doubleword;
-  ]
+  RTL.[ cpu.store (ra + im) rs doubleword ]
 
 (** Fixed-point Store Doubleword with Update
     Page 57 of IBM Power ISATM Version 3.0 B
@@ -153,11 +130,7 @@ let stdu cpu ops =
   let im = signed imm ops.(2) in
   let ra = signed cpu.reg ops.(3) in
   let ea = unsigned var doubleword in
-  RTL.[
-    ea := ra + im;
-    cpu.store ea rs doubleword;
-    ra := ea;
-  ]
+  RTL.[ ea := ra + im; cpu.store ea rs doubleword; ra := ea ]
 
 (** Fixed-point Store Halfword Byte-Reverse Indexed
     Pages 60-61 of IBM Power ISATM Version 3.0 B
@@ -170,12 +143,13 @@ let sthbrx cpu ops =
   let ea = unsigned var cpu.word_width in
   let x = unsigned var halfword in
   let y = unsigned var doubleword in
-  RTL.[
-    ea := ra + rb;
-    y := rs;
-    x := nth byte y 7 ^ nth byte y 6;
-    cpu.store ea x halfword;
-  ]
+  RTL.
+    [
+      ea := ra + rb;
+      y := rs;
+      x := nth byte y 7 ^ nth byte y 6;
+      cpu.store ea x halfword;
+    ]
 
 (** Fixed-point Store Word Byte-Reverse Indexed
     Pages 60-61 of IBM Power ISATM Version 3.0 B
@@ -188,12 +162,13 @@ let stwbrx cpu ops =
   let ea = unsigned var cpu.word_width in
   let x = unsigned var word in
   let y = unsigned var doubleword in
-  RTL.[
-    ea := ra + rb;
-    y := rs;
-    x := nth byte y 7 ^ nth byte y 6 ^ nth byte y 5 ^ nth byte y 4;
-    cpu.store ea x word;
-  ]
+  RTL.
+    [
+      ea := ra + rb;
+      y := rs;
+      x := nth byte y 7 ^ nth byte y 6 ^ nth byte y 5 ^ nth byte y 4;
+      cpu.store ea x word;
+    ]
 
 (** Fixed-point Store Doubleword Byte-Reverse Indexed
     Pages 60-61 of IBM Power ISATM Version 3.0 B
@@ -205,31 +180,32 @@ let stdbrx cpu ops =
   let rb = signed cpu.reg ops.(2) in
   let ea = unsigned var doubleword in
   let x = unsigned var doubleword in
-  RTL.[
-    ea := ra + rb;
-    x :=
-      nth byte rs 7 ^ nth byte rs 6 ^ nth byte rs 5 ^ nth byte rs 4 ^
-      nth byte rs 3 ^ nth byte rs 2 ^ nth byte rs 1 ^ nth byte rs 0;
-    cpu.store ea x doubleword;
-  ]
+  RTL.
+    [
+      ea := ra + rb;
+      x :=
+        nth byte rs 7 ^ nth byte rs 6 ^ nth byte rs 5 ^ nth byte rs 4
+        ^ nth byte rs 3 ^ nth byte rs 2 ^ nth byte rs 1 ^ nth byte rs 0;
+      cpu.store ea x doubleword;
+    ]
 
 let init () =
-  "STB"    >| stb;
-  "STH"    >| sth;
-  "STW"    >| stw;
-  "STBX"   >| stbx;
-  "STHX"   >| sthx;
-  "STWX"   >| stwx;
-  "STDX"   >| stdx;
-  "STBU"   >| stbu;
-  "STHU"   >| sthu;
-  "STWU"   >| stwu;
-  "STBUX"  >| stbux;
-  "STHUX"  >| sthux;
-  "STWUX"  >| stwux;
-  "STDUX"  >| stdux;
-  "STD"    >| std;
-  "STDU"   >| stdu;
+  "STB" >| stb;
+  "STH" >| sth;
+  "STW" >| stw;
+  "STBX" >| stbx;
+  "STHX" >| sthx;
+  "STWX" >| stwx;
+  "STDX" >| stdx;
+  "STBU" >| stbu;
+  "STHU" >| sthu;
+  "STWU" >| stwu;
+  "STBUX" >| stbux;
+  "STHUX" >| sthux;
+  "STWUX" >| stwux;
+  "STDUX" >| stdux;
+  "STD" >| std;
+  "STDU" >| stdu;
   "STHBRX" >| sthbrx;
   "STWBRX" >| stwbrx;
-  "STDBRX" >| stdbrx;
+  "STDBRX" >| stdbrx

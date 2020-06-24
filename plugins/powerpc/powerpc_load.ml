@@ -11,19 +11,19 @@ let lbz cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let im = signed imm ops.(1) in
   let ra = signed cpu.reg ops.(2) in
-  RTL.[ rt := cpu.load (ra + im) byte; ]
+  RTL.[ rt := cpu.load (ra + im) byte ]
 
 let lhz cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let im = signed imm ops.(1) in
   let ra = signed cpu.reg ops.(2) in
-  RTL.[ rt := cpu.load (ra + im) halfword; ]
+  RTL.[ rt := cpu.load (ra + im) halfword ]
 
 let lwz cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let im = signed imm ops.(1) in
   let ra = signed cpu.reg ops.(2) in
-  RTL.[ rt := cpu.load (ra + im) word; ]
+  RTL.[ rt := cpu.load (ra + im) word ]
 
 (** Fixed-point Load Byte/Halfword/Word and Zero Indexed
     Pages 48-54 of IBM Power ISATM Version 3.0 B
@@ -35,19 +35,19 @@ let lbzx cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
-  RTL.[ rt := cpu.load (ra + rb) byte; ]
+  RTL.[ rt := cpu.load (ra + rb) byte ]
 
 let lhzx cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
-  RTL.[ rt := cpu.load (ra + rb) halfword; ]
+  RTL.[ rt := cpu.load (ra + rb) halfword ]
 
 let lwzx cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
-  RTL.[ rt := cpu.load (ra + rb) word; ]
+  RTL.[ rt := cpu.load (ra + rb) word ]
 
 (** Fixed-point Load Byte/Halfword/Word and Zero with Update
     Pages 48-54 of IBM Power ISATM Version 3.0 B
@@ -59,28 +59,19 @@ let lbzu cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let im = signed imm ops.(2) in
   let ra = signed cpu.reg ops.(3) in
-  RTL.[
-    rt := cpu.load (ra + im) byte;
-    ra := ra + im;
-  ]
+  RTL.[ rt := cpu.load (ra + im) byte; ra := ra + im ]
 
 let lhzu cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let im = signed imm ops.(2) in
   let ra = signed cpu.reg ops.(3) in
-  RTL.[
-    rt := cpu.load (ra + im) halfword;
-    ra := ra + im;
-  ]
+  RTL.[ rt := cpu.load (ra + im) halfword; ra := ra + im ]
 
 let lwzu cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let im = signed imm ops.(2) in
   let ra = signed cpu.reg ops.(3) in
-  RTL.[
-    rt := cpu.load (ra + im) word;
-    ra := ra + im;
-  ]
+  RTL.[ rt := cpu.load (ra + im) word; ra := ra + im ]
 
 (** Fixed-point Load Byte/Halfword/Word and Zero with Update Indexed
     Pages 48-54 of IBM Power ISATM Version 3.0 B
@@ -92,29 +83,19 @@ let lbzux cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(2) in
   let rb = signed cpu.reg ops.(3) in
-  RTL.[
-    rt := cpu.load (ra + rb) byte;
-    ra := ra + rb;
-  ]
+  RTL.[ rt := cpu.load (ra + rb) byte; ra := ra + rb ]
 
 let lhzux cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(2) in
   let rb = signed cpu.reg ops.(3) in
-  RTL.[
-    rt := cpu.load (ra + rb) halfword;
-    ra := ra + rb;
-  ]
+  RTL.[ rt := cpu.load (ra + rb) halfword; ra := ra + rb ]
 
 let lwzux cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(2) in
   let rb = signed cpu.reg ops.(3) in
-  RTL.[
-    rt := cpu.load (ra + rb) word;
-    ra := ra + rb;
-  ]
-
+  RTL.[ rt := cpu.load (ra + rb) word; ra := ra + rb ]
 
 (** Fixed-point Load Halfword Algebraic
     Pages 48-54 of IBM Power ISATM Version 3.0 B
@@ -124,9 +105,7 @@ let lha cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let im = signed imm ops.(1) in
   let ra = signed cpu.reg ops.(2) in
-  RTL.[
-    rt := cpu.load (ra + im) halfword;
-  ]
+  RTL.[ rt := cpu.load (ra + im) halfword ]
 
 (** Fixed-point Load Word Algebraic
     Pages 48-54 of IBM Power ISATM Version 3.0 B
@@ -136,9 +115,7 @@ let lwa cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let im = signed imm ops.(1) in
   let ra = signed cpu.reg ops.(2) in
-  RTL.[
-    rt := cpu.load (ra + im) word;
-  ]
+  RTL.[ rt := cpu.load (ra + im) word ]
 
 (** Fixed-point Load Halfword/Word Algebraic Indexed
     Pages 48-54 of IBM Power ISATM Version 3.0 B
@@ -149,17 +126,13 @@ let lhax cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
-  RTL.[
-    rt := cpu.load (ra + rb) halfword;
-  ]
+  RTL.[ rt := cpu.load (ra + rb) halfword ]
 
 let lwax cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
-  RTL.[
-    rt := cpu.load (ra + rb) word;
-  ]
+  RTL.[ rt := cpu.load (ra + rb) word ]
 
 (** Fixed-point Load Halfword Algebraic with Update
     Pages 48-54 of IBM Power ISATM Version 3.0 B
@@ -169,10 +142,7 @@ let lhau cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let im = signed imm ops.(2) in
-  RTL.[
-    rt := cpu.load (ra + im) halfword;
-    ra := ra + im
-  ]
+  RTL.[ rt := cpu.load (ra + im) halfword; ra := ra + im ]
 
 (** Fixed-point Load Data/Word Algebraic with Update Indexed
     Pages 48-54 of IBM Power ISATM Version 3.0 B
@@ -183,19 +153,13 @@ let lhaux cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(2) in
   let rb = signed cpu.reg ops.(3) in
-  RTL.[
-    rt := cpu.load (ra + rb) halfword;
-    ra := ra + rb;
-  ]
+  RTL.[ rt := cpu.load (ra + rb) halfword; ra := ra + rb ]
 
 let lwaux cpu ops =
   let rt = signed cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(2) in
   let rb = signed cpu.reg ops.(3) in
-  RTL.[
-    rt := cpu.load (ra + rb) word;
-    ra := ra + rb;
-  ]
+  RTL.[ rt := cpu.load (ra + rb) word; ra := ra + rb ]
 
 (** Fixed-point Load Doubleword
     Pages 48-54 of IBM Power ISATM Version 3.0 B
@@ -205,9 +169,7 @@ let ld cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let im = signed imm ops.(1) in
   let ra = signed cpu.reg ops.(2) in
-  RTL.[
-    rt := cpu.load (ra + im) doubleword;
-  ]
+  RTL.[ rt := cpu.load (ra + im) doubleword ]
 
 (** Fixed-point Load Doubleword Indexed
     Pages 48-54 of IBM Power ISATM Version 3.0 B
@@ -217,9 +179,7 @@ let ldx cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
-  RTL.[
-    rt := cpu.load (ra + rb) doubleword;
-  ]
+  RTL.[ rt := cpu.load (ra + rb) doubleword ]
 
 (** Fixed-point Load Doubleword with Update
     Pages 48-54 of IBM Power ISATM Version 3.0 B
@@ -229,10 +189,7 @@ let ldu cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(1) in
   let im = unsigned imm ops.(2) in
-  RTL.[
-    rt := cpu.load (ra + im) doubleword;
-    ra := ra + im;
-  ]
+  RTL.[ rt := cpu.load (ra + im) doubleword; ra := ra + im ]
 
 (** Fixed-point Load Doubleword with Update Indexed
     Pages 48-54 of IBM Power ISATM Version 3.0 B
@@ -242,10 +199,7 @@ let ldux cpu ops =
   let rt = unsigned cpu.reg ops.(0) in
   let ra = signed cpu.reg ops.(2) in
   let rb = signed cpu.reg ops.(3) in
-  RTL.[
-    rt := cpu.load (ra + rb) doubleword;
-    ra := ra + rb;
-  ]
+  RTL.[ rt := cpu.load (ra + rb) doubleword; ra := ra + rb ]
 
 (** Fixed-point Load Halfword Byte-Reverse Indexed
     Pages 60-61 of IBM Power ISATM Version 3.0 B
@@ -256,10 +210,7 @@ let lhbrx cpu ops =
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
   let x = unsigned var halfword in
-  RTL.[
-    x := cpu.load (ra + rb) halfword;
-    rt := nth byte x 1 ^ nth byte x 0;
-  ]
+  RTL.[ x := cpu.load (ra + rb) halfword; rt := nth byte x 1 ^ nth byte x 0 ]
 
 (** Fixed-point Load Word Byte-Reverse Indexed
     Pages 60-61 of IBM Power ISATM Version 3.0 B
@@ -270,10 +221,11 @@ let lwbrx cpu ops =
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
   let x = unsigned var word in
-  RTL.[
-    x := cpu.load (ra + rb) word;
-    rt := nth byte x 3 ^ nth byte x 2 ^ nth byte x 1 ^ nth byte x 0;
-  ]
+  RTL.
+    [
+      x := cpu.load (ra + rb) word;
+      rt := nth byte x 3 ^ nth byte x 2 ^ nth byte x 1 ^ nth byte x 0;
+    ]
 
 (** Fixed-point Load Doubleword Byte-Reverse Indexed
     Pages 60-61 of IBM Power ISATM Version 3.0 B
@@ -284,37 +236,38 @@ let ldbrx cpu ops =
   let ra = signed cpu.reg ops.(1) in
   let rb = signed cpu.reg ops.(2) in
   let x = unsigned var doubleword in
-  RTL.[
-    x := cpu.load (ra + rb) doubleword;
-    rt :=
-      nth byte x 7 ^ nth byte x 6 ^ nth byte x 5 ^ nth byte x 4 ^
-      nth byte x 3 ^ nth byte x 2 ^ nth byte x 1 ^ nth byte x 0;
-  ]
+  RTL.
+    [
+      x := cpu.load (ra + rb) doubleword;
+      rt :=
+        nth byte x 7 ^ nth byte x 6 ^ nth byte x 5 ^ nth byte x 4 ^ nth byte x 3
+        ^ nth byte x 2 ^ nth byte x 1 ^ nth byte x 0;
+    ]
 
 let init () =
-  "LBZ"   >| lbz;
-  "LHZ"   >| lhz;
-  "LWZ"   >| lwz;
-  "LBZX"  >| lbzx;
-  "LHZX"  >| lhzx;
-  "LWZX"  >| lwzx;
-  "LBZU"  >| lbzu;
-  "LHZU"  >| lhzu;
-  "LWZU"  >| lwzu;
+  "LBZ" >| lbz;
+  "LHZ" >| lhz;
+  "LWZ" >| lwz;
+  "LBZX" >| lbzx;
+  "LHZX" >| lhzx;
+  "LWZX" >| lwzx;
+  "LBZU" >| lbzu;
+  "LHZU" >| lhzu;
+  "LWZU" >| lwzu;
   "LBZUX" >| lbzux;
   "LHZUX" >| lhzux;
   "LWZUX" >| lwzux;
-  "LHA"   >| lha;
-  "LWA"   >| lwa;
-  "LHAX"  >| lhax;
-  "LWAX"  >| lwax;
-  "LHAU"  >| lhau;
+  "LHA" >| lha;
+  "LWA" >| lwa;
+  "LHAX" >| lhax;
+  "LWAX" >| lwax;
+  "LHAU" >| lhau;
   "LHAUX" >| lhaux;
   "LWAUX" >| lwaux;
-  "LD"    >| ld;
-  "LDX"   >| ldx;
-  "LDU"   >| ldu;
-  "LDUX"  >| ldux;
+  "LD" >| ld;
+  "LDX" >| ldx;
+  "LDU" >| ldu;
+  "LDUX" >| ldux;
   "LHBRX" >| lhbrx;
   "LWBRX" >| lwbrx;
-  "LDBRX" >| ldbrx;
+  "LDBRX" >| ldbrx

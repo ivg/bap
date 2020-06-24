@@ -4,9 +4,9 @@
 
 open Bap.Std
 
+val base_var : X86_types.mode -> reg -> Var.t option
 (** [base_var mode reg] given a [reg] operand provided by the LLVM
     disassembler, [base_var] returns the variable corresponding to
     the physical register for that [mode] if it exists. If no such
     register exists for our backend, None is returned.
 *)
-val base_var : X86_types.mode -> reg -> Var.t option

@@ -10,6 +10,7 @@ val lift_r :
   mode_r ->
   sign ->
   size ->
-  operation -> stmt list
+  operation ->
+  stmt list
 
 val lift_m : var list -> var -> mode_m -> update_m -> operation -> stmt list

@@ -2,12 +2,10 @@ open Core_kernel
 open Bap_bundle.Std
 open Bap_future.Std
 open Or_error.Monad_infix
-
 module Units = Bap_plugins_units
 module Filename = Caml.Filename
 
 module Plugin = struct
-
   type 'a or_error = 'a Or_error.t
 
   let args = ref Sys.argv
@@ -20,24 +18,24 @@ module Plugin = struct
     bundle : bundle sexp_opaque;
     loaded : unit future sexp_opaque;
     finish : unit promise sexp_opaque;
-  } [@@deriving fields, sexp_of]
+  }
+  [@@deriving fields, sexp_of]
 
-  type system_event = [
-    | `Opening  of string
+  type system_event =
+    [ `Opening of string
     | `Loading of t
     | `Linking of string
-    | `Loaded  of t
-    | `Errored of string * Error.t
-  ] [@@deriving sexp_of]
+    | `Loaded of t
+    | `Errored of string * Error.t ]
+  [@@deriving sexp_of]
 
+  let system_events, event = Stream.create ()
 
-  let system_events,event = Stream.create ()
   let notify (value : system_event) = Signal.send event value
 
   let load = ref Dynlink.loadfile
 
-  let setup_dynamic_loader loader =
-    load := loader
+  let setup_dynamic_loader loader = load := loader
 
   let init = lazy (Units.init ())
 
@@ -46,48 +44,47 @@ module Plugin = struct
       notify (`Opening path);
       let bundle = Bundle.of_uri (Uri.of_string path) in
       let name = Bundle.manifest bundle |> Manifest.name in
-      let loaded,finish = Future.create () in
-      {name; path; bundle; loaded; finish}
+      let loaded, finish = Future.create () in
+      { name; path; bundle; loaded; finish }
     with exn ->
       let err = Error.of_exn exn in
-      notify (`Errored (path,err));
+      notify (`Errored (path, err));
       raise exn
 
   let manifest p = Bundle.manifest p.bundle
+
   let name p = manifest p |> Manifest.name
+
   let desc p = manifest p |> Manifest.desc
+
   let tags p = manifest p |> Manifest.tags
+
   let cons p = manifest p |> Manifest.cons
 
   let find_library_exn name =
     let dir = Findlib.package_directory name in
     let nat = if Dynlink.is_native then "native" else "byte" in
-    let pre = ["plugin"; nat ] in
+    let pre = [ "plugin"; nat ] in
     let cmx = Findlib.package_property pre name "archive" in
     let file = Dynlink.adapt_filename cmx in
     Findlib.resolve_path ~base:dir file
 
-  let find_library name =
-    try Some (find_library_exn name) with _ -> None
+  let find_library name = try Some (find_library_exn name) with _ -> None
 
-  let load_unit ?(don't_register=false) ~reason ~name pkg : unit or_error =
+  let load_unit ?(don't_register = false) ~reason ~name pkg : unit or_error =
     try
       notify (`Linking name);
       !load pkg;
-      if not (don't_register)
-      then Units.record name reason;
+      if not don't_register then Units.record name reason;
       Ok ()
     with
     | Dynlink.Error err -> Units.handle_error name reason err
     | exn -> Or_error.of_exn exn
 
-
-
   let is_debugging () =
     try String.(Sys.getenv "BAP_DEBUG" <> "0") with Caml.Not_found -> false
 
-  let do_if_not_debugging f x =
-    if is_debugging () then () else f x
+  let do_if_not_debugging f x = if is_debugging () then () else f x
 
   (** [load_entry plugin name] loads a compilation unit with the
       specified [name] required by [plugin]. The compilation unit
@@ -121,30 +118,32 @@ module Plugin = struct
     let reason = `Requested_by plugin.name in
     Bundle.get_file ~name:dst plugin.bundle path |> function
     | Some uri ->
-      let path = Uri.to_string uri in
-      let result = load_unit ?don't_register ~reason ~name path in
-      do_if_not_debugging Sys.remove path;
-      result
-    | None -> match find_library name with
-      | Some lib ->
-        let name = Filename.(basename name |> chop_extension) in
-        load_unit ?don't_register ~reason ~name lib
-      | None -> Or_error.error_string "dependency not found"
+        let path = Uri.to_string uri in
+        let result = load_unit ?don't_register ~reason ~name path in
+        do_if_not_debugging Sys.remove path;
+        result
+    | None -> (
+        match find_library name with
+        | Some lib ->
+            let name = Filename.(basename name |> chop_extension) in
+            load_unit ?don't_register ~reason ~name lib
+        | None -> Or_error.error_string "dependency not found" )
 
   let validate_unit _plugin main =
     match Units.lookup main with
     | None -> Ok ()
     | Some (`Provided_by name) when String.equal name main -> Ok ()
     | Some reason ->
-      let with_whom = match reason with
-        | `In_core -> "host program"
-        | `Provided_by p -> "plugin " ^ p
-        | `Requested_by p -> "library from plugin " ^ p in
-      Or_error.errorf "a name %S clashes with a %s" main with_whom
+        let with_whom =
+          match reason with
+          | `In_core -> "host program"
+          | `Provided_by p -> "plugin " ^ p
+          | `Requested_by p -> "library from plugin " ^ p
+        in
+        Or_error.errorf "a name %S clashes with a %s" main with_whom
 
   let validate_provided plugin mains =
-    List.map mains ~f:(validate_unit plugin) |>
-    Or_error.all_unit
+    List.map mains ~f:(validate_unit plugin) |> Or_error.all_unit
 
   let load_entries plugin entries =
     List.fold entries ~init:(Ok ()) ~f:(fun so_far entry ->
@@ -152,16 +151,15 @@ module Plugin = struct
         match load_entry plugin entry with
         | Ok () -> Ok ()
         | Error err ->
-          Or_error.errorf "Failed to load %s: %s" entry @@
-          Error.to_string_hum err)
+            Or_error.errorf "Failed to load %s: %s" entry
+            @@ Error.to_string_hum err)
 
   let is_missing dep = Option.is_none (Units.lookup dep)
 
   let try_load (plugin : t) =
-    if Future.is_decided plugin.loaded
-    then Ok ()
+    if Future.is_decided plugin.loaded then Ok ()
     else
-      let lazy () = init in
+      let (lazy ()) = init in
       notify (`Loading plugin);
       let m = manifest plugin in
       let mains = Manifest.provides m in
@@ -178,32 +176,28 @@ module Plugin = struct
       let reason = `Provided_by plugin.name in
       List.iter mains ~f:(fun unit -> Units.record unit reason)
 
-
-  let with_argv argv f = match argv with
+  let with_argv argv f =
+    match argv with
     | None -> f ()
-    | Some argv ->
-      let old = !args in
-      args := argv;
-      try
-        let r = f () in
-        args := old;
-        r
-      with
-      | exn ->
-        args := old;
-        raise exn
-
+    | Some argv -> (
+        let old = !args in
+        args := argv;
+        try
+          let r = f () in
+          args := old;
+          r
+        with exn ->
+          args := old;
+          raise exn )
 
   let do_load plugin =
     match try_load plugin with
     | Error err as result ->
-      notify (`Errored (plugin.name,err));
-      result
+        notify (`Errored (plugin.name, err));
+        result
     | result -> result
 
-  let load ?argv plugin =
-    with_argv argv (fun () -> do_load plugin)
-
+  let load ?argv plugin = with_argv argv (fun () -> do_load plugin)
 end
 
 module Plugins = struct
@@ -214,10 +208,10 @@ module Plugins = struct
   let path = Bap_plugins_config.plugindir
 
   let plugin_paths library =
-    [library; paths_of_env (); [path]] |>
-    List.concat |>
-    List.filter ~f:Sys.file_exists |>
-    List.filter ~f:Sys.is_directory
+    [ library; paths_of_env (); [ path ] ]
+    |> List.concat
+    |> List.filter ~f:Sys.file_exists
+    |> List.filter ~f:Sys.is_directory
 
   let has_feature requested features =
     match requested with
@@ -228,97 +222,99 @@ module Plugins = struct
     List.for_all requirements ~f:(Set.mem provided)
 
   let is_selected ~provides ~env p =
-    has_feature provides (Plugin.tags p) &&
-    meets_constraint env (Plugin.cons p)
+    has_feature provides (Plugin.tags p) && meets_constraint env (Plugin.cons p)
 
+  let plugin_name = function Ok p -> Plugin.name p | Error (name, _) -> name
 
-  let plugin_name = function
-    | Ok p -> Plugin.name p
-    | Error (name,_) -> name
-
-  let collect ?env ?provides ?(library=[]) () =
-    let (/) = Filename.concat in
+  let collect ?env ?provides ?(library = []) () =
+    let ( / ) = Filename.concat in
     let strset = Set.of_list (module String) in
     let provides = Option.map provides ~f:strset in
     let env = strset (Option.value env ~default:[]) in
-    plugin_paths library |>
-    List.concat_map ~f:(fun dir ->
-        Sys.readdir dir |> Array.to_list |>
-        List.filter_map ~f:(fun file ->
-            let file = dir / file in
-            if not (Filename.check_suffix file ".plugin")
-            then None
-            else try
-                let p = Plugin.of_path file in
-                Option.some_if (is_selected ~provides ~env p) (Ok p)
-              with exn -> Some (Error (file,Error.of_exn exn)))) |>
-    List.sort ~compare:(fun x y ->
-        String.compare (plugin_name x) (plugin_name y))
-
+    plugin_paths library
+    |> List.concat_map ~f:(fun dir ->
+           Sys.readdir dir |> Array.to_list
+           |> List.filter_map ~f:(fun file ->
+                  let file = dir / file in
+                  if not (Filename.check_suffix file ".plugin") then None
+                  else
+                    try
+                      let p = Plugin.of_path file in
+                      Option.some_if (is_selected ~provides ~env p) (Ok p)
+                    with exn -> Some (Error (file, Error.of_exn exn))))
+    |> List.sort ~compare:(fun x y ->
+           String.compare (plugin_name x) (plugin_name y))
 
   let list ?env ?provides ?library () =
-    collect ?env ?provides ?library () |> List.filter_map ~f:(function
-        | Ok p -> Some p
-        | Error _ -> None)
+    collect ?env ?provides ?library ()
+    |> List.filter_map ~f:(function Ok p -> Some p | Error _ -> None)
 
-  let loaded,finished = Future.create ()
+  let loaded, finished = Future.create ()
 
-  let load ?argv ?env ?provides ?library ?(exclude=[]) () =
-    if Future.is_decided loaded
-    then []
-    else begin
+  let load ?argv ?env ?provides ?library ?(exclude = []) () =
+    if Future.is_decided loaded then []
+    else (
       Dynlink.allow_unsafe_modules true;
       let excluded = Set.of_list (module String) exclude in
       let r =
-        collect ?env ?provides ?library () |>
-        List.filter_map ~f:(function
-            | Error err -> Some (Error err)
-            | Ok p when Set.mem excluded (Plugin.name p) -> None
-            | Ok p -> match Plugin.load ?argv p with
-              | Ok () -> Some (Ok p)
-              | Error err -> Some (Error (Plugin.path p, err))) in
+        collect ?env ?provides ?library ()
+        |> List.filter_map ~f:(function
+             | Error err -> Some (Error err)
+             | Ok p when Set.mem excluded (Plugin.name p) -> None
+             | Ok p -> (
+                 match Plugin.load ?argv p with
+                 | Ok () -> Some (Ok p)
+                 | Error err -> Some (Error (Plugin.path p, err)) ))
+      in
       Promise.fulfill finished ();
-      r
-    end
+      r )
 
   (* we will record all events from the plugin subsystem,
      and if a bad thing happens, we will dump the full history.
      We will clean the history once all plugins are loaded, to prevent
-     a memory leak.  *)
+     a memory leak. *)
   let setup_default_handler () =
     let events_backtrace = ref [] in
-    Stream.observe Plugin.system_events (fun ev -> match ev with
-        | `Errored (name,err) ->
-          let backtrace = String.concat ~sep:"\n" @@
-            List.map !events_backtrace ~f:(fun ev ->
-                Format.asprintf "%a" Sexp.pp
-                  (Plugin.sexp_of_system_event ev)) in
-          Format.eprintf "An error has occurred while loading `%s': %a\n
-                          Events backtrace:\n%s\n
-                          Aborting program ...\n%!"
-            name Error.pp err backtrace;
-          exit 1
-        | ev ->
-          events_backtrace := ev :: !events_backtrace);
+    Stream.observe Plugin.system_events (fun ev ->
+        match ev with
+        | `Errored (name, err) ->
+            let backtrace =
+              String.concat ~sep:"\n"
+              @@ List.map !events_backtrace ~f:(fun ev ->
+                     Format.asprintf "%a" Sexp.pp
+                       (Plugin.sexp_of_system_event ev))
+            in
+            Format.eprintf
+              "An error has occurred while loading `%s': %a\n\n\
+              \                          Events backtrace:\n\
+               %s\n\n\
+              \                          Aborting program ...\n\
+               %!"
+              name Error.pp err backtrace;
+            exit 1
+        | ev -> events_backtrace := ev :: !events_backtrace);
     Future.upon loaded (fun () -> events_backtrace := [])
 
-  let run ?argv ?env ?provides ?(don't_setup_handlers=false) ?library ?exclude () =
-    if not don't_setup_handlers
-    then setup_default_handler ();
-    let _ : (Plugin.t, string * Error.t) result list =
-      load ?argv ?env ?provides ?library ?exclude ()  in
+  let run ?argv ?env ?provides ?(don't_setup_handlers = false) ?library ?exclude
+      () =
+    if not don't_setup_handlers then setup_default_handler ();
+    let (_ : (Plugin.t, string * Error.t) result list) =
+      load ?argv ?env ?provides ?library ?exclude ()
+    in
     ()
 
   let events = Plugin.system_events
-  type event = Plugin.system_event [@@deriving sexp_of]
 
+  type event = Plugin.system_event [@@deriving sexp_of]
 end
 
 module Std = struct
   type plugin = Plugin.t
+
   module Plugin = Plugin
   module Plugins = Plugins
-  let setup_dynamic_loader = Plugin.setup_dynamic_loader
-  let list_loaded_units () = Units.list ()
 
+  let setup_dynamic_loader = Plugin.setup_dynamic_loader
+
+  let list_loaded_units () = Units.list ()
 end

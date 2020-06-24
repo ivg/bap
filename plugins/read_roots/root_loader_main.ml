@@ -3,8 +3,8 @@ module File = struct
 
   let split_right ~after str =
     match String.rindex str after with
-    | None -> str,None
-    | Some n -> String.(subo ~len:n str, Some (subo ~pos:(n+1) str))
+    | None -> (str, None)
+    | Some n -> String.(subo ~len:n str, Some (subo ~pos:(n + 1) str))
 
   let extension s = split_right ~after:'.' s |> snd
 
@@ -15,10 +15,9 @@ module File = struct
      The example above will use sexp serializer to read data from file.
   *)
   let rooter filename =
-    let name,ver = split_right ~after:'-' filename in
-    extension name >>= fun fmt -> Addr.find_reader fmt >>| fun _ ->
+    let name, ver = split_right ~after:'-' filename in
+    extension name >>= fun fmt ->
+    Addr.find_reader fmt >>| fun _ ->
     In_channel.with_file filename ~f:(fun chan ->
-        Addr.Io.load_all ?ver ~fmt chan |>
-        Seq.of_list |>
-        create)
+        Addr.Io.load_all ?ver ~fmt chan |> Seq.of_list |> create)
 end

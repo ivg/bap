@@ -1,63 +1,63 @@
-
 open Core_kernel
 open Bap.Std
 open Bap_c_type
 
-include Self()
+include Self ()
 
-module Registry(T : T) = struct
+module Registry (T : T) = struct
   let registry : T.t list ref = ref []
+
   let register x = registry := x :: !registry
 end
 
 type 'a pass = attr -> 'a term -> 'a term
 
-include Registry(struct type t = sub pass end)
-let apply attr sub =
-  List.fold !registry ~init:sub ~f:(fun sub f -> f attr sub)
+include Registry (struct
+  type t = sub pass
+end)
+
+let apply attr sub = List.fold !registry ~init:sub ~f:(fun sub f -> f attr sub)
 
 module Gnu = struct
   let register_attr n f =
-    let pass {Attr.name; args} sub =
-      if String.equal n name then f args sub else sub in
+    let pass { Attr.name; args } sub =
+      if String.equal n name then f args sub else sub
+    in
     register pass
 
-  exception Attr_type   of string * string
-  exception Attr_arity  of string
+  exception Attr_type of string * string
 
-  let int n =
-    try Int.of_string n with exn -> raise (Attr_type ("<int>",n))
+  exception Attr_arity of string
 
-  let set attr v arg sub =
-    Term.set_attr arg attr v |>
-    Term.update arg_t sub
+  let int n = try Int.of_string n with exn -> raise (Attr_type ("<int>", n))
+
+  let set attr v arg sub = Term.set_attr arg attr v |> Term.update arg_t sub
 
   let mark_arg attr v sub i =
     match Term.nth arg_t sub (int i - 1) with
     | None ->
-      warning "failed to apply attribute %s to sub: %s"
-        (Value.Tag.name attr) (Sub.name sub);
-      sub
+        warning "failed to apply attribute %s to sub: %s" (Value.Tag.name attr)
+          (Sub.name sub);
+        sub
     | Some arg -> set attr v arg sub
 
-
-  let mark_args attr args sub =
-    List.fold args ~init:sub ~f:(mark_arg attr ())
+  let mark_args attr args sub = List.fold args ~init:sub ~f:(mark_arg attr ())
 
   let alloc_size = mark_args Arg.alloc_size
 
-  let format args sub = match args with
-    | [l;i;_] -> mark_arg Arg.format l sub i
+  let format args sub =
+    match args with
+    | [ l; i; _ ] -> mark_arg Arg.format l sub i
     | _ -> raise (Attr_arity "3")
 
   let nonnull = mark_args Arg.nonnull
 
-  let wur args sub = match Term.last arg_t sub with
+  let wur args sub =
+    match Term.last arg_t sub with
     | None -> sub
     | Some arg -> set Arg.warn_unused () arg sub
 
-  let set attr args sub =
-    Term.set_attr sub attr ()
+  let set attr args sub = Term.set_attr sub attr ()
 
   let () =
     register_attr "alloc_size" alloc_size;

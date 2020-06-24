@@ -1,16 +1,13 @@
-(** Basic type declarations for DWARF format.  *)
 open Core_kernel
+(** Basic type declarations for DWARF format.  *)
+
 open Bap.Std
 
 type leb128 = Dwarf_leb128.t [@@deriving bin_io, compare, sexp]
 
 (** File sections  *)
 module Section = struct
-  type t =
-    | Info
-    | Abbrev
-    | Str
-  [@@deriving sexp, bin_io, compare, variants]
+  type t = Info | Abbrev | Str [@@deriving sexp, bin_io, compare, variants]
 end
 
 (** Debug Entry Tag  *)
@@ -25,24 +22,13 @@ module Tag = struct
   [@@deriving sexp, bin_io, compare, variants]
 end
 
-
 (** Attribute  *)
 module Attr = struct
-  type t =
-    | Name
-    | Low_pc
-    | High_pc
-    | Entry_pc
-    | Unknown of int
+  type t = Name | Low_pc | High_pc | Entry_pc | Unknown of int
   [@@deriving sexp, bin_io, compare, variants]
 end
 
-type lenspec =
-  | Leb128
-  | One
-  | Two
-  | Four
-  | Eight
+type lenspec = Leb128 | One | Two | Four | Eight
 [@@deriving sexp, bin_io, compare]
 
 (** Attribute form  *)
@@ -62,7 +48,10 @@ module Form = struct
   [@@deriving sexp, bin_io, compare, variants]
 end
 
-type tag  = Tag.t  [@@deriving sexp, bin_io, compare]
+type tag = Tag.t [@@deriving sexp, bin_io, compare]
+
 type attr = Attr.t [@@deriving sexp, bin_io, compare]
+
 type form = Form.t [@@deriving sexp, bin_io, compare]
+
 type section = Section.t [@@deriving sexp, bin_io, compare]

@@ -1,18 +1,16 @@
 open Core_kernel
 open Regular.Std
 open Format
-
 module Seq = Sequence
 
 type scheme = string * (string -> string)
 
 type 'n symbolizer = 'n -> string
 
-
 (** [next_char c] returns next a lowercase character following the
     [c], if it exists   *)
 let next_char char : char option =
-  match (Char.to_int char + 1) |> Char.of_int with
+  match Char.to_int char + 1 |> Char.of_int with
   | Some c when Char.(is_lowercase c && is_alpha c) -> Some c
   | _ -> None
 
@@ -22,83 +20,91 @@ let next_char char : char option =
     scheme [node_n], where n goes from zero to max_int.*)
 let next_sym sym : string =
   match String.split sym ~on:'_' with
-  | [v] when String.length v = 1 ->
-    (match next_char v.[0] with
-     | Some c -> String.of_char c
-     | None -> "node_1")
-  | [v;n] -> let m = Int.of_string n + 1 in
-    sprintf "%s_%d" v m
+  | [ v ] when String.length v = 1 -> (
+      match next_char v.[0] with Some c -> String.of_char c | None -> "node_1" )
+  | [ v; n ] ->
+      let m = Int.of_string n + 1 in
+      sprintf "%s_%d" v m
   | _ -> assert false
 
-let next_num num : string =
-  Int.to_string (Int.of_string num + 1)
+let next_num num : string = Int.to_string (Int.of_string num + 1)
 
-let symbols = ("a",next_sym)
-let numbers = ("0",next_num)
-let nothing = ("",ident)
+let symbols = ("a", next_sym)
 
-let create_scheme ~next init = init,next
+let numbers = ("0", next_num)
 
+let nothing = ("", ident)
 
+let create_scheme ~next init = (init, next)
 
-let by_given_order (type a) (init,next) compare nodes =
+let by_given_order (type a) (init, next) compare nodes =
   let module T : Comparator.S with type t = a = struct
     type t = a
-    include Comparator.Make(struct
-        type t = a
-        let compare = compare
-        let sexp_of_t = sexp_of_opaque
-      end) end in
-  Seq.fold nodes ~init:(Map.empty (module T),init) ~f:(fun (names,name) node ->
-      Map.set names ~key:node ~data:name, next name) |> fst |>
-  Map.find_exn
+
+    include Comparator.Make (struct
+      type t = a
+
+      let compare = compare
+
+      let sexp_of_t = sexp_of_opaque
+    end)
+  end in
+  Seq.fold nodes
+    ~init:(Map.empty (module T), init)
+    ~f:(fun (names, name) node ->
+      (Map.set names ~key:node ~data:name, next name))
+  |> fst |> Map.find_exn
 
 let by_natural_order (type a) variant compare nodes =
   let module T : Comparator.S with type t = a = struct
     type t = a
-    include Comparator.Make(struct
-        type t = a
-        let compare = compare
-        let sexp_of_t = sexp_of_opaque
-      end) end in
-  Seq.fold nodes ~init:(Set.empty (module T)) ~f:Set.add |>
-  Set.to_sequence |> by_given_order variant compare
+
+    include Comparator.Make (struct
+      type t = a
+
+      let compare = compare
+
+      let sexp_of_t = sexp_of_opaque
+    end)
+  end in
+  Seq.fold nodes ~init:(Set.empty (module T)) ~f:Set.add
+  |> Set.to_sequence
+  |> by_given_order variant compare
 
 module Dot = struct
-  let pp_label ppf lab = match lab with
-    | "" -> ()
-    | lab -> Format.fprintf ppf "[label=\"%s\"]" lab
+  let pp_label ppf lab =
+    match lab with "" -> () | lab -> Format.fprintf ppf "[label=\"%s\"]" lab
 
-  let pp_edge ppf (src,dst,lab) =
+  let pp_edge ppf (src, dst, lab) =
     fprintf ppf "\"%s\" -> \"%s\"%a" src dst pp_label lab
 
-  let pp_node ppf (name,label) =
+  let pp_node ppf (name, label) =
     match label with
     | "" -> fprintf ppf "\"%s\"" name
-    | _ ->  fprintf ppf "\"%s\"[label=\"%s\"]" name label
+    | _ -> fprintf ppf "\"%s\"[label=\"%s\"]" name label
 
   let noname _ = ""
 
-  let pp_graph
-      ?name
-      ?(cluster=false)
-      ?(subgraph=false)
-      ?(attrs=[])
-      ?string_of_node:(node=noname)
-      ?(node_label=noname)
-      ?(edge_label=noname)
-      ~nodes_of_edge ~nodes ~edges ppf =
-    let nodes = Seq.map nodes ~f:(fun n -> node n,node_label n) in
-    let edges = Seq.map edges ~f:(fun e ->
-        let src,dst = nodes_of_edge e in
-        node src, node dst, edge_label e) in
-    let attrs = if List.is_empty attrs then "" else
-        sprintf "@;%s" (String.concat ~sep:"@;" attrs) in
-    let graphname = match name with
+  let pp_graph ?name ?(cluster = false) ?(subgraph = false) ?(attrs = [])
+      ?string_of_node:(node = noname) ?(node_label = noname)
+      ?(edge_label = noname) ~nodes_of_edge ~nodes ~edges ppf =
+    let nodes = Seq.map nodes ~f:(fun n -> (node n, node_label n)) in
+    let edges =
+      Seq.map edges ~f:(fun e ->
+          let src, dst = nodes_of_edge e in
+          (node src, node dst, edge_label e))
+    in
+    let attrs =
+      if List.is_empty attrs then ""
+      else sprintf "@;%s" (String.concat ~sep:"@;" attrs)
+    in
+    let graphname =
+      match name with
       | None -> ""
       | Some name ->
-        if cluster then sprintf "%S" ("cluster_"^name)
-        else sprintf "%S" name in
+          if cluster then sprintf "%S" ("cluster_" ^ name)
+          else sprintf "%S" name
+    in
     let graph = if subgraph then "subgraph" else "digraph" in
     fprintf ppf "@.@[<v2>%s %s {%s" graph graphname attrs;
     Option.iter name ~f:(fprintf ppf "@;label=%S@;");

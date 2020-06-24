@@ -1,6 +1,5 @@
 open Bap.Std
 
-
 (** IA32 Architecture Registers.
 
     For simplicity we're using the same names for registers in
@@ -11,49 +10,47 @@ open Bap.Std
 module IA32 : sig
   include Bap.Std.CPU
 
-
-  (** [flags] is a set of flag registers  *)
   val flags : Var.Set.t
+  (** [flags] is a set of flag registers  *)
 
-  (** base pointer  *)
   val rbp : var
+  (** base pointer  *)
 
-  (** stack pointer  *)
   val rsp : var
+  (** stack pointer  *)
 
-  (** source index  *)
   val rsi : var
+  (** source index  *)
 
-  (** destination index  *)
   val rdi : var
+  (** destination index  *)
 
-  (** instruction pointer  *)
   val rip : var
+  (** instruction pointer  *)
 
-  (** accumulator register  *)
   val rax : var
+  (** accumulator register  *)
 
-  (** base register  *)
   val rbx : var
+  (** base register  *)
 
-  (** counter register  *)
   val rcx : var
+  (** counter register  *)
 
-  (** data register  *)
   val rdx : var
+  (** data register  *)
 
+  val ymms : var array
   (** YMM registers that are available *)
-  val ymms: var array
-
 end
-
 
 (** AMD64 registers  *)
 module AMD64 : sig
   include Bap.Std.CPU
+
   include module type of IA32
 
+  val r : var array
   (** r8-r15 registers.
       Due to a legacy issues r.(0) -> r8, r.(1) -> r8, ... *)
-  val r : var array
 end

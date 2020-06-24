@@ -11,24 +11,25 @@ let subst file str =
   Buffer.contents buf
 
 let cat header inputs output =
-  let data = List.map (fun file ->
-      subst file header,read_all file) inputs in
+  let data = List.map (fun file -> (subst file header, read_all file)) inputs in
   let ch = open_out output in
-  data |> List.iter (fun (header,data) ->
-      output_string ch header;
-      output_string ch data);
+  data
+  |> List.iter (fun (header, data) ->
+         output_string ch header;
+         output_string ch data);
   close_out ch
-
 
 let () =
   match Array.to_list Sys.argv with
-  | _ :: sep :: "--" :: (_ :: _ as ios)  ->
-    let soi = List.rev ios in
-    let inputs = List.(soi |> tl |> rev) in
-    let output = List.hd soi in
-    let sep = try Scanf.sscanf sep "%S" (fun x -> x) with exn ->
-      Printf.eprintf "Failed to unescape: %s\n" sep;
-      sep in
-    cat sep inputs output
-  | _ ->
-    prerr_endline "Usage: cat header -- input1 [.. inputN] output"
+  | _ :: sep :: "--" :: (_ :: _ as ios) ->
+      let soi = List.rev ios in
+      let inputs = List.(soi |> tl |> rev) in
+      let output = List.hd soi in
+      let sep =
+        try Scanf.sscanf sep "%S" (fun x -> x)
+        with exn ->
+          Printf.eprintf "Failed to unescape: %s\n" sep;
+          sep
+      in
+      cat sep inputs output
+  | _ -> prerr_endline "Usage: cat header -- input1 [.. inputN] output"

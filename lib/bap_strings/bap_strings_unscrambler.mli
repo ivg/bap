@@ -2,14 +2,13 @@ open Core_kernel
 
 (** symbol encoding *)
 module type Alphabet = sig
-  (** total number of symbols in the alphabet *)
   val length : int
+  (** total number of symbols in the alphabet *)
 
-
+  val index : char -> int
   (** [index x] maps [x] to the [n]'th symbol of an alphabet, if [x]
       is a representation of that symbols, returns a number that is
       outside of [[0,len-1]] interval if it is not.*)
-  val index : char -> int
 end
 
 (** ASCII Characters
@@ -18,29 +17,27 @@ end
     e.g., [Ascii.Digits], [AScii]
 *)
 module Ascii : sig
-
   (** Letters *)
   module Alpha : sig
-
-    (** Caseless Letters  *)
     module Caseless : Alphabet
+    (** Caseless Letters  *)
+
     include Alphabet
   end
-
 
   (** Letters and Numbers  *)
   module Alphanum : sig
-
-    (** Caseless Letters *)
     module Caseless : Alphabet
+    (** Caseless Letters *)
+
     include Alphabet
   end
 
-  (** Digits *)
   module Digits : Alphabet
+  (** Digits *)
 
-  (** All printable ASCII characters *)
   module Printable : Alphabet
+  (** All printable ASCII characters *)
 
   include Alphabet
 end
@@ -59,34 +56,31 @@ end
     of the dictionary size).
 
 *)
-module Make(A : Alphabet) : sig
+module Make (A : Alphabet) : sig
   type t [@@deriving bin_io, compare, sexp]
 
-  (** an empty unscrambler that doesn't know any words *)
   val empty : t
+  (** an empty unscrambler that doesn't know any words *)
 
-
+  val of_file : string -> t
   (** [of_file name] reads the dictionary from file [name],
       each word is on a separate line. (the standard linux dictionary
       file format)
   *)
-  val of_file : string -> t
 
+  val of_files : string list -> t
   (** [of_files names] reads the dictionary from all provided file
       [names], each file should be a sequence of newline separated
       words.*)
-  val of_files : string list -> t
 
-
-  (** [add_word d x] extends the dictionary [d] with the new word [x]. *)
   val add_word : t -> string -> t
+  (** [add_word d x] extends the dictionary [d] with the new word [x]. *)
 
-
+  val build : t -> string -> string Sequence.t
   (** [build d chars] returns a sequence of all words in the
       dictionary [d] that could be built from the sequence of characters [chars]  *)
-  val build : t -> string -> string Sequence.t
 
+  val is_buildable : t -> string -> bool
   (** [is_buildable d chars] returns [true] if in the dictionary [d]
       exists a word that can be built from the given characters. *)
-  val is_buildable : t -> string -> bool
 end

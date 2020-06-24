@@ -1,39 +1,45 @@
 open OUnit2
 open Core_kernel
 open Or_error
-
 open Bap.Std
 open Bap_traces.Std
 open Event
 open Meta
 
 let bed = Word.of_int32 0xBEDl
-let coffee = Word.of_int32 0xC0FFEEl
-let move = Move.{cell = bed; data = coffee}
-let var = Var.create ~fresh:true "temp" (Type.Imm 0xC0FFEE)
-let reg = Move.{cell = var; data = coffee}
-let bin = Binary.{
-    path = "home";
-    args = [|"go"|] ;
-    envp = [|"drink=coffee"|] ;
-    md5sum = ""
-  }
 
-let trc = Tracer.{
-    name = "coffee";
-    args = [|"scent"|] ;
-    envp = [|"require=coffee"|] ;
-    version="0.1"
-  }
+let coffee = Word.of_int32 0xC0FFEEl
+
+let move = Move.{ cell = bed; data = coffee }
+
+let var = Var.create ~fresh:true "temp" (Type.Imm 0xC0FFEE)
+
+let reg = Move.{ cell = var; data = coffee }
+
+let bin =
+  Binary.
+    {
+      path = "home";
+      args = [| "go" |];
+      envp = [| "drink=coffee" |];
+      md5sum = "";
+    }
+
+let trc =
+  Tracer.
+    {
+      name = "coffee";
+      args = [| "scent" |];
+      envp = [| "require=coffee" |];
+      version = "0.1";
+    }
 
 let memory_events =
-  [ Value.create memory_load move;
-    Value.create memory_store move; ]
+  [ Value.create memory_load move; Value.create memory_store move ]
 
 let test_events =
-  memory_events @
-  [ Value.create register_read reg;
-    Value.create register_write reg; ]
+  memory_events
+  @ [ Value.create register_read reg; Value.create register_write reg ]
 
 let test_meta =
   let open Dict in
@@ -42,15 +48,17 @@ let test_meta =
 
 module Tool : Trace.S = struct
   let name = "test_tool"
-  let supports = fun tag ->
+
+  let supports tag =
     let same t = Value.Tag.same tag t in
     same memory_load || same memory_store
 end
 
 let test_tool = Trace.register_tool (module Tool)
+
 let empty = Trace.create test_tool
 
-let assert_seq_equal ~ctxt  =
+let assert_seq_equal ~ctxt =
   let cmp s s' = Seq.compare Value.compare s s' = 0 in
   assert_equal ~ctxt ~cmp
 
@@ -60,12 +68,14 @@ let assert_dict_equal ~ctxt =
 
 let unfold_list lst =
   let rest = ref lst in
-  fun () -> match !rest with
+  fun () ->
+    match !rest with
     | [] -> None
-    | e :: es -> rest := es; Some (Ok e)
+    | e :: es ->
+        rest := es;
+        Some (Ok e)
 
-let new_tracer () =
-  Trace.create test_tool (unfold_list test_events)
+let new_tracer () = Trace.create test_tool (unfold_list test_events)
 
 let save_and_load ctxt =
   let uri = Uri.of_string "file:///tmp/bap_trace.binprot" in
@@ -73,23 +83,26 @@ let save_and_load ctxt =
     let t = new_tracer () in
     let t = Trace.set_meta t test_meta in
     let r = Trace.save uri t in
-    assert_bool "save failed" (Result.is_ok r) in
-  let load () = match Trace.load uri with
+    assert_bool "save failed" (Result.is_ok r)
+  in
+  let load () =
+    match Trace.load uri with
     | Ok t ->
-      let evs = Trace.read_events t in
-      let meta = Trace.meta t in
-      let tool = Trace.tool t in
-      assert_seq_equal ~ctxt evs (Seq.of_list test_events);
-      assert_dict_equal ~ctxt meta test_meta;
-      assert_equal ~ctxt test_tool tool
-    | Error s -> assert_failure "load failed" in
+        let evs = Trace.read_events t in
+        let meta = Trace.meta t in
+        let tool = Trace.tool t in
+        assert_seq_equal ~ctxt evs (Seq.of_list test_events);
+        assert_dict_equal ~ctxt meta test_meta;
+        assert_equal ~ctxt test_tool tool
+    | Error s -> assert_failure "load failed"
+  in
   save ();
   load ()
 
 let id ctxt =
-  let t  = new_tracer () in
+  let t = new_tracer () in
   let t' = new_tracer () in
-  let id,id' = Trace.(id t, id t') in
+  let id, id' = Trace.(id t, id t') in
   let not_eql = not (Trace.Id.equal id id') in
   assert_bool "id mustn't be equal, failed" not_eql
 
@@ -117,16 +130,19 @@ let set_meta t ctxt =
 
 let find_all_matching ctxt =
   let t = new_tracer () in
-  let s = Trace.read_all_matching t
-      Value.Match.(begin
-          case memory_load  (fun x  -> `Memory) @@
-          case memory_store (fun x  -> `Memory) @@
-          default           (fun () -> `Unknown)
-        end) in
-  let s' = Seq.filter s ~f:(fun x -> [%compare.equal: [ `Memory | `Unknown] ] x `Memory) in
+  let s =
+    Trace.read_all_matching t
+      Value.Match.(
+        case memory_load (fun x -> `Memory)
+        @@ case memory_store (fun x -> `Memory)
+        @@ default (fun () -> `Unknown))
+  in
+  let s' =
+    Seq.filter s ~f:(fun x ->
+        [%compare.equal: [ `Memory | `Unknown ]] x `Memory)
+  in
   assert_bool "failed find_all_matching"
     (Seq.length s' = List.length memory_events)
-
 
 let supports ctxt =
   let empty = new_tracer () in
@@ -135,19 +151,20 @@ let supports ctxt =
   let r = not (Trace.supports empty register_read) in
   assert_bool "supports failed" (m && m' && r)
 
-
 let error = Error.of_string "syscall failed"
 
-let events_with_error =
-  Error error ::
-  List.map test_events ~f:(fun ev -> Ok ev)
+let events_with_error = Error error :: List.map test_events ~f:(fun ev -> Ok ev)
 
 let create_with_monitor monitor =
   let unfold_list lst =
     let rest = ref lst in
-    fun () -> match !rest with
+    fun () ->
+      match !rest with
       | [] -> None
-      | e :: es -> rest := es; Some (e) in
+      | e :: es ->
+          rest := es;
+          Some e
+  in
   Trace.create ~monitor test_tool (unfold_list events_with_error)
 
 let fail_monitor ctxt =
@@ -194,20 +211,20 @@ let user_monitor ctxt =
 let empty = new_tracer ()
 
 let suite () =
-  "Trace" >:::
-  [
-    "save_and_load"     >:: save_and_load;
-    "id"                >:: id;
-    "tool"              >:: trace_tool;
-    "set_and_get_attr"  >:: set_and_get_attr empty binary bin;
-    "has_attr"          >:: has_attr empty binary bin;
-    "set_meta"          >:: set_meta empty;
-    "find_all_matching" >:: find_all_matching;
-    "supports"          >:: supports;
-    "fail_monitor"      >:: fail_monitor;
-    "miss_monitor"      >:: miss_monitor;
-    "stop_monitor"      >:: stop_monitor;
-    "pack_monitor"      >:: pack_monitor;
-    "warn_monitor"      >:: warn_monitor;
-    "user_monitor"      >:: user_monitor;
-  ]
+  "Trace"
+  >::: [
+         "save_and_load" >:: save_and_load;
+         "id" >:: id;
+         "tool" >:: trace_tool;
+         "set_and_get_attr" >:: set_and_get_attr empty binary bin;
+         "has_attr" >:: has_attr empty binary bin;
+         "set_meta" >:: set_meta empty;
+         "find_all_matching" >:: find_all_matching;
+         "supports" >:: supports;
+         "fail_monitor" >:: fail_monitor;
+         "miss_monitor" >:: miss_monitor;
+         "stop_monitor" >:: stop_monitor;
+         "pack_monitor" >:: pack_monitor;
+         "warn_monitor" >:: warn_monitor;
+         "user_monitor" >:: user_monitor;
+       ]

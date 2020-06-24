@@ -1,10 +1,14 @@
 type error
 
 type t
+
 type param
 
-
-
+val load :
+  ?paths:string list ->
+  ?env:(string * string) list ->
+  string ->
+  (t, error) result
 (** [load recipe] searches and loads a recipe.
 
     Searches a recipe in the search paths specified with the [paths]
@@ -22,11 +26,8 @@ type param
     folder, which will be removed when {!close} is called on the
     recipe.
 *)
-val load :
-  ?paths:string list ->
-  ?env:(string * string) list ->
-  string -> (t,error) result
 
+val search : string list -> string list
 (** [search paths] is a list of recipe names available in [paths].
 
     A file or a folder is considered to be a recipe if has the
@@ -34,16 +35,14 @@ val load :
     list of all files and directories that match this criterion. The
     names a chopped of the extension and dirnames.
 *)
-val search : string list -> string list
 
-
-(** [args recipe] is an array of arguments specified in the recipe. *)
 val args : t -> string array
+(** [args recipe] is an array of arguments specified in the recipe. *)
 
-
-(** [command recipe] returns the [recipe] command, if one exists.  *)
 val command : t -> string option
+(** [command recipe] returns the [recipe] command, if one exists.  *)
 
+val argv : ?argv:string array -> t -> string array
 (** [argv recipe] builds an argument vector from the [recipe].
 
     All arguments are appended to the passed [argv] (which defaults to
@@ -56,37 +55,32 @@ val command : t -> string option
     argument already specifies the same command, in which case it is
     ignored.
 *)
-val argv : ?argv:string array -> t -> string array
 
-
-(** [close recipe] closes the recipe and clears all associated resources.  *)
 val close : t -> unit
+(** [close recipe] closes the recipe and clears all associated resources.  *)
 
-
-(** [doc recipe] is the recipe description.  *)
 val doc : t -> string
+(** [doc recipe] is the recipe description.  *)
 
-
-(** [params recipe] is the list of recipe parameters. *)
 val params : t -> param list
+(** [params recipe] is the list of recipe parameters. *)
 
-
-(** [pp_error ppf err] prints the error message [err].   *)
 val pp_error : Format.formatter -> error -> unit
+(** [pp_error ppf err] prints the error message [err].   *)
 
 (** Recipe Parameters.  *)
 module Param : sig
   type t = param
 
-  (** [name p] the parameter [p] name.  *)
   val name : param -> string
+  (** [name p] the parameter [p] name.  *)
 
-  (** [doc p] the parameter [p] description.  *)
   val doc : param -> string
+  (** [doc p] the parameter [p] description.  *)
 
-  (** [default p] the default value of the parameter [p].  *)
   val default : param -> string
+  (** [default p] the default value of the parameter [p].  *)
 
-  (** [pp ppf p] prints the human-readable description of [p].  *)
   val pp : Format.formatter -> param -> unit
+  (** [pp ppf p] prints the human-readable description of [p].  *)
 end

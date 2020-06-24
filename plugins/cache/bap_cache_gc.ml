@@ -81,75 +81,65 @@ include Self ()
 module Cache = Bap_cache
 module CDF = Int.Map
 
-type entry = {
-  path : string;
-  size : int;    (* Kb  *)
-}
+type entry = { path : string; size : int (* Kb  *) }
 
-let (//) = Filename.concat
+let ( // ) = Filename.concat
 
 let min_entry_size = 4 (* Kb *)
 
 let entry path name =
   try
     let path = path // name in
-    let size = Unix.( (stat path).st_size ) / 1024 in
-    Some {path; size;}
+    let size = Unix.((stat path).st_size) / 1024 in
+    Some { path; size }
   with _ -> None
 
-let read_cache path =
-  Sys.readdir path |> Array.filter_map ~f:(entry path)
+let read_cache path = Sys.readdir path |> Array.filter_map ~f:(entry path)
 
-let total_size =
-  Array.fold ~init:0 ~f:(fun s e -> s + e.size)
+let total_size = Array.fold ~init:0 ~f:(fun s e -> s + e.size)
 
 let cdf entries =
-  fst @@
-  Array.foldi entries ~init:(Map.empty (module Int),0)
-    ~f:(fun i (m,prev) e ->
-        let f_i = prev + max min_entry_size e.size in
-        CDF.add_exn m prev i, f_i)
+  fst
+  @@ Array.foldi entries
+       ~init:(Map.empty (module Int), 0)
+       ~f:(fun i (m, prev) e ->
+         let f_i = prev + max min_entry_size e.size in
+         (CDF.add_exn m prev i, f_i))
 
 let select entries total_size size_to_free =
   let cdf = cdf entries in
   let rec loop indexes freed =
     if freed < size_to_free then
       let u = Random.int total_size in
-      let (_,i) =
-        Option.value_exn (CDF.closest_key cdf `Less_than u) in
-      if Set.mem indexes i
-      then loop indexes freed
+      let _, i = Option.value_exn (CDF.closest_key cdf `Less_than u) in
+      if Set.mem indexes i then loop indexes freed
       else loop (Set.add indexes i) (freed + entries.(i).size)
-    else indexes in
+    else indexes
+  in
   loop (Set.empty (module Int)) 0 |> Set.to_array
 
 let remove e =
   try Sys.remove e.path
-  with exn ->
-    warning "unable to remove entry: %s" (Exn.to_string exn)
+  with exn -> warning "unable to remove entry: %s" (Exn.to_string exn)
 
-let shuffle fs =
-  Array.permute ~random_state:(Random.State.make_self_init ()) fs
+let shuffle fs = Array.permute ~random_state:(Random.State.make_self_init ()) fs
 
 let to_Kb s = s * 1024
 
 let lower_bound c =
   let open Bap_cache_types in
-  to_Kb @@
-  max 0
-    (c.capacity - (c.capacity * c.overhead / 100))
+  to_Kb @@ max 0 (c.capacity - (c.capacity * c.overhead / 100))
 
-let shrink ?(by_threshold=false) cfg =
+let shrink ?(by_threshold = false) cfg =
   let entries = read_cache @@ Cache.data () in
   let total = total_size entries in
   let lower_bound = lower_bound cfg in
   let max_size =
-    if by_threshold then to_Kb @@ Cache.gc_threshold cfg
-    else lower_bound in
-  if total > max_size then
+    if by_threshold then to_Kb @@ Cache.gc_threshold cfg else lower_bound
+  in
+  if total > max_size then (
     let selected = select entries total (total - lower_bound) in
     shuffle selected;
-    Array.iter selected ~f:(fun i -> remove entries.(i))
+    Array.iter selected ~f:(fun i -> remove entries.(i)) )
 
-let clean () =
-  Array.iter (read_cache @@ Cache.data ()) ~f:remove
+let clean () = Array.iter (read_cache @@ Cache.data ()) ~f:remove

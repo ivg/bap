@@ -3,13 +3,13 @@ open Bap.Std
 
 include module type of X86_asm_reg_types
 
+val width : [ gpr | ip ] -> size
 (** [width reg_type] returns the size of the given [reg_type] *)
-val width : [gpr | ip] -> size
 
+val bitwidth : [ gpr | ip ] -> int
 (** [bitwidth reg_type] returns the width in bits of the
     given [reg_type] *)
-val bitwidth : [gpr | ip] -> int
 
+val decode : reg -> t option
 (** [decode reg] decodes the given [reg] provided by the
     disassembler as an x86 register if that is feasible. *)
-val decode : reg -> t option

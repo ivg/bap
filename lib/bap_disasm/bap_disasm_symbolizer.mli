@@ -5,10 +5,13 @@ open Bap_image_std
 open Bap_disasm_source
 
 type t
+
 type symbolizer = t
 
 val common_name : (Theory.program, string option KB.opinions) KB.slot
+
 val provide : Knowledge.agent -> t -> unit
+
 val get_name : addr -> string knowledge
 
 module Toplevel : sig
@@ -29,6 +32,7 @@ val chain : t list -> t
 
 module Name : sig
   val is_empty : string -> bool
+
   val order : string -> string -> Knowledge.Order.partial
 end
 

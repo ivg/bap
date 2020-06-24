@@ -24,4 +24,3 @@ let to_int = function
   | `SX -> 30
   | `INTR v -> v
   | `SOFTWARE v -> v
-

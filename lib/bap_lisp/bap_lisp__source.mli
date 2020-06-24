@@ -20,67 +20,65 @@
     will move it into a separate library, along with the index and
     location modules. *)
 
-
 module Index = Bap_lisp__index
 module Loc = Bap_lisp__loc
+
 module Id : Index.S
+
 module Eq : Index.S
 
 type error
+
 type t
-type 'a indexed = ('a,Id.t,Eq.t) Index.interned
+
+type 'a indexed = ('a, Id.t, Eq.t) Index.interned
+
 type tree = token indexed
+
 and token = Atom of string | List of tree list
 
-
-
-(** [empty] source repository  *)
 val empty : t
+(** [empty] source repository  *)
 
-
+val load : t -> string -> (t, error) result
 (** [load source filename] loads the source code from the given
     [filename]. The source code should be a sequence of well-formed
     s-expressions.
 
     The [filename] should be an explicit path.
 *)
-val load : t -> string -> (t,error) result
 
-
+val find : t -> string -> tree list option
 (** [find source filename] returns a list of trees loaded from a file
     with the given [filename]. *)
-val find : t -> string -> tree list option
 
-
+val loc : t -> Id.t -> Loc.t
 (** [loc source id] returns a location information for the identity
     with the provided [id].
 
     If there is no such information, then a bogus location is
     returned. *)
-val loc : t -> Id.t -> Loc.t
 
+val has_loc : t -> Id.t -> bool
 (** [has_loc source id] if the location information is associated
     with the given [id] *)
-val has_loc : t -> Id.t -> bool
 
+val filename : t -> Id.t -> string
 (** [filename source id] returns the name of a file from which an
     identity with the given [id] is orginating.
 
     If the identity is not known to the source code repository, then
     a bogus filename is returned. *)
-val filename : t -> Id.t -> string
 
-
+val fold : t -> init:'a -> f:(string -> tree list -> 'a -> 'a) -> 'a
 (** [fold source ~init ~f] iterates over all files loaded into the
     [source] repository.  *)
-val fold : t -> init:'a -> f:(string -> tree list -> 'a -> 'a) -> 'a
 
 val derived : t -> from:Id.t -> Id.t -> t
 
 val lastid : t -> Id.t
 
 val lasteq : t -> Eq.t
-
 
 val pp_error : Format.formatter -> error -> unit
 

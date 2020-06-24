@@ -1,4 +1,5 @@
-let man = {|
+let man =
+  {|
   # DESCRIPTION
 
   Disassembles and analyzes the input file. This is the default
@@ -90,18 +91,20 @@ open Monads.Std
 open Format
 open Bap_plugins.Std
 
-include Self()
+include Self ()
+
 open Bap_main
 
-let features_used = [
-  "disassembler";
-  "lifter";
-  "symbolizer";
-  "rooter";
-  "reconstructor";
-  "brancher";
-  "loader";
-]
+let features_used =
+  [
+    "disassembler";
+    "lifter";
+    "symbolizer";
+    "rooter";
+    "reconstructor";
+    "brancher";
+    "loader";
+  ]
 
 type failure =
   | Expects_a_regular_file
@@ -115,25 +118,22 @@ type failure =
 
 type Extension.Error.t += Fail of failure
 
-module Err = Monad.Result.Make(Extension.Error)(Monad.Ident)
+module Err = Monad.Result.Make (Extension.Error) (Monad.Ident)
 open Err.Syntax
 
 let pass_error = Result.map_error ~f:(fun err -> Fail (Pass err))
+
 let proj_error = Result.map_error ~f:(fun err -> Fail (Project err))
 
 let run_passes base proj =
-  Err.List.fold ~init:(0,proj) ~f:(fun (step,proj) pass ->
-      report_progress
-        ~stage:(step+base)
-        ~note:(Project.Pass.name pass) ();
+  Err.List.fold ~init:(0, proj) ~f:(fun (step, proj) pass ->
+      report_progress ~stage:(step + base) ~note:(Project.Pass.name pass) ();
       Project.Pass.run pass proj |> pass_error >>= fun proj ->
-      Ok (step+1,proj))
+      Ok (step + 1, proj))
 
 let knowledge_cache () =
-  let reader = Data.Read.create
-      ~of_bigstring:Knowledge.of_bigstring () in
-  let writer = Data.Write.create
-      ~to_bigstring:Knowledge.to_bigstring () in
+  let reader = Data.Read.create ~of_bigstring:Knowledge.of_bigstring () in
+  let writer = Data.Write.create ~to_bigstring:Knowledge.to_bigstring () in
   Data.Cache.Service.request reader writer
 
 let project_state_cache () =
@@ -148,14 +148,13 @@ let project_state_cache () =
 
 let import_knowledge_from_cache digest =
   let digest = digest ~namespace:"knowledge" in
-  info "looking for knowledge with digest %a"
-    Data.Cache.Digest.pp digest;
+  info "looking for knowledge with digest %a" Data.Cache.Digest.pp digest;
   let cache = knowledge_cache () in
   match Data.Cache.load cache digest with
   | None -> ()
   | Some state ->
-    info "importing knowledge from cache";
-    Toplevel.set state
+      info "importing knowledge from cache";
+      Toplevel.set state
 
 let load_project_state_from_cache digest =
   let digest = digest ~namespace:"project" in
@@ -169,27 +168,22 @@ let save_project_state_to_cache digest state =
 
 let store_knowledge_in_cache digest =
   let digest = digest ~namespace:"knowledge" in
-  info "caching knowledge with digest %a"
-    Data.Cache.Digest.pp digest;
+  info "caching knowledge with digest %a" Data.Cache.Digest.pp digest;
   let cache = knowledge_cache () in
-  Toplevel.current () |>
-  Data.Cache.save cache digest
-
+  Toplevel.current () |> Data.Cache.save cache digest
 
 let process passes outputs project =
-  let autoruns = Project.passes () |>
-                 List.filter ~f:Project.Pass.autorun in
+  let autoruns = Project.passes () |> List.filter ~f:Project.Pass.autorun in
   let autos = List.length autoruns in
   let total = List.length passes + autos in
   report_progress ~note:"analyzing" ~total ();
-  run_passes 0 project autoruns >>= fun (step,proj) ->
-  run_passes step proj passes >>| fun (_,proj) ->
+  run_passes 0 project autoruns >>= fun (step, proj) ->
+  run_passes step proj passes >>| fun (_, proj) ->
   List.iter outputs ~f:(function
-      | `file dst,fmt,ver ->
+    | `file dst, fmt, ver ->
         Out_channel.with_file dst ~f:(fun ch ->
             Project.Io.save ~fmt ?ver ch proj)
-      | `stdout,fmt,ver ->
-        Project.Io.show ~fmt ?ver proj)
+    | `stdout, fmt, ver -> Project.Io.show ~fmt ?ver proj)
 
 let old_style_passes =
   Extension.Command.switches
@@ -199,50 +193,52 @@ let old_style_passes =
 
 let passes =
   Extension.Command.parameters
-    ~doc:"Run the selected passes (in the specified order)"
-    ~aliases:["p"]
-    Extension.Type.("PASSES" %: list string) "passes"
+    ~doc:"Run the selected passes (in the specified order)" ~aliases:[ "p" ]
+    Extension.Type.("PASSES" %: list string)
+    "passes"
 
 let outputs =
   Extension.Command.parameters
-    ~doc:"Dumps the program to <FILE> (defaults to stdout) \
-          in the <FMT> format (defaults to bir)."
-    ~as_flag:"bir"
-    ~aliases:["d"]
+    ~doc:
+      "Dumps the program to <FILE> (defaults to stdout) in the <FMT> format \
+       (defaults to bir)."
+    ~as_flag:"bir" ~aliases:[ "d" ]
     Extension.Type.("[<FMT>[:<FILE>]]" %: string)
     "dump"
 
-let input = Extension.Command.argument
-    ~doc:"The input file" Extension.Type.("FILE" %: string)
+let input =
+  Extension.Command.argument ~doc:"The input file"
+    Extension.Type.("FILE" %: string)
 
 let loader =
   Extension.Command.parameter
-    ~doc:"Use the specified loader.
-          Use the loader `raw' to load unstructured files"
+    ~doc:
+      "Use the specified loader.\n\
+      \          Use the loader `raw' to load unstructured files"
     Extension.Type.(string =? "llvm")
     "loader"
 
 let validate_input file =
-  Result.ok_if_true (Sys.file_exists file)
-    ~error:(Fail Expects_a_regular_file)
+  Result.ok_if_true (Sys.file_exists file) ~error:(Fail Expects_a_regular_file)
 
 let validate_passes_style old_style_passes new_style_passes =
-  match old_style_passes, new_style_passes with
-  | xs,[] | [],xs -> Ok xs
+  match (old_style_passes, new_style_passes) with
+  | xs, [] | [], xs -> Ok xs
   | _ -> Error (Fail Old_and_new_style_passes)
 
 let validate_passes passes =
-  let known = Project.passes () |>
-              List.map ~f:(fun p -> Project.Pass.name p, p) |>
-              Map.of_alist_exn (module String) in
-  Result.all @@
-  List.map passes ~f:(fun p -> match Map.find known p with
-      | Some p -> Ok p
-      | None -> Error (Fail (Unknown_pass p)))
+  let known =
+    Project.passes ()
+    |> List.map ~f:(fun p -> (Project.Pass.name p, p))
+    |> Map.of_alist_exn (module String)
+  in
+  Result.all
+  @@ List.map passes ~f:(fun p ->
+         match Map.find known p with
+         | Some p -> Ok p
+         | None -> Error (Fail (Unknown_pass p)))
 
-let option_digest f = function
-  | None -> "none"
-  | Some s -> f s
+let option_digest f = function None -> "none" | Some s -> f s
 
 let make_digest inputs =
   let inputs = String.concat inputs in
@@ -253,145 +249,142 @@ let make_digest inputs =
 module Dump_formats = struct
   let parse_fmt fmt =
     match String.split ~on:'-' fmt with
-    | [fmt;ver] -> fmt, Some ver
-    | _ -> fmt,None
+    | [ fmt; ver ] -> (fmt, Some ver)
+    | _ -> (fmt, None)
 
-  let flatten (x,(y,z)) = x,y,z
+  let flatten (x, (y, z)) = (x, y, z)
 
-  let split str = match String.split ~on:':' str with
-    | [fmt;dst] -> flatten (`file dst,parse_fmt fmt)
-    | _ -> flatten (`stdout,parse_fmt str)
+  let split str =
+    match String.split ~on:':' str with
+    | [ fmt; dst ] -> flatten (`file dst, parse_fmt fmt)
+    | _ -> flatten (`stdout, parse_fmt str)
 
   let parse_format str =
-    let (_,fmt,ver) as r = split str in
+    let ((_, fmt, ver) as r) = split str in
     match Project.find_writer ?ver fmt with
     | Some _ -> Ok r
-    | None -> match Project.find_writer fmt with
-      | None -> Error (Fail (Unknown_format fmt))
-      | Some _ -> Error (Fail (Unavailable_format_version fmt))
+    | None -> (
+        match Project.find_writer fmt with
+        | None -> Error (Fail (Unknown_format fmt))
+        | Some _ -> Error (Fail (Unavailable_format_version fmt)) )
 
-  let parse outputs =
-    Result.all @@
-    List.map outputs ~f:parse_format
+  let parse outputs = Result.all @@ List.map outputs ~f:parse_format
 end
 
 let setup_gc () =
   let opts = Caml.Gc.get () in
   info "Setting GC parameters";
-  Caml.Gc.set {
-    opts with
-    window_size = 20;
-    minor_heap_size = 1024 * 1024;
-    major_heap_increment = 64 * 1024 * 1024;
-    space_overhead = 200;
-  }
+  Caml.Gc.set
+    {
+      opts with
+      window_size = 20;
+      minor_heap_size = 1024 * 1024;
+      major_heap_increment = 64 * 1024 * 1024;
+      space_overhead = 200;
+    }
 
-let has_env var = match Sys.getenv var with
-  | exception _ -> false
-  | _ -> true
+let has_env var = match Sys.getenv var with exception _ -> false | _ -> true
 
 let _disassemble_command_registered : unit =
-  Extension.Command.(begin
-      declare ~doc:man "disassemble"
-        ~requires:features_used
-        (args $input $outputs $old_style_passes $passes $loader)
-    end) @@
-  fun input outputs old_style_passes passes loader ctxt ->
-  if not (has_env "OCAMLRUNPARAM" || has_env "CAMLRUNPARAM")
-  then setup_gc ()
+  Extension.Command.(
+    declare ~doc:man "disassemble" ~requires:features_used
+      (args $ input $ outputs $ old_style_passes $ passes $ loader))
+  @@ fun input outputs old_style_passes passes loader ctxt ->
+  if not (has_env "OCAMLRUNPARAM" || has_env "CAMLRUNPARAM") then setup_gc ()
   else info "GC parameters are overriden by a user";
   validate_input input >>= fun () ->
-  validate_passes_style old_style_passes (List.concat passes) >>=
-  validate_passes >>= fun passes ->
+  validate_passes_style old_style_passes (List.concat passes)
+  >>= validate_passes
+  >>= fun passes ->
   Dump_formats.parse outputs >>= fun outputs ->
-  let digest = make_digest [
-      Extension.Configuration.digest ctxt;
-      Caml.Digest.file input;
-      loader;
-    ] in
+  let digest =
+    make_digest
+      [ Extension.Configuration.digest ctxt; Caml.Digest.file input; loader ]
+  in
   import_knowledge_from_cache digest;
   let state = load_project_state_from_cache digest in
   let input = Project.Input.file ~loader ~filename:input in
-  Project.create ?state
-    input |> proj_error >>= fun proj ->
-  if Option.is_none state then begin
+  Project.create ?state input |> proj_error >>= fun proj ->
+  if Option.is_none state then (
     store_knowledge_in_cache digest;
-    save_project_state_to_cache digest (Project.state proj);
-  end;
+    save_project_state_to_cache digest (Project.state proj) );
   process passes outputs proj
 
 let pp_guesses ppf badname =
-  let guess = String.map badname ~f:(function
-      | '_' -> '-'
-      | c -> Char.lowercase c) in
+  let guess =
+    String.map badname ~f:(function '_' -> '-' | c -> Char.lowercase c)
+  in
   let suffix = "-" ^ name in
   let good_guess name =
-    String.equal name guess || String.is_suffix ~suffix name in
+    String.equal name guess || String.is_suffix ~suffix name
+  in
   let guesses =
-    Project.passes () |>
-    List.filter_map ~f:(fun p ->
-        let name = Project.Pass.name p in
-        Option.some_if (good_guess name) name) in
+    Project.passes ()
+    |> List.filter_map ~f:(fun p ->
+           let name = Project.Pass.name p in
+           Option.some_if (good_guess name) name)
+  in
   let pp_sep ppf () = Format.pp_print_string ppf ", or" in
   match guesses with
   | [] -> Format.fprintf ppf "make sure that your plugin is installed"
   | guesses ->
-    Format.fprintf ppf "did you mean %a?"
-      (Format.pp_print_list ~pp_sep Format.pp_print_string) guesses
+      Format.fprintf ppf "did you mean %a?"
+        (Format.pp_print_list ~pp_sep Format.pp_print_string)
+        guesses
 
 let is_verbose = Option.is_some (Sys.getenv_opt "BAP_DEBUG")
 
-let pp_backtrace ppf bt =
-  if is_verbose then fprintf ppf "Backtrace:@\n%s" bt
+let pp_backtrace ppf bt = if is_verbose then fprintf ppf "Backtrace:@\n%s" bt
 
 let pp_exn ppf = function
-  | Invalid_argument s ->
-    fprintf ppf "%s" s
-  | Failure s ->
-    fprintf ppf "%s" s
+  | Invalid_argument s -> fprintf ppf "%s" s
+  | Failure s -> fprintf ppf "%s" s
   | other -> fprintf ppf "%a" Exn.pp other
 
 let nice_pp_error fmt er =
   let module R = Info.Internal_repr in
   let rec pp_sexp fmt = function
     | Sexp.Atom x -> Format.fprintf fmt "%s\n" x
-    | Sexp.List xs -> List.iter ~f:(pp_sexp fmt) xs in
+    | Sexp.List xs -> List.iter ~f:(pp_sexp fmt) xs
+  in
   let rec pp fmt r =
     let open R in
     match r with
     | With_backtrace (r, backtrace) ->
-      Format.fprintf fmt "%a@\n%a" pp r
-        pp_backtrace (String.strip backtrace);
+        Format.fprintf fmt "%a@\n%a" pp r pp_backtrace (String.strip backtrace)
     | String s -> Format.fprintf fmt "%s" s
-    | r -> pp_sexp fmt (R.sexp_of_t r) in
+    | r -> pp_sexp fmt (R.sexp_of_t r)
+  in
   Format.fprintf fmt "%a" pp (R.of_info (Error.to_info er))
 
 let string_of_failure = function
-  | Expects_a_regular_file ->
-    "Unable to open the specified file."
+  | Expects_a_regular_file -> "Unable to open the specified file."
   | Old_and_new_style_passes ->
-    "Bad invocation: passes are specified in both old an new style, \
-     please switch to the new style, e.g., `-p<p1>,<p2>,<p3>'"
+      "Bad invocation: passes are specified in both old an new style, please \
+       switch to the new style, e.g., `-p<p1>,<p2>,<p3>'"
   | Unknown_pass name ->
-    asprintf "Bad invocation: failed to find the pass named %S, %a" name pp_guesses name
-  | Incompatible_options (o1,o2) ->
-    sprintf "Bad invocation: the options `%s' and `%s' can not be used together" o1 o2
+      asprintf "Bad invocation: failed to find the pass named %S, %a" name
+        pp_guesses name
+  | Incompatible_options (o1, o2) ->
+      sprintf
+        "Bad invocation: the options `%s' and `%s' can not be used together" o1
+        o2
   | Project err ->
-    asprintf "Failed to build the project:@\n %a" nice_pp_error err
-  | Pass (Project.Pass.Unsat_dep (p,s)) ->
-    sprintf "Can't run passes - the dependency %S of pass %S is not available."
-      s (Project.Pass.name p)
-  | Pass (Project.Pass.Runtime_error (p, Exn.Reraised (bt,exn))) ->
-    asprintf "The pass %S failed with:@\n%a@\n%a"
-      (Project.Pass.name p) pp_exn exn pp_backtrace bt
+      asprintf "Failed to build the project:@\n %a" nice_pp_error err
+  | Pass (Project.Pass.Unsat_dep (p, s)) ->
+      sprintf
+        "Can't run passes - the dependency %S of pass %S is not available." s
+        (Project.Pass.name p)
+  | Pass (Project.Pass.Runtime_error (p, Exn.Reraised (bt, exn))) ->
+      asprintf "The pass %S failed with:@\n%a@\n%a" (Project.Pass.name p) pp_exn
+        exn pp_backtrace bt
   | Pass (Project.Pass.Runtime_error (p, exn)) ->
-    asprintf "The pass %S failed with:@\n%a"
-      (Project.Pass.name p) pp_exn exn
-  | Unknown_format fmt ->
-    sprintf "The format %S is not known." fmt
+      asprintf "The pass %S failed with:@\n%a" (Project.Pass.name p) pp_exn exn
+  | Unknown_format fmt -> sprintf "The format %S is not known." fmt
   | Unavailable_format_version fmt ->
-    sprintf "The selected version of the format %S is not supported." fmt
+      sprintf "The selected version of the format %S is not supported." fmt
 
-let () = Extension.Error.register_printer @@ function
+let () =
+  Extension.Error.register_printer @@ function
   | Fail err -> Some (string_of_failure err)
   | _ -> None

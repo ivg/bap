@@ -6,10 +6,13 @@ open Bap_core_theory
 module Dis = Bap_disasm_basic
 
 type state [@@deriving bin_io]
+
 type insns
 
 val init : state
+
 val scan : mem -> state -> state knowledge
+
 val merge : state -> state -> state
 
 val explore :
@@ -19,8 +22,9 @@ val explore :
   node:('n -> 'c -> 'c knowledge) ->
   edge:('n -> 'n -> 'c -> 'c knowledge) ->
   init:'c ->
-  state -> 'c knowledge
-
+  state ->
+  'c knowledge
 
 val list_insns : ?rev:bool -> insns -> Theory.Label.t list
+
 val execution_order : insns -> Theory.Label.t list knowledge

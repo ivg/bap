@@ -236,23 +236,20 @@
 
 open Core_kernel
 open Bap.Std
-
 module Attribute = Bap_primus_lisp_attribute
 
 type t
 
 val t : t Attribute.t
 
-
-(** [of_project p] initializes a context from the project [p].  *)
 val of_project : project -> t
+(** [of_project p] initializes a context from the project [p].  *)
 
 val create : (string * string list) list -> t
 
 val empty : t
 
-
-
+val ( <= ) : t -> t -> bool
 (** [cx <= cx'] is true if [cx] is same as [cx'] or if [cx] is more
     specific. Where a context [c] is the same as context [c'] if [c]
     is as specific as [c'], i.e., no more, no less.
@@ -269,8 +266,6 @@ val empty : t
     ((arch arm v7) (compiler gcc)) <= ((arch arm)) => false
     v}
 *)
-val (<=) : t -> t -> bool
-
 
 (** Partial ordering between context classes.
 
@@ -279,12 +274,13 @@ val (<=) : t -> t -> bool
 
 *)
 type porder =
-  | Less     (** less generic:     c1 <= c2  && not(c2 <= c1) *)
-  | Same     (** exactly the same: c1 <= c2  &&   c2 <= c1  *)
-  | Equiv    (** not comparable :  not(c1 <= c2) && not(c2 <= c1) *)
-  | More     (** more generic :  not(c1 <= c2) &&   c2 <= c1  *)
+  | Less  (** less generic:     c1 <= c2  && not(c2 <= c1) *)
+  | Same  (** exactly the same: c1 <= c2  &&   c2 <= c1  *)
+  | Equiv  (** not comparable :  not(c1 <= c2) && not(c2 <= c1) *)
+  | More  (** more generic :  not(c1 <= c2) &&   c2 <= c1  *)
 
 val compare : t -> t -> porder
+
 val pp : Format.formatter -> t -> unit
 
 val merge : t -> t -> t

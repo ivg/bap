@@ -8,17 +8,16 @@ open Bap_trace_meta_types
     specified in this module.
 *)
 
-
-(** description of a tracer that was used to create the trace  *)
 val tracer : tracer tag
+(** description of a tracer that was used to create the trace  *)
 
-(** description of a target binary (executable) that was traced.*)
 val binary : binary tag
+(** description of a target binary (executable) that was traced.*)
 
-(** description of binary architecture. *)
 val arch : arch tag
+(** description of binary architecture. *)
 
-(** file stats of the traced binary  *)
 val binary_file_stats : file_stats tag
+(** file stats of the traced binary  *)
 
 val trace_stats : trace_stats tag

@@ -3,81 +3,95 @@ open X86_types
 
 (** {2 condition flag bits} *)
 
-
-(** carry flag  *)
 val cf : var
+(** carry flag  *)
 
-(** parity flag  *)
 val pf : var
+(** parity flag  *)
 
-(** adjust flag  *)
 val af : var
+(** adjust flag  *)
 
-(** zero flag  *)
 val zf : var
+(** zero flag  *)
 
-(** sign flag  *)
 val sf : var
+(** sign flag  *)
 
-(** overflow flag  *)
 val oF : var
+(** overflow flag  *)
 
-(** direction flag  *)
 val df : var
+(** direction flag  *)
 
-(** code segment  *)
 val cs : var
+(** code segment  *)
 
-(** data segment  *)
 val ds : var
+(** data segment  *)
 
-(** extra data segment #1 *)
 val es : var
+(** extra data segment #1 *)
 
-(** extra data segment #2 *)
 val fs : var
+(** extra data segment #2 *)
 
-(** extra data segment #3  *)
 val gs : var
+(** extra data segment #3  *)
 
-(** stack segment  *)
 val ss : var
+(** stack segment  *)
 
-(** fpu control register  *)
 val fpu_ctrl : var
+(** fpu control register  *)
 
-
+val mxcsr : var
 (** mx status control register  *)
-val mxcsr    : var
-
-
 
 val o_rax : operand
+
 val o_rcx : operand
+
 val o_rdx : operand
+
 val o_rbx : operand
+
 val o_rsp : operand
+
 val o_rbp : operand
-val o_fs  : operand
-val o_gs  : operand
+
+val o_fs : operand
+
+val o_gs : operand
 
 val pref_lock : int
-val repnz     : int
-val repz      : int
-val hint_bnt  : int
+
+val repnz : int
+
+val repz : int
+
+val hint_bnt : int
+
 val hint_bt : int
+
 val pref_cs : int
+
 val pref_ss : int
+
 val pref_ds : int
+
 val pref_es : int
+
 val pref_fs : int
+
 val pref_gs : int
+
 val pref_opsize : int
+
 val pref_addrsize : int
 
-(** Prefixes that we can usually handle automatically *)
 val standard_prefs : int list
-
+(** Prefixes that we can usually handle automatically *)
 
 (** CPU BIL variables.
 
@@ -88,82 +102,81 @@ val standard_prefs : int list
 
 *)
 module type ModeVars = sig
-
-  (** base pointer *)
   val rbp : var
+  (** base pointer *)
 
-  (** stack pointer  *)
   val rsp : var
+  (** stack pointer  *)
 
-  (** source index  *)
   val rsi : var
+  (** source index  *)
 
-  (** destination index  *)
   val rdi : var
+  (** destination index  *)
 
-  (** instruction pointer  *)
   val rip : var
+  (** instruction pointer  *)
 
-  (** accumulator register *)
   val rax : var
+  (** accumulator register *)
 
-  (** base register *)
   val rbx : var
+  (** base register *)
 
-  (** counter register *)
   val rcx : var
+  (** counter register *)
 
-  (** data register *)
   val rdx : var
+  (** data register *)
 
-
+  val rflags : var
   (** RFLAGS register  *)
-  val rflags  : var
 
-
-  (** Global Descriptor Table  *)
   val gdt : var
+  (** Global Descriptor Table  *)
 
-
-  (** Local Descriptor Table  *)
   val ldt : var
+  (** Local Descriptor Table  *)
 
-  (** segment registers let bases *)
   val fs_base : var
+  (** segment registers let bases *)
+
   val gs_base : var
 
   val seg_ss : var option
+
   val seg_es : var option
+
   val seg_cs : var option
+
   val seg_ds : var option
+
   val seg_fs : var option
+
   val seg_gs : var option
 
-
-  (** memory  *)
   val mem : var
+  (** memory  *)
+
   (* r8 -> r15 *)
 
+  val r : var array
   (** r8-r15 registers.
       Due to a legacy issues r.(0) -> r8, r.(1) -> r8, ... *)
-  val r : var array
 
-  (** Legacy version of the `r` array. *)
   val nums : var array
-  [@@deprecated "[since 2018-01] use `r` instead"]
+    [@@deprecated "[since 2018-01] use `r` instead"]
+  (** Legacy version of the `r` array. *)
 
+  val ymms : var array
   (** array of YMM registers  *)
-  val ymms: var array
-
 end
 
-
-(** 32-bit mode registers  *)
 module R32 : ModeVars
+(** 32-bit mode registers  *)
 
-(** 64-bit mode registers  *)
 module R64 : ModeVars
+(** 64-bit mode registers  *)
 
-
-(** [vars_of_mode mode] creates registers for a [mode]  *)
 val vars_of_mode : mode -> (module ModeVars)
+(** [vars_of_mode mode] creates registers for a [mode]  *)

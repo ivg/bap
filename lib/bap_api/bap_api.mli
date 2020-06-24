@@ -17,31 +17,31 @@ open Core_kernel
 open Bap.Std
 
 type filename = string
+
 type api = string
 
 (** Language processor interface.  *)
 module type S = sig
-
   type t
 
-  (** [language] a name of a language, e.g., ["C"] *)
   val language : string
+  (** [language] a name of a language, e.g., ["C"] *)
 
+  val parse : (api -> filename option) -> api list -> t Or_error.t
   (** [parse get_api apis] creates a language processor from a list of
       api. Function [get_api api] must return a name of an existing
       file, that corresponds to the given [api]. The [apis] parameter
       is a list of [api] names.  *)
-  val parse : (api -> filename option) -> api list -> t Or_error.t
 
+  val mapper : t -> Term.mapper
   (** the processor itself  *)
-  val mapper : t  -> Term.mapper
 end
 
-(** language processor type  *)
 type t = (module S)
+(** language processor type  *)
 
-(** apply the language processor  *)
 val process : t -> unit
+(** apply the language processor  *)
 
-(** enumerate all registered language processors  *)
 val processors : unit -> t list
+(** enumerate all registered language processors  *)

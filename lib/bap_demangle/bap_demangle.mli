@@ -1,39 +1,34 @@
+open Core_kernel
 (** Name demangling.
 
     This library provides an interface for creating and registering
     demanglers, that can be used on demand by fronends and plugins.
 
 *)
-open Core_kernel
 
 module Std : sig
   type demangler
-
 
   (** Demangler is a named string transformation.  *)
   module Demangler : sig
     type t = demangler
 
-
-    (** [create name demangler]  *)
     val create : string -> (string -> string) -> t
+    (** [create name demangler]  *)
 
-    (** [run demangler name] demangle given [name] *)
     val run : t -> string -> string
+    (** [run demangler name] demangle given [name] *)
 
-
-    (** [name demangler] returns a [demangler]'s name.  *)
     val name : t -> string
+    (** [name demangler] returns a [demangler]'s name.  *)
   end
-
 
   (** Registry of demanglers.  *)
   module Demanglers : sig
-
-    (** [register demangler] register new demangler.  *)
     val register : demangler -> unit
+    (** [register demangler] register new demangler.  *)
 
-    (** [available ()] lists currently registered demanglers.  *)
     val available : unit -> demangler list
+    (** [available ()] lists currently registered demanglers.  *)
   end
 end

@@ -1,6 +1,5 @@
 open Core_kernel
 
-
 (** Binary Analysis Rule Engine (BARE).
 
     The Binary Analysis Rule Engine is a production system (a forward
@@ -190,14 +189,11 @@ open Core_kernel
     v}
 *)
 
-
-(** representation of a tuple  *)
 type tuple = Sexp.t
+(** representation of a tuple  *)
 
-(** representation of a fact  *)
 type fact = tuple
-
-
+(** representation of a fact  *)
 
 (** Matching rule specification.
 
@@ -206,63 +202,52 @@ type fact = tuple
     store the partial matching state and, if some states reached the
     completion, it will also produce a sequence of facts.*)
 module Rule : sig
-
-
-  (** [rule abstract type]  *)
   type t [@@deriving sexp_of]
+  (** [rule abstract type]  *)
 
-
-
-  (** an abstract representation of an error  *)
   type error
+  (** an abstract representation of an error  *)
 
   (** {3 Rule Parsing}  *)
 
-
   val from_string : string -> (t list, error) Result.t
 
+  val from_file : string -> (t list, error) Result.t
   (** [from_file name] parses a file that contains zero or more rule
       specifications. Returns [Ok rules] if all rules specifications
       were well-formed, otherwise returns [Error e] with a detailed
       description of an error and a location of a subterm that is not
       part of the grammar.  *)
-  val from_file : string -> (t list, error) Result.t
 
+  val of_string : string -> t
   (** [of_string s] parses the rule specification [s].
 
       Precondition: [s] is a well-formed rule specification. *)
-  val of_string : string -> t
-
 
   (** {3 Rule introspecting}  *)
 
-
-  (** [lhs rule] is the left hand side of the rule.  *)
   val lhs : t -> tuple list
+  (** [lhs rule] is the left hand side of the rule.  *)
 
-
-  (** [rhs rule] is the right hand side of the rule  *)
   val rhs : t -> fact list
+  (** [rhs rule] is the right hand side of the rule  *)
 
-
+  val spec : t -> string
   (** [spec rule] is the human readable and machine parseable
       well-formed rule specification.  *)
-  val spec : t -> string
 
-
-  (** [pp ppf rule] prints [rule] into the formatter [ppf].  *)
   val pp : Format.formatter -> t -> unit
-
+  (** [pp ppf rule] prints [rule] into the formatter [ppf].  *)
 
   (** {3 Rule transformations}  *)
 
+  val apply : t -> fact -> t * fact list
   (** [apply rule fact] applies [rule] to [fact] and produces a new
       rule that contains a partial mathcing state, as well as a list
       (possibly empty) of newly produced facts.  *)
-  val apply : t -> fact -> t * fact list
 
-  (** [reset rule] discards the matching state and returns a fresh rule. *)
   val reset : t -> t
+  (** [reset rule] discards the matching state and returns a fresh rule. *)
 
   val report_error : ?filename:string -> Format.formatter -> error -> unit
 end
