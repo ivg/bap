@@ -19,39 +19,39 @@ module Scheme = struct
   let rel_off = "rel-off" %: int
 
   let file_type () =
-    Ogre.declare ~name:"file-type" (scheme name) ident
+    Ogre.declare ~name:"llvm:file-type" (scheme name) ident
 
   (** entry point  *)
   let entry () =
-    Ogre.declare ~name:"entry" (scheme rel_addr) ident
+    Ogre.declare ~name:"llvm:entry" (scheme rel_addr) ident
 
   let default_base_address () =
-    Ogre.declare ~name:"default-base-address" (scheme addr) ident
+    Ogre.declare ~name:"llvm:default-base-address" (scheme addr) ident
 
   (** reference to internal - symbol offset, relocation offset. *)
   let ref_internal () =
-    Ogre.declare ~name:"ref-internal" (scheme sym_off $ rel_off) Tuple.T2.create
+    Ogre.declare ~name:"llvm:ref-internal" (scheme sym_off $ rel_off) Tuple.T2.create
 
   (** reference to external - relocation offset, name *)
   let ref_external () =
-    Ogre.declare ~name:"ref-external" (scheme rel_off $ name) Tuple.T2.create
+    Ogre.declare ~name:"llvm:ref-external" (scheme rel_off $ name) Tuple.T2.create
 
   (** file is relocatable *)
-  let is_relocatable () = Ogre.declare ~name:"relocatable" (scheme flag) ident
+  let is_relocatable () = Ogre.declare ~name:"llvm:relocatable" (scheme flag) ident
 
   let section_entry () =
-    Ogre.declare ~name:"section-entry" (scheme name $ rel_addr $ size $ off)
+    Ogre.declare ~name:"llvm:section-entry" (scheme name $ rel_addr $ size $ off)
       (fun name addr size off -> name, addr, size, off)
 
   (** named entry that contains code *)
   let code_entry () =
-    Ogre.declare ~name:"code-entry" (scheme name $ off $ size) Tuple.T3.create
+    Ogre.declare ~name:"llvm:code-entry" (scheme name $ off $ size) Tuple.T3.create
 
   (** symbol *)
   let symbol_entry () =
-    Ogre.declare ~name:"symbol-entry"
-      (scheme name $ rel_addr $ size $ off)
-      (fun name addr size off -> name, addr, size, off)
+    Ogre.declare ~name:"llvm:symbol-entry"
+      (scheme name $ rel_addr $ size $ off $ value)
+      (fun name addr size off value -> name, addr, size, off, value)
 
 end
 
