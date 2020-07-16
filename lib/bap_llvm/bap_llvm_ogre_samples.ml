@@ -10,10 +10,11 @@ module Symbols(Fact : Ogre.S) = struct
   let symbols =
     Fact.require base_address >>= fun base ->
     Fact.collect Ogre.Query.(select (from symbol_entry)) >>= fun s ->
-    Fact.Seq.iter s ~f:(fun (name, relative_addr, size, off) ->
+    Fact.Seq.iter s ~f:(fun (name, relative_addr, size, off, value) ->
         if Int64.(size = 0L) then Fact.return ()
         else
           let full_addr = Int64.(relative_addr + base) in
+          Fact.provide symbol_value full_addr value >>= fun () ->
           Fact.provide named_symbol full_addr name >>= fun () ->
           Fact.provide symbol_chunk full_addr size full_addr >>= fun () ->
           Fact.request code_entry ~that:(fun (n,o,s) ->
@@ -60,10 +61,11 @@ module Relocatable_symbols(Fact : Ogre.S) = struct
     externals >>= fun () ->
     Fact.require base_address >>= fun base ->
     Fact.collect Ogre.Query.(select (from symbol_entry)) >>= fun s ->
-    Fact.Seq.iter s ~f:(fun (name, _, size, off) ->
+    Fact.Seq.iter s ~f:(fun (name, _, size, off, value) ->
         if Int64.(size = 0L) then Fact.return ()
         else
           let addr = Int64.(base + off) in
+          Fact.provide symbol_value addr value >>= fun () ->
           Fact.provide named_symbol addr name >>= fun () ->
           Fact.provide symbol_chunk addr size addr >>= fun () ->
           Fact.request code_entry ~that:(fun (n,o,s) ->

@@ -37,7 +37,6 @@ symbol_iterator begin_symbols(const ObjectFile &obj);
 symbol_iterator end_symbols(const ObjectFile &obj);
 error_or<uint64_t> symbol_address(const SymbolRef &sym);
 error_or<std::string> symbol_name(const SymbolRef &s);
-error_or<uint64_t> symbol_value(const SymbolRef &s);
 error_or<SymbolRef::Type> symbol_type(const SymbolRef &s);
 error_or<section_iterator> symbol_section(const ObjectFile &obj, const SymbolRef &s);
 error_or<uint64_t> symbol_size(const SymbolRef &s);

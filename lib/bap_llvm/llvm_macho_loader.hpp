@@ -51,9 +51,9 @@ void segment_command(const T &cmd, uint64_t base, ogre_doc &s) {
     bool r = static_cast<bool>(cmd.initprot & MachO::VM_PROT_READ);
     bool w = static_cast<bool>(cmd.initprot & MachO::VM_PROT_WRITE);
     bool x = static_cast<bool>(cmd.initprot & MachO::VM_PROT_EXECUTE);
-    s.entry("segment-command") << cmd.segname << cmd.fileoff << cmd.filesize;
-    s.entry("segment-command-flags") << cmd.segname << r << w << x;
-    s.entry("virtual-segment-command") << cmd.segname << (cmd.vmaddr - base) << cmd.vmsize;
+    s.entry("llvm:segment-command") << cmd.segname << cmd.fileoff << cmd.filesize;
+    s.entry("llvm:segment-command-flags") << cmd.segname << r << w << x;
+    s.entry("llvm:virtual-segment-command") << cmd.segname << (cmd.vmaddr - base) << cmd.vmsize;
 }
 
 uint32_t filetype(const macho &obj) {
@@ -182,18 +182,18 @@ error_or<uint64_t> entry_of_sections(const macho &obj) {
 
 void entry_point(const macho &obj, ogre_doc &s) {
     if (auto entry = entry_of_commands(obj))
-        s.entry("entry") << *entry;
+        s.entry("llvm:entry") << *entry;
     else
         if (auto entry = entry_of_sections(obj))
-            s.entry("entry") << *entry;
+            s.entry("llvm:entry") << *entry;
 }
 
 void image_info(const macho &obj, ogre_doc &s) {
     if (!is_exec(obj))
-        s.raw_entry("(entry 0)");
+        s.raw_entry("(llvm:entry 0)");
     else
         entry_point(obj, s);
-    s.entry("relocatable") << is_relocatable(obj);
+    s.entry("llvm:relocatable") << is_relocatable(obj);
 }
 
 uint32_t section_type(const macho &obj, SectionRef sec) {
@@ -201,20 +201,12 @@ uint32_t section_type(const macho &obj, SectionRef sec) {
 }
 
 void section(const std::string &name, uint64_t rel_addr, uint64_t size, uint64_t off, ogre_doc &s) {
-    s.entry("section-entry") << name << rel_addr << size << off;
+    s.entry("llvm:section-entry") << name << rel_addr << size << off;
 }
 
-// we distinguish symbols that are defined in some section and symbols that are not. For former it's ok
-// to provide size and interpret symbol's value as an address. For later we provide only name and value
-// as it is.
-void section_symbol(const std::string &name, uint64_t rel_addr, uint64_t size, uint64_t off, sym_type typ, ogre_doc &s) {
-    s.entry("symbol-entry") << name << rel_addr << size << off;
-    if (typ == SymbolRef::ST_Function)
-        s.entry("code-entry") << name << off << size;
-}
 
 void macho_symbol(const std::string &name, uint64_t value, ogre_doc &s) {
-    s.entry("macho-symbol") << name << value;
+    s.entry("llvm:macho-symbol") << name << value;
 }
 
 bool is_external(const macho &obj, const SymbolRef &sym) {
@@ -251,10 +243,10 @@ void symbol_reference(const macho &obj, const RelocationRef &rel, section_iterat
     auto off = prim::relocation_offset(rel) + sec_offset;
     if (is_external(obj, *it)) {
         if (auto name = prim::symbol_name(*it))
-            s.entry("ref-external") << off << *name;
+            s.entry("llvm:ref-external") << off << *name;
     } else {
         if (auto file_offset = symbol_file_offset(obj, *it))
-            s.entry("ref-internal") << *file_offset << off;
+            s.entry("llvm:ref-internal") << *file_offset << off;
     }
 }
 
@@ -266,7 +258,7 @@ void symbol_reference(const macho &obj, uint32_t sym_num, uint64_t offset, ogre_
     if (it == prim::end_symbols(obj)) return;
     if (is_external(obj, *it))
         if (auto name = prim::symbol_name(*it))
-            s.entry("ref-external") << offset << *name;
+            s.entry("llvm:ref-external") << offset << *name;
 }
 
 // checks that symbol belongs to some sections,
@@ -315,7 +307,7 @@ void sections(const macho &obj, ogre_doc &s) {
         if (addr && name && size) {
             section(*name, *addr-base, *size, offs, s);
             if (is_code_section(obj, sec))
-                s.entry("code-entry") << *name << offs << *size;
+                s.entry("llvm:code-entry") << *name << offs << *size;
         }
     }
 }
@@ -331,7 +323,13 @@ void symbols(const macho &obj, const prim::symbols_sizes &sizes, ogre_doc &s) {
                 auto offs = symbol_file_offset(obj, sym);
                 auto type = prim::symbol_type(sym);
                 if (addr && offs && type) {
-                    section_symbol(*name, *addr, size, *offs, *type, s);
+                    s.entry("llvm:symbol-entry") << *name
+                                                 << *addr
+                                                 << size
+                                                 << *offs
+                                                 << symbol_value(obj, sym);
+                    if (*type == SymbolRef::ST_Function)
+                        s.entry("llvm:code-entry") << *name << *offs << size;
                 }
             }
             else {
@@ -442,8 +440,12 @@ void indirect_symbols(const macho &obj, const MachO::dysymtab_command &dlc, ogre
                     if (auto name = prim::symbol_name(*sym)) {
                         auto sym_addr = (sec_addr + j * stride) - base;
                         auto sym_offs = sec_offs + j * stride;
-                        s.entry("symbol-entry") << *name << sym_addr << stride << sym_offs ;
-                        s.entry("code-entry") << *name << sym_offs << stride;
+                        s.entry("llvm:symbol-entry") << *name
+                                                     << sym_addr
+                                                     << stride
+                                                     << sym_offs
+                                                     << sym->getValue();
+                        s.entry("llvm:code-entry") << *name << sym_offs << stride;
                     }
                 }
             }
@@ -543,8 +545,8 @@ symbol_iterator get_symbol(const macho &obj, std::size_t index) {
 
 error_or<std::string> load(ogre_doc &s, const llvm::object::MachOObjectFile &obj) {
     using namespace macho_loader;
-    s.raw_entry("(file-type macho)");
-    s.entry("default-base-address") << image_base(obj);
+    s.raw_entry("(llvm:file-type macho)");
+    s.entry("llvm:default-base-address") << image_base(obj);
     image_info(obj, s);
     iterate_macho_commands(obj, s);
     sections(obj, s);

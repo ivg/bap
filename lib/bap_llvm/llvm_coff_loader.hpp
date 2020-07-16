@@ -31,17 +31,17 @@ void section(const coff_section &sec, uint64_t image_base,  ogre_doc &s) {
     bool r = static_cast<bool>(sec.Characteristics & COFF::IMAGE_SCN_MEM_READ);
     bool w = static_cast<bool>(sec.Characteristics & COFF::IMAGE_SCN_MEM_WRITE);
     bool x = is_code_section(sec);
-    s.entry("section-entry") << sec.Name << sec.VirtualAddress << sec.SizeOfRawData << sec.PointerToRawData;
-    s.entry("virtual-section-header") << sec.Name << sec.VirtualAddress << sec.VirtualSize;
-    s.entry("section-flags") << sec.Name << r << w << x;
+    s.entry("llvm:section-entry") << sec.Name << sec.VirtualAddress << sec.SizeOfRawData << sec.PointerToRawData;
+    s.entry("llvm:virtual-section-header") << sec.Name << sec.VirtualAddress << sec.VirtualSize;
+    s.entry("llvm:section-flags") << sec.Name << r << w << x;
     if (x)
-        s.entry("code-entry") << sec.Name << sec.PointerToRawData << sec.SizeOfRawData;
+        s.entry("llvm:code-entry") << sec.Name << sec.PointerToRawData << sec.SizeOfRawData;
 }
 
 void symbol(const std::string &name, uint64_t relative_addr, uint64_t size, uint64_t off, SymbolRef::Type typ, ogre_doc &s) {
-    s.entry("symbol-entry") << name << relative_addr << size << off;
+    s.entry("llvm:symbol-entry") << name << relative_addr << size << off;
     if (typ == SymbolRef::ST_Function)
-        s.entry("code-entry") << name << off << size;
+        s.entry("llvm:code-entry") << name << off << size;
 }
 
 error_or<uint64_t> get_image_base(const coff_obj &obj);
@@ -63,23 +63,23 @@ const coff_section * get_coff_section(const coff_obj &obj, std::size_t index) {
 void image_base(const coff_obj &obj, ogre_doc &s) {
     auto base = get_image_base(obj);
     if (base)
-        s.entry("default-base-address") << *base;
+        s.entry("llvm:default-base-address") << *base;
 }
 
 void entry_point(const coff_obj &obj, ogre_doc &s) {
     // coff object files may not have a PE/PE+ header
     if (is_relocatable(obj)) {
-        s.entry("entry") << 0;
+        s.entry("llvm:entry") << 0;
         return;
     }
     if (obj.getBytesInAddress() == 4) {
         error_or<pe32_header> hdr = prim::get_pe32_header(obj);
         if (!hdr) { s.fail("PE header not found"); return; }
-        s.entry("entry") << hdr->AddressOfEntryPoint;
+        s.entry("llvm:entry") << hdr->AddressOfEntryPoint;
     } else {
         error_or<pe32plus_header> hdr = prim::get_pe32plus_header(obj);
         if (!hdr) { s.fail("PE+ header not found"); return; }
-        s.entry("entry") << hdr->AddressOfEntryPoint;
+        s.entry("llvm:entry") << hdr->AddressOfEntryPoint;
     }
 }
 
@@ -100,10 +100,10 @@ void symbol_reference(const coff_obj &obj, const RelocationRef &rel, section_ite
     auto off = prim::relocation_offset(rel) + sec_offset; // relocation file offset
     if (is_external_symbol(obj, it)) {
         if (auto name = prim::symbol_name(*it))
-            s.entry("ref-external") << off << *name;
+            s.entry("llvm:ref-external") << off << *name;
     } else {
         if (auto file_offset = symbol_file_offset(obj, *it))
-            s.entry("ref-internal") << *file_offset << off;
+            s.entry("llvm:ref-internal") << *file_offset << off;
     }
 }
 
@@ -121,8 +121,15 @@ void symbols(const coff_obj &obj, ogre_doc &s) {
         auto type = prim::symbol_type(sym);
         auto addr = symbol_relative_address(obj, sym);
         auto offs = symbol_file_offset(obj, sym);
-        if (!name || !type || !addr || !offs) continue;
-        symbol(*name, *addr, sized_sym.second, *offs, *type, s);
+        if (name && type && addr && offs) {
+            s.entry("llvm:symbol-entry") << *name
+                                         << *addr
+                                         << sized_sym.second
+                                         << *offs
+                                         << sym.getValue();
+            if (*type == SymbolRef::ST_Function)
+                s.entry("llvm:code-entry") << *name << *offs << sized_sym.second;
+        }
     }
 }
 
@@ -206,8 +213,8 @@ void exported_symbols(const coff_obj &obj, exports &syms, ogre_doc &s) {
         else
             size = exp_sym_size(c, syms[i]);
         auto offs = exp_sym_offset(c, syms[i]);
-        s.entry("symbol-entry") << syms[i].second << syms[i].first << size << offs;
-        s.entry("code-entry") << syms[i].second << offs << size;
+        s.entry("llvm:symbol-entry") << syms[i].second << syms[i].first << size << offs << 0;
+        s.entry("llvm:code-entry") << syms[i].second << offs << size;
     }
 }
 
@@ -370,8 +377,8 @@ error_or<uint64_t> symbol_value(const coff_obj &obj, const SymbolRef &s) {
 
 error_or<std::string> load(ogre_doc &s, const llvm::object::COFFObjectFile &obj, const char* pdb_path) {
     using namespace coff_loader;
-    s.raw_entry("(file-type coff)");
-    s.entry("relocatable") << is_relocatable(obj);
+    s.raw_entry("(llvm:file-type coff)");
+    s.entry("llvm:relocatable") << is_relocatable(obj);
     image_base(obj, s);
     entry_point(obj, s);
     sections(obj, s);

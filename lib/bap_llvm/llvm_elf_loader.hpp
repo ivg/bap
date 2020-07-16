@@ -70,8 +70,8 @@ template <typename T>
 void file_header(const ELFObjectFile<T> &obj, ogre_doc &s) {
     auto hdr = obj.getELFFile()->getHeader();
     auto base = base_address(obj);
-    s.entry("relocatable") << is_rel(obj);
-    s.entry("entry") << hdr->e_entry - base;
+    s.entry("llvm:relocatable") << is_rel(obj);
+    s.entry("llvm:entry") << hdr->e_entry - base;
 }
 
 std::string name_of_index(std::size_t i) {
@@ -80,15 +80,34 @@ std::string name_of_index(std::size_t i) {
     return s.str();
 }
 
+template <typename I>
+void program_headers(I begin, I end, ogre_doc &s) {
+    std::size_t i = 0;
+    uint64_t base = base_address(begin, end);
+    for (auto it = begin; it != end; ++it, ++i) {
+        bool ld = (it->p_type == ELF::PT_LOAD);
+        bool r = static_cast<bool>(it->p_flags & ELF::PF_R);
+        bool w = static_cast<bool>(it->p_flags & ELF::PF_W);
+        bool x = static_cast<bool>(it->p_flags & ELF::PF_X);
+        auto off = it->p_offset;
+        auto filesz = it->p_filesz;
+        auto name = name_of_index(i);
+        auto addr = it->p_vaddr - base;
+        s.entry("llvm:program-header") << name << off << filesz;
+        s.entry("llvm:virtual-program-header") << name << addr << it->p_memsz;
+        s.entry("llvm:program-header-flags") << name << ld << r << w << x;
+    }
+}
+
 template <typename T>
 void section_header(const T &hdr, const std::string &name, uint64_t base, ogre_doc &s) {
     auto addr = hdr.sh_addr - base;
-    s.entry("section-entry") << name << addr << hdr.sh_size << hdr.sh_offset;
+    s.entry("llvm:section-entry") << name << addr << hdr.sh_size << hdr.sh_offset;
     bool w = static_cast<bool>(hdr.sh_flags & ELF::SHF_WRITE);
     bool x = static_cast<bool>(hdr.sh_flags & ELF::SHF_EXECINSTR);
-    s.entry("section-flags") << name << true << w << x;
+    s.entry("llvm:section-flags") << name << true << w << x;
     if (x)
-        s.entry("code-entry") << name << hdr.sh_offset << hdr.sh_size;
+        s.entry("llvm:code-entry") << name << hdr.sh_offset << hdr.sh_size;
 }
 
 template <typename T>
@@ -136,10 +155,10 @@ void symbol_reference(const ELFObjectFile<T> &obj, const RelocationRef &rel, sec
     auto off = prim::relocation_offset(rel) + sec_offset; // relocation file offset
     if (is_external_symbol(*sym_elf)) {
         if (auto name = prim::symbol_name(*it))
-            s.entry("ref-external") << off << *name;
+            s.entry("llvm:ref-external") << off << *name;
     } else {
         if (auto file_offset = symbol_file_offset(obj, *it))
-            s.entry("ref-internal") << *file_offset << off;
+            s.entry("llvm:ref-internal") << *file_offset << off;
     }
 }
 
@@ -153,9 +172,14 @@ void symbol_entry(const ELFObjectFile<T> &obj, const SymbolRef &sym, ogre_doc &s
     auto addr = symbol_address(obj, sym);
     auto off = symbol_file_offset(obj, sym);
     if (name && addr && off) {
-        s.entry("symbol-entry") << *name << *addr << sym_elf->st_size << *off;
+        s.entry("llvm:symbol-entry") << *name
+                                     << *addr
+                                     << sym_elf->st_size
+                                     << *off
+                                     << sym_elf->st_value;
+
         if (sym_elf->getType() == ELF::STT_FUNC)
-            s.entry("code-entry") << *name << *off << sym_elf->st_size ;
+            s.entry("llvm:code-entry") << *name << *off << sym_elf->st_size ;
     }
 }
 
@@ -309,8 +333,8 @@ void relocations(const ELFObjectFile<T> &obj, ogre_doc &s) {
 template <typename T>
 error_or<std::string> load(ogre_doc &s, const llvm::object::ELFObjectFile<T> &obj) {
     using namespace elf_loader;
-    s.raw_entry("(file-type elf)");
-    s.entry("default-base-address") << base_address(obj);
+    s.raw_entry("(llvm:file-type elf)");
+    s.entry("llvm:default-base-address") << base_address(obj);
     file_header(obj, s);
     program_headers(obj, s);
     section_headers(obj, s);

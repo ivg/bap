@@ -133,8 +133,11 @@ struct symbol_visitor : public codeview::SymbolVisitorCallbacks {
         uint64_t relative_addr = it->second.rel_addr + proc.CodeOffset;
         uint64_t off = it->second.offset + proc.CodeOffset;
 
-        doc.entry("symbol-entry") << proc.Name.str() << relative_addr << proc.CodeSize << off;
-        doc.entry("code-entry") << proc.Name.str() << off << proc.CodeSize;
+        doc.entry("llvm:symbol-entry") << proc.Name.str()
+                                       << relative_addr
+                                       << proc.CodeSize
+                                       << off;
+        doc.entry("llvm:code-entry") << proc.Name.str() << off << proc.CodeSize;
 
         return Error::success();
     }

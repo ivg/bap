@@ -158,8 +158,6 @@ error_or<std::string> symbol_name(const SymbolRef &s) {
     else return failure(error_message(name));
 }
 
-error_or<uint64_t> symbol_value(const SymbolRef &s) { return success(s.getValue()); }
-
 error_or<section_iterator> symbol_section(const ObjectFile &obj, const SymbolRef &s) {
     auto sec = s.getSection();
     if (sec) return success(*sec);
