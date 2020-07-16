@@ -1,5 +1,7 @@
 open Core_kernel
 open Bap.Std
+open Bap_future.Std
+open Bap_core_theory
 include Self()
 
 let () = Config.manpage [
@@ -32,9 +34,54 @@ module ARM = struct
         Error (Error.of_string "type error")
 end
 
+let symbol_values doc =
+  let field = Ogre.Query.(select (from Image.Scheme.symbol_value)) in
+  match Ogre.eval (Ogre.collect field) doc with
+  | Ok syms -> syms
+  | Error err -> error "the file specification is ill-formed: %a"
+                   Error.pp err;
+    failwith "broken file specification"
+
+
+let compute_arch_from_symbol_table file spec =
+  let open KB.Syntax in
+  let init = Map.empty (module Bitvec_order) in
+  let (>>=?) x f = x >>= function
+    | None -> KB.return `unknown
+    | Some x -> f x in
+  let require_equal prop obj v =
+    KB.collect prop obj >>|? fun r ->
+    if String.equal r v then Some ()
+    else None in
+  let symbols =
+    symbol_values spec |>
+    Seq.fold ~init ~f:(fun symbols (addr,value) ->
+        let arch = match Int64.(value land 1L) with
+          | 0L ->
+            Format.eprintf "%Lx is 32-bit@\n%!" addr;
+            `armv7
+          | _ ->
+            Format.eprintf "%Lx is 16-bit@\n%!" addr;
+            `thumbv7 in
+        let addr = Bitvec.M32.int64 addr in
+        Map.add_exn symbols addr arch) in
+  KB.promise Arch.slot @@ fun label ->
+  KB.collect Theory.Label.unit label >>=? fun unit ->
+  require_equal Theory.Unit.path unit file >>=? fun () ->
+  require_equal Theory.Unit.Target.arch unit "arm" >>=? fun () ->
+  KB.collect Theory.Label.addr label >>=? fun addr ->
+  KB.return @@ match Map.find symbols addr with
+  | None -> `armv7
+  | Some arch -> arch
+
+
 
 let () =
-  Config.when_ready (fun _ ->
-      List.iter Arch.all_of_arm ~f:(fun arch ->
-          register_target (arch :> arch) (module ARM);
-          Arm_gnueabi.setup ()))
+  Config.when_ready @@ fun _ ->
+  List.iter Arch.all_of_arm ~f:(fun arch ->
+      register_target (arch :> arch) (module ARM);
+      Arm_gnueabi.setup ());
+  let inputs = Stream.merge ~f:Tuple.T2.create
+      Project.Info.file Project.Info.spec  in
+  Stream.observe inputs @@ fun (file,spec) ->
+  compute_arch_from_symbol_table file spec

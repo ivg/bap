@@ -23,8 +23,8 @@ type jump = {
 
 module Machine : sig
   type task = private
-    | Dest of {dst : addr; parent : task option; arch : arch}
-    | Fall of {dst : addr; parent : task; delay : slot}
+    | Dest of {dst : addr; parent : task option; arch : arch option}
+    | Fall of {dst : addr; parent : task; delay : slot; arch : arch option}
     | Jump of {src : addr; age: int; dsts : jump; parent : task}
   and slot = private
     | Ready of task option
@@ -32,7 +32,6 @@ module Machine : sig
   [@@deriving bin_io]
 
   type state = private {
-    arch : arch;
     stop : bool;
     work : task list;           (* work list*)
     debt : task list;           (* work that we can't finish *)
@@ -47,29 +46,28 @@ module Machine : sig
   }
 
   val start :
-    arch ->
     mem ->
     debt:task list ->
     code:Set.M(Addr).t ->
     data:Set.M(Addr).t ->
     init:Set.M(Addr).t ->
     empty:(state -> 'a) ->
-    ready:(state -> arch -> mem -> 'a) -> 'a
+    ready:(state -> arch option -> mem -> 'a) -> 'a
 
   val view : state -> mem ->
     empty:(state -> 'a) ->
-    ready:(state -> arch -> mem -> 'a) -> 'a
+    ready:(state -> arch option -> mem -> 'a) -> 'a
 
-  val failed : state -> addr -> state
-  val jumped : state -> mem -> jump -> int -> state
-  val stopped : state -> state
-  val moved  : state -> mem -> state
+  val failed : state -> arch -> addr -> state
+  val jumped : state -> arch -> mem -> jump -> int -> state
+  val stopped : state -> arch -> state
+  val moved  : state -> arch -> mem -> state
   val is_ready : state -> bool
 end = struct
 
   type task =
-    | Dest of {dst : addr; parent : task option; arch : arch}
-    | Fall of {dst : addr; parent : task; delay : slot}
+    | Dest of {dst : addr; parent : task option; arch : arch option}
+    | Fall of {dst : addr; parent : task; delay : slot; arch : arch option}
     | Jump of {src : addr; age: int; dsts : jump; parent : task}
   and slot =
     | Ready of task option
@@ -77,13 +75,12 @@ end = struct
   [@@deriving bin_io]
 
 
-  let init_work arch init roots =
+  let init_work init roots =
     Set.to_sequence ~order:`Decreasing roots |>
     Seq.fold ~init ~f:(fun work root ->
-        Dest {dst=root; parent=None; arch} :: work)
+        Dest {dst=root; parent=None; arch=None} :: work)
 
   type state = {
-    arch : arch;
     stop : bool;
     work : task list;           (* work list*)
     debt : task list;
@@ -156,7 +153,7 @@ end = struct
     | [] ->
       if Set.is_empty s.usat then {s with stop = true}
       else step {s with work = [
-          Dest {dst=Set.min_elt_exn s.usat; parent=None; arch=s.arch}
+          Dest {dst=Set.min_elt_exn s.usat; parent=None; arch=None}
         ]}
     | Dest {dst=next} as curr :: work
       when is_data s next || is_slot s next ->
@@ -184,7 +181,7 @@ end = struct
         Set.fold resolved ~init ~f:(fun s next -> {
               s with
               work = Dest {
-                  dst=next; parent = Some jump; arch = dsts.arch;
+                  dst=next; parent = Some jump; arch = Some dsts.arch;
                 } :: s.work})
     | Jump jmp as self :: Fall ({dst=next} as slot) :: work ->
       let s = cancel_beg s next in
@@ -207,7 +204,7 @@ end = struct
              usat = Set.remove s.usat addr
     }
 
-  let jumped s mem dsts delay =
+  let jumped s arch mem dsts delay =
     let s = decoded s mem in
     let parent = s.curr in
     let src = Memory.min_addr mem in
@@ -215,63 +212,65 @@ end = struct
     let next = Addr.succ (Memory.max_addr mem) in
     let next =
       if dsts.barrier && delay = 0
-      then Dest {dst=next; parent=None; arch=dsts.arch}
-      else Fall {dst=next; parent=jump; delay = Ready None} in
+      then Dest {dst=next; parent=None; arch=None}
+      else Fall {dst=next; parent=jump; delay = Ready None; arch=Some arch} in
     step {s with work = jump :: next :: s.work }
 
   let insert_delayed t = function
     | x :: xs -> x :: t :: xs
     | [] -> [t]
 
-  let moved s mem =
+  let moved s arch mem =
     let parent = match s.curr with
       | Fall {delay=Ready (Some parent)} -> parent
       | _ -> s.curr in
     let next = Addr.succ (Memory.max_addr mem) in
     let next = match parent with
-      | Jump {dsts={barrier=true; arch}} ->
-        Dest {dst=next; parent=None; arch}
+      | Jump {dsts={barrier=true}} ->
+        Dest {dst=next; parent=None; arch=None}
       | parent -> Fall {
           dst = next;
           parent;
           delay = Ready None;
+          arch = Some arch;
         } in
     let work = match s.curr with
       | Fall {delay = Delay} -> insert_delayed next s.work
       | _ -> next :: s.work in
     step @@ decoded {s with work} mem
 
-
-  let failed s addr =
+  let failed s _arch addr =
     step @@ cancel s.curr @@ mark_data s addr
 
-  let stopped s =
+  let stopped s _arch =
     step @@ cancel s.curr @@ mark_data s s.addr
+
+  let task_arch = function
+    | Fall {arch} | Dest {arch} -> arch
+    | Jump _ -> None
 
   let rec view s base ~empty ~ready =
     match Memory.view ~from:s.addr base with
-    | Ok mem -> ready s s.arch mem
+    | Ok mem -> ready s (task_arch s.curr) mem
     | Error _ ->
       let s = match s.curr with
-        | Fall _ as task ->
-          cancel task s
+        | Fall _ as task -> cancel task s
         | t -> {s with debt = t :: s.debt} in
       match s.work with
       | [] -> empty (step s)
       | _ -> view (step s) base ~empty ~ready
 
-  let start arch mem ~debt ~code ~data ~init =
+  let start mem ~debt ~code ~data ~init =
     let init = if Set.is_empty init
       then Set.singleton (module Addr) (Memory.min_addr mem)
       else init in
-    let work = init_work arch debt init in
+    let work = init_work debt init in
     let start = Set.min_elt_exn init in
     view {
-      arch;
       work; data; usat=code;
       addr = start;
       debt = [];
-      curr = Dest {dst = start; parent = None; arch};
+      curr = Dest {dst = start; parent = None; arch=None};
       stop = false;
       dels = Set.empty (module Addr);
       begs = Map.empty (module Addr);
@@ -280,17 +279,24 @@ end = struct
     } mem
 end
 
-let new_insn arch mem insn =
+let query_arch addr =
+  KB.Object.scoped Theory.Program.cls @@ fun obj ->
+  KB.provide Theory.Label.addr obj (Some (Word.to_bitvec addr)) >>= fun () ->
+  KB.collect Arch.slot obj
+
+let new_insn mem insn =
   let addr = Addr.to_bitvec (Memory.min_addr mem) in
   Theory.Label.for_addr addr >>= fun code ->
-  KB.provide Arch.slot code arch >>= fun () ->
   KB.provide Memory.slot code (Some mem) >>= fun () ->
   KB.provide Dis.Insn.slot code (Some insn) >>| fun () ->
+  Format.eprintf "%a\t%s@\n%!"
+    Memory.pp mem (Dis.Insn.asm insn);
   code
 
-let collect_dests arch mem insn =
+let collect_dests mem insn =
+  new_insn mem insn >>= fun code ->
+  KB.collect Arch.slot code >>= fun arch ->
   let width = Size.in_bits (Arch.addr_size arch) in
-  new_insn arch mem insn >>= fun code ->
   KB.collect Theory.Program.Semantics.slot code >>= fun insn ->
   let init = {
     arch;
@@ -319,8 +325,8 @@ let pp_addr_opt ppf = function
   | None -> Format.fprintf ppf "Unk"
   | Some addr -> Format.fprintf ppf "%a" Bitvec.pp addr
 
-let delay arch mem insn =
-  new_insn arch mem insn >>= fun code ->
+let delay mem insn =
+  new_insn mem insn >>= fun code ->
   KB.collect Theory.Program.Semantics.slot code >>| fun insn ->
   KB.Value.get Insn.Slot.delay insn |> function
   | None -> 0
@@ -348,31 +354,43 @@ let switch arch s = match Dis.create (Arch.to_string arch) with
   | Error _ -> s
   | Ok dis -> Dis.switch s dis
 
-let scan_mem ~code ~data ~funs arch debt base : Machine.state KB.t =
+let next_arch arch mem = match arch with
+  | Some arch -> KB.return arch
+  | None -> query_arch (Memory.min_addr mem)
+
+let scan_mem ~code ~data ~funs debt base : Machine.state KB.t =
   let step d s =
     if Machine.is_ready s then KB.return s
     else Machine.view s base
-        ~ready:(fun s arch mem -> Dis.jump (switch arch d) mem s)
+        ~ready:(fun s arch mem ->
+            next_arch arch mem >>= fun arch ->
+            Dis.jump (switch arch d) mem s)
         ~empty:KB.return in
-  Machine.start arch base ~debt ~code ~data ~init:funs
+  Machine.start base ~debt ~code ~data ~init:funs
     ~ready:(fun init arch mem ->
+        next_arch arch mem >>= fun arch ->
         match Dis.create (Arch.to_string arch) with
-        | Error _ -> KB.return init
+        | Error err ->
+          failwithf
+            "Failed to create a disassembler for arch %s at %a: %s"
+            (Arch.to_string arch)
+            Addr.pps (Memory.min_addr mem)
+            (Error.to_string_hum err) ()
         | Ok disasm ->
           Dis.run disasm mem ~stop_on:[`Valid]
             ~return:KB.return ~init
             ~stopped:(fun d s ->
-                step d (Machine.stopped s))
+                step d (Machine.stopped s arch))
             ~hit:(fun d mem insn s ->
-                collect_dests arch mem insn >>= fun dests ->
+                collect_dests mem insn >>= fun dests ->
                 if Set.is_empty dests.resolved &&
                    not dests.indirect then
-                  step d @@ Machine.moved s mem
+                  step d @@ Machine.moved s arch mem
                 else
-                  delay arch mem insn >>= fun delay ->
-                  step d @@ Machine.jumped s mem dests delay)
+                  delay mem insn >>= fun delay ->
+                  step d @@ Machine.jumped s arch mem dests delay)
             ~invalid:(fun d _ s ->
-                step d (Machine.failed s s.addr)))
+                step d (Machine.failed s arch s.addr)))
     ~empty:KB.return
 
 type insns = Theory.Label.t list
@@ -408,11 +426,6 @@ let destinations dsts = dsts.resolved
 let is_call dsts = dsts.call
 let is_barrier dsts = dsts.barrier
 
-let query_arch addr =
-  KB.Object.scoped Theory.Program.cls @@ fun obj ->
-  KB.provide Theory.Label.addr obj (Some addr) >>= fun () ->
-  KB.collect Arch.slot obj
-
 let already_scanned addr s =
   List.exists s.mems ~f:(fun mem ->
       Memory.contains mem addr)
@@ -435,10 +448,13 @@ let scan mem s =
   if already_scanned start s
   then KB.return s
   else
-    query_arch (Word.to_bitvec start) >>= fun arch ->
+    let () = Format.eprintf "Scanning memory %a:%a!@\n%!"
+        Addr.pp (Memory.min_addr mem)
+        Addr.pp (Memory.max_addr mem) in
     classify_mem mem >>= fun (code,data,funs) ->
-    scan_mem ~code ~data ~funs arch s.debt mem >>=
+    scan_mem ~code ~data ~funs s.debt mem >>=
     fun {Machine.begs; jmps; data; debt; dels} ->
+    Format.eprintf "The scan was successful!@\n%!";
     let jmps = Map.merge s.jmps jmps ~f:(fun ~key:_ -> function
         | `Left dsts | `Right dsts | `Both (_,dsts) -> Some dsts) in
     let begs = Set.of_map_keys begs in
@@ -484,7 +500,7 @@ let execution_order stack =
 let always _ = KB.return true
 
 let with_disasm beg cfg f =
-  query_arch (Word.to_bitvec beg) >>= fun arch ->
+  query_arch beg >>= fun arch ->
   match Dis.create (Arch.to_string arch) with
   | Error _ -> KB.return (cfg,None)
   | Ok dis -> f arch dis
@@ -505,6 +521,8 @@ let explore
     else follow beg >>= function
       | false -> KB.return (cfg,None)
       | true -> with_disasm beg cfg @@ fun arch dis ->
+        Format.eprintf "Disassembling with %a from %a@\n%!"
+          Arch.pp arch Addr.pp beg;
         match Hashtbl.find blocks beg with
         | Some block -> KB.return (cfg, Some block)
         | None -> match find_base beg with
@@ -513,7 +531,7 @@ let explore
             Dis.run dis (view beg base) ~stop_on:[`Valid]
               ~init:(beg,0,[]) ~return:KB.return
               ~hit:(fun s mem insn (curr,len,insns) ->
-                  new_insn arch mem insn >>= fun insn ->
+                  new_insn mem insn >>= fun insn ->
                   let len = Memory.length mem + len in
                   let last = Memory.max_addr mem in
                   let next = Addr.succ last in
