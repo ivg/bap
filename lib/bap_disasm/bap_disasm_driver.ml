@@ -244,10 +244,7 @@ end = struct
     step @@ cancel s.curr @@ mark_data s addr
 
   let skipped s addr =
-    let s = step {s with usat = Set.remove s.usat addr } in
-    Format.eprintf "skipping %a, next is %a@\n%!"
-      Addr.pp addr Addr.pp s.addr;
-    s
+    step {s with usat = Set.remove s.usat addr }
 
   let stopped s _arch =
     step @@ cancel s.curr @@ mark_data s s.addr
@@ -297,8 +294,6 @@ let new_insn mem insn =
   Theory.Label.for_addr addr >>= fun code ->
   KB.provide Memory.slot code (Some mem) >>= fun () ->
   KB.provide Dis.Insn.slot code (Some insn) >>| fun () ->
-  Format.eprintf "%a\t%s@\n%!"
-    Memory.pp mem (Dis.Insn.asm insn);
   code
 
 
@@ -460,13 +455,9 @@ let scan mem s =
   if already_scanned start s
   then KB.return s
   else
-    let () = Format.eprintf "Scanning memory %a:%a!@\n%!"
-        Addr.pp (Memory.min_addr mem)
-        Addr.pp (Memory.max_addr mem) in
     classify_mem mem >>= fun (code,data,funs) ->
     scan_mem ~code ~data ~funs s.debt mem >>=
     fun {Machine.begs; jmps; data; debt; dels} ->
-    Format.eprintf "The scan was successful!@\n%!";
     let jmps = Map.merge s.jmps jmps ~f:(fun ~key:_ -> function
         | `Left dsts | `Right dsts | `Both (_,dsts) -> Some dsts) in
     let begs = Set.of_map_keys begs in
@@ -533,9 +524,7 @@ let explore
     if Set.mem data beg then KB.return (cfg,None)
     else follow beg >>= function
       | false -> KB.return (cfg,None)
-      | true -> with_disasm beg cfg @@ fun arch dis ->
-        Format.eprintf "Disassembling with %a from %a@\n%!"
-          Arch.pp arch Addr.pp beg;
+      | true -> with_disasm beg cfg @@ fun _arch dis ->
         match Hashtbl.find blocks beg with
         | Some block -> KB.return (cfg, Some block)
         | None -> match find_base beg with

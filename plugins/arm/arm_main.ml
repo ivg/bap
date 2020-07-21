@@ -57,12 +57,8 @@ let compute_arch_from_symbol_table file spec =
     symbol_values spec |>
     Seq.fold ~init ~f:(fun symbols (addr,value) ->
         let arch = match Int64.(value land 1L) with
-          | 0L ->
-            Format.eprintf "%Lx is 32-bit@\n%!" addr;
-            `armv7
-          | _ ->
-            Format.eprintf "%Lx is 16-bit@\n%!" addr;
-            `thumbv7 in
+          | 0L -> `armv7
+          | _ -> `thumbv7 in
         let addr = Bitvec.M32.int64 addr in
         Map.add_exn symbols addr arch) in
   KB.promise Arch.slot @@ fun label ->
