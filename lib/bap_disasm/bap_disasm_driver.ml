@@ -61,6 +61,7 @@ module Machine : sig
   val failed : state -> arch -> addr -> state
   val jumped : state -> arch -> mem -> jump -> int -> state
   val stopped : state -> arch -> state
+  val skipped : state -> addr -> state
   val moved  : state -> arch -> mem -> state
   val is_ready : state -> bool
 end = struct
@@ -242,6 +243,12 @@ end = struct
   let failed s _arch addr =
     step @@ cancel s.curr @@ mark_data s addr
 
+  let skipped s addr =
+    let s = step {s with usat = Set.remove s.usat addr } in
+    Format.eprintf "skipping %a, next is %a@\n%!"
+      Addr.pp addr Addr.pp s.addr;
+    s
+
   let stopped s _arch =
     step @@ cancel s.curr @@ mark_data s s.addr
 
@@ -250,15 +257,16 @@ end = struct
     | Jump _ -> None
 
   let rec view s base ~empty ~ready =
-    match Memory.view ~from:s.addr base with
-    | Ok mem -> ready s (task_arch s.curr) mem
-    | Error _ ->
-      let s = match s.curr with
-        | Fall _ as task -> cancel task s
-        | t -> {s with debt = t :: s.debt} in
-      match s.work with
-      | [] -> empty (step s)
-      | _ -> view (step s) base ~empty ~ready
+    if s.stop then empty (step s)
+    else match Memory.view ~from:s.addr base with
+      | Ok mem -> ready s (task_arch s.curr) mem
+      | Error _ ->
+        let s = match s.curr with
+          | Fall _ as task -> cancel task s
+          | t -> {s with debt = t :: s.debt} in
+        match s.work with
+        | [] -> empty (step s)
+        | _ -> view (step s) base ~empty ~ready
 
   let start mem ~debt ~code ~data ~init =
     let init = if Set.is_empty init
@@ -293,8 +301,9 @@ let new_insn mem insn =
     Memory.pp mem (Dis.Insn.asm insn);
   code
 
-let collect_dests mem insn =
-  new_insn mem insn >>= fun code ->
+
+
+let collect_dests code =
   KB.collect Arch.slot code >>= fun arch ->
   let width = Size.in_bits (Arch.addr_size arch) in
   KB.collect Theory.Program.Semantics.slot code >>= fun insn ->
@@ -354,35 +363,38 @@ let switch arch s = match Dis.create (Arch.to_string arch) with
   | Error _ -> s
   | Ok dis -> Dis.switch s dis
 
-let next_arch arch mem = match arch with
+let rec next_arch state arch code = match arch with
   | Some arch -> KB.return arch
-  | None -> query_arch (Memory.min_addr mem)
+  | None ->
+    let addr = Memory.min_addr code in
+    query_arch addr >>= function
+    | `unknown -> Machine.view (Machine.skipped state addr) code
+                    ~empty:(fun _ -> KB.return `unknown)
+                    ~ready:next_arch
+    | arch -> KB.return arch
 
 let scan_mem ~code ~data ~funs debt base : Machine.state KB.t =
   let step d s =
     if Machine.is_ready s then KB.return s
     else Machine.view s base
         ~ready:(fun s arch mem ->
-            next_arch arch mem >>= fun arch ->
+            next_arch s arch mem >>= fun arch ->
             Dis.jump (switch arch d) mem s)
         ~empty:KB.return in
   Machine.start base ~debt ~code ~data ~init:funs
     ~ready:(fun init arch mem ->
-        next_arch arch mem >>= fun arch ->
+        next_arch init arch mem >>= fun arch ->
         match Dis.create (Arch.to_string arch) with
-        | Error err ->
-          failwithf
-            "Failed to create a disassembler for arch %s at %a: %s"
-            (Arch.to_string arch)
-            Addr.pps (Memory.min_addr mem)
-            (Error.to_string_hum err) ()
+        | Error _ -> KB.return init
         | Ok disasm ->
           Dis.run disasm mem ~stop_on:[`Valid]
             ~return:KB.return ~init
             ~stopped:(fun d s ->
                 step d (Machine.stopped s arch))
             ~hit:(fun d mem insn s ->
-                collect_dests mem insn >>= fun dests ->
+                new_insn mem insn >>= fun label ->
+                KB.provide Arch.slot label arch >>= fun () ->
+                collect_dests label >>= fun dests ->
                 if Set.is_empty dests.resolved &&
                    not dests.indirect then
                   step d @@ Machine.moved s arch mem
@@ -500,7 +512,8 @@ let execution_order stack =
 let always _ = KB.return true
 
 let with_disasm beg cfg f =
-  query_arch beg >>= fun arch ->
+  Theory.Label.for_addr (Addr.to_bitvec beg) >>=
+  KB.collect Arch.slot >>= fun arch ->
   match Dis.create (Arch.to_string arch) with
   | Error _ -> KB.return (cfg,None)
   | Ok dis -> f arch dis
