@@ -188,8 +188,8 @@ let fix_cmnz insn mem = match insn with
 let run_lifter _label addr insn mem 
     (lifter : Bitvec.t -> Defs.insn -> Defs.op array -> unit Theory.eff) =
   match fix_cmnz (Insns.of_basic insn) mem with
-  | None -> raise (Defs.Lift_Error "unknown instruction")
-  | Some arm_insn -> 
+  | None -> KB.return Insn.empty
+  | Some arm_insn ->
     match Insns.arm_ops (Disasm_expert.Basic.Insn.ops insn) with
     | Error err -> raise (Defs.Lift_Error (Error.to_string_hum err))
     | Ok ops -> lifter addr arm_insn ops
