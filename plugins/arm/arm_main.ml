@@ -71,7 +71,7 @@ let compute_arch_from_symbol_table file spec =
   require_equal Theory.Unit.Target.arch unit "arm" >>=? fun () ->
   KB.collect Theory.Label.addr label >>=? fun addr ->
   KB.return @@ match Map.find symbols addr with
-  | None -> `armv7
+  | None -> `unknown
   | Some arch -> arch
 
 
