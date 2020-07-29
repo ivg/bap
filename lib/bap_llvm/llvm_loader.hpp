@@ -18,22 +18,21 @@ static std::string scheme =
     "(declare vendor (name str))\n"
     "(declare llvm:code-entry (name str) (off int) (size int))\n"
     "(declare llvm:default-base-address (addr int))\n"
-    "(declare llvm:entry (relative-addr int))\n"
+    "(declare llvm:entry-point (addr int))\n"
     "(declare llvm:file-type (name str))\n"
     "(declare llvm:macho-symbol (name str) (value int))\n"
     "(declare llvm:program-header-flags (name str) (ld bool) (r bool) (w bool) (x bool))\n"
     "(declare llvm:program-header (name str) (off int) (size int))\n"
     "(declare llvm:ref-external (rel-off int) (name str))\n"
     "(declare llvm:ref-internal (sym-off int) (rel-off int))\n"
-    "(declare llvm:relocatable (flag bool))\n"
-    "(declare llvm:section-entry (name str) (relative-addr int) (size int) (off int))\n"
+    "(declare llvm:section-entry (name str) (addr int) (size int) (off int))\n"
     "(declare llvm:section-flags (name str) (r bool) (w bool) (x bool))\n"
     "(declare llvm:segment-command-flags (name str) (r bool) (w bool) (x bool))\n"
     "(declare llvm:segment-command (name str) (off int) (size int))\n"
-    "(declare llvm:symbol-entry (name str) (relative-addr int) (size int) (off int) (value int))\n"
-    "(declare llvm:virtual-program-header (name str) (relative-addr int) (size int))\n"
-    "(declare llvm:virtual-section-header (name str) (relative-addr int) (size int))\n"
-    "(declare llvm:virtual-segment-command (name str) (relative-addr int) (size int))\n";
+    "(declare llvm:symbol-entry (name str) (addr int) (size int) (off int) (value int))\n"
+    "(declare llvm:virtual-program-header (name str) (addr int) (size int))\n"
+    "(declare llvm:virtual-section-header (name str) (addr int) (size int))\n"
+    "(declare llvm:virtual-segment-command (name str) (addr int) (size int))\n";
 
 
 namespace loader {
