@@ -17,21 +17,21 @@ static std::string scheme =
     "(declare system (name str))\n"
     "(declare vendor (name str))\n"
     "(declare llvm:code-entry (name str) (off int) (size int))\n"
-    "(declare llvm:default-base-address (addr int))\n"
+    "(declare llvm:base-address (addr int))\n"
     "(declare llvm:entry-point (addr int))\n"
     "(declare llvm:file-type (name str))\n"
     "(declare llvm:macho-symbol (name str) (value int))\n"
-    "(declare llvm:program-header-flags (name str) (ld bool) (r bool) (w bool) (x bool))\n"
-    "(declare llvm:program-header (name str) (off int) (size int))\n"
-    "(declare llvm:ref-external (rel-off int) (name str))\n"
-    "(declare llvm:ref-internal (sym-off int) (rel-off int))\n"
+    "(declare llvm:elf-program-header-flags (name str) (ld bool) (r bool) (w bool) (x bool))\n"
+    "(declare llvm:elf-program-header (name str) (off int) (size int))\n"
+    "(declare llvm:name-reference (at int) (name str))\n"
+    "(declare llvm:relocation (at int) (addr int))\n"
     "(declare llvm:section-entry (name str) (addr int) (size int) (off int))\n"
     "(declare llvm:section-flags (name str) (r bool) (w bool) (x bool))\n"
     "(declare llvm:segment-command-flags (name str) (r bool) (w bool) (x bool))\n"
     "(declare llvm:segment-command (name str) (off int) (size int))\n"
     "(declare llvm:symbol-entry (name str) (addr int) (size int) (off int) (value int))\n"
-    "(declare llvm:virtual-program-header (name str) (addr int) (size int))\n"
-    "(declare llvm:virtual-section-header (name str) (addr int) (size int))\n"
+    "(declare llvm:elf-virtual-program-header (name str) (addr int) (size int))\n"
+    "(declare llvm:coff-virtual-section-header (name str) (addr int) (size int))\n"
     "(declare llvm:virtual-segment-command (name str) (addr int) (size int))\n";
 
 
@@ -39,8 +39,6 @@ namespace loader {
 
 using namespace llvm;
 using namespace llvm::object;
-
-#if LLVM_VERSION_MAJOR >= 4
 
 error_or<object::Binary> get_binary(const char* data, std::size_t size) {
     StringRef data_ref(data, size);
@@ -51,32 +49,6 @@ error_or<object::Binary> get_binary(const char* data, std::size_t size) {
     error_or<object::Binary> v(binary->release());
     return v;
 }
-
-#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 8
-
-error_or<object::Binary> get_binary(const char* data, std::size_t size) {
-    StringRef data_ref(data, size);
-    MemoryBufferRef buf(data_ref, "binary");
-    auto binary = createBinary(buf);
-    if (auto ec = binary.getError())
-        return failure(ec.message());
-    error_or<object::Binary> v(binary->release());
-    return v;
-}
-
-#elif LLVM_VERSION_MAJOR == 3 && LLVM_VERSION_MINOR == 4
-error_or<object::Binary> get_binary(const char* data, std::size_t size) {
-    StringRef data_ref(data, size);
-    MemoryBuffer* buff(MemoryBuffer::getMemBufferCopy(data_ref, "binary"));
-    OwningPtr<object::Binary> bin;
-    if (error_code ec = createBinary(buff, bin))
-        return failure(ec.message());
-    return error_or<object::Binary>(bin.take());
-}
-
-#else
-#error LLVM version is not supported
-#endif
 
 error_or<std::string> unsupported_filetype() { return success(std::string("")); }
 
