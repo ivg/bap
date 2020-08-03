@@ -7,7 +7,8 @@ RUN sudo apt-get update  \
  && eval "$(opam env)" \
  && opam remote set-url default https://opam.ocaml.org \
  && opam update \
- && opam depext bap --yes -j 2 \
+ && opam depext bap --yes  \
+ && opam depext conf-libcurl --yes \
  && git clone https://github.com/ivg/bap --single-branch --branch=rectifies-base-address-computation \
  && opam pin add bap bap -n \
  && opam install bap --deps-only --yes -j 2 \
