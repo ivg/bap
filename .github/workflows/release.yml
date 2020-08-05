@@ -1,0 +1,36 @@
+
+name: release
+on:
+  - push
+#  schedule:
+#     - cron: '0 0 * * SAT' # every Saturday
+
+jobs:
+  build:
+     runs-on: ubuntu-latest
+
+     env:
+       OPAMJOBS: 2
+       OPAMRETRES: 8
+
+     steps:
+         - name: Checkout code
+           uses: actions/checkout@v2
+           with:
+             submodules: recursive
+
+         - name: Install OCaml
+           uses: avsm/setup-ocaml@v1
+           with:
+             ocaml-version: 4.09.1+flambda
+
+         - name: Build deb packages
+           run: |
+             ./tools/deb-build.sh
+             ls -l
+
+          - name: Upload deb packages
+            uses: actions/upload-artifact@v2
+            with:
+             name: deb-packages
+             path: ./*.deb
