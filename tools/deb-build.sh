@@ -23,15 +23,6 @@ echo "Looking in the dev-repo for the current list of dependencies"
 opam pin add bap --dev-repo --yes -n
 echo "Installing System dependenices"
 opam depext bap --yes
-
-echo "TEST======>>>"
-opam install conf-bap-llvm
-LLVM_VERSION=`opam config var conf-bap-llvm:package-version`
-LLVM_CONFIG=`opam config var conf-bap-llvm:config`
-echo $LLVM_CONFIG
-echo $LLVM_VERSION
-exit
-
 echo "Installing OCaml dependenices"
 opam install --yes --deps-only bap
 echo "Installed dependencies. Cleaning up..."
@@ -60,7 +51,7 @@ git pull
 ./configure --enable-everything \
             --disable-ida \
             --with-llvm-version=$LLVM_VERSION \
-            --with-llvm-config=llvm-config-$LLVM_VERSION \
+            --with-llvm-config=$LLVM_CONFIG \
             --libdir=$PREFIX/lib/bap \
             --plugindir=$PREFIX/lib/bap \
             --prefix=$PREFIX \
