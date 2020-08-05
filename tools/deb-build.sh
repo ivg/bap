@@ -16,7 +16,8 @@ TMPDIR=$(mktemp -d)
 
 eval $(opam config env)
 echo OCaml is at `which ocaml`
-which ocaml
+
+sudo ap-get update
 
 echo "Looking in the dev-repo for the current list of dependencies"
 opam pin add bap --dev-repo --yes -n
@@ -190,8 +191,3 @@ chmod a+x $DEBIAN/postinst
 chmod a+x $DEBIAN/postrm
 sudo chown -R root:root bap/libbap-dev_$BAP_VERSION
 dpkg-deb --build bap/libbap-dev_$BAP_VERSION
-
-echo "time to clean up..."
-cd bap-repo
-sudo sh -c "PATH=$PATH make uninstall"
-cd ..
