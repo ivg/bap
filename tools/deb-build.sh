@@ -17,12 +17,21 @@ TMPDIR=$(mktemp -d)
 eval $(opam config env)
 echo OCaml is at `which ocaml`
 
-sudo ap-get update
+sudo apt-get update
 
 echo "Looking in the dev-repo for the current list of dependencies"
 opam pin add bap --dev-repo --yes -n
 echo "Installing System dependenices"
 opam depext bap --yes
+
+echo "TEST======>>>"
+opam install conf-bap-llvm
+LLVM_VERSION=`opam config var conf-bap-llvm:package-version`
+LLVM_CONFIG=`opam config var conf-bap-llvm:config`
+echo $LLVM_CONFIG
+echo $LLVM_VERSION
+exit
+
 echo "Installing OCaml dependenices"
 opam install --yes --deps-only bap
 echo "Installed dependencies. Cleaning up..."
@@ -40,7 +49,7 @@ cd bap-repo
 LLVM_VERSION=`opam config var conf-bap-llvm:package-version`
 LLVM_CONFIG=`opam config var conf-bap-llvm:config`
 
-VERSION=`git tag | tail -n 1 | sed "s/v//"`
+BAP_VERSION=`git tag | tail -n 1 | sed "s/v//"`
 SIGURL=$GITHUB/bap/releases/download/v$BAP_VERSION/sigs.zip
 echo BAP version is $BAP_VERSION
 echo LLVM is $LLVM_VERSION
