@@ -102,9 +102,7 @@ let providing agent s =
     ~propose:(provide_symbolizer s)
 
 let get_name addr =
-  let data = Some (Word.to_bitvec addr) in
-  KB.Object.scoped Theory.Program.cls @@ fun label ->
-  KB.provide Theory.Label.addr label data >>= fun () ->
+  Theory.Label.for_addr (Word.to_bitvec addr) >>= fun label ->
   KB.collect Theory.Label.name label >>| function
   | None -> name_of_addr addr
   | Some name -> name
