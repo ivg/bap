@@ -72,7 +72,7 @@ module type Loader = sig
 end
 
 val register_loader : name:string -> (module Loader) -> unit
-
+val find_loader : string -> (module Loader) option
 val available_backends : unit -> string list
 
 
@@ -97,11 +97,13 @@ module Scheme : sig
 
   val arch : (string, (string -> 'a) -> 'a) Ogre.attribute
   val subarch : (string, (string -> 'a) -> 'a) Ogre.attribute
+  val format : (string, (string -> 'a) -> 'a)  Ogre.attribute
   val vendor : (string, (string -> 'a) -> 'a) Ogre.attribute
   val system : (string, (string -> 'a) -> 'a) Ogre.attribute
   val abi : (string, (string -> 'a) -> 'a) Ogre.attribute
   val bits : (size, (size -> 'a) -> 'a) Ogre.attribute
   val is_little_endian : (bool, (bool -> 'a) -> 'a) Ogre.attribute
+  val is_executable : (bool, (bool -> 'a) -> 'a) Ogre.attribute
 
   val bias : (off, (off -> 'a) -> 'a) Ogre.attribute
   val segment : ((bool * bool * bool) region,

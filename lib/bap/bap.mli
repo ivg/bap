@@ -5492,6 +5492,14 @@ module Std : sig
     (** [register_loader ~name backend] registers new loader. *)
     val register_loader : name:string -> (module Loader) -> unit
 
+    (** [find_loader name] lookups the loader registered under the
+        given [name].
+
+        @since 2.2.0
+    *)
+    val find_loader : string -> (module Loader) option
+
+
     (** lists all registered backends  *)
     val available_backends : unit -> string list
 
@@ -5606,12 +5614,26 @@ module Std : sig
       val bits : (size, (size -> 'a) -> 'a) Ogre.attribute
 
 
-      (** [is_little_endian yes-or-no] is [true] if the target is
-          little endian.
+      (** [(format X)] defines the file format to be X.
+
+          Currently supported formats:
+          - ["elf"];
+          - ["macho"];
+          - ["coff"]
+      *)
+      val format : (string, (string -> 'a) -> 'a) Ogre.attribute
+
+
+      (** (is-little-endian FLAG)] is set for files with words encoded in the
+          little-endian order.
 
           @since 2.2.0  *)
       val is_little_endian : (bool, (bool -> 'a) -> 'a) Ogre.attribute
 
+      (** [(is-executable FLAG)] is set for binaries that executable.
+
+          @since 2.2.0 *)
+      val is_executable : (bool, (bool -> 'a) -> 'a) Ogre.attribute
 
       (** [bias offset] the value by which all addresses are biased
           wrt to the real addresses in the binary.
@@ -9341,6 +9363,12 @@ module Std : sig
 
     (** [arch project] reveals the architecture of a loaded file  *)
     val arch : t -> arch
+
+
+    (** [specification p] returns the specification of the binary.
+
+        @since 2.2.0*)
+    val specification : t -> Ogre.doc
 
     val state : t -> state
 
