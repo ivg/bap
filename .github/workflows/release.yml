@@ -29,8 +29,8 @@ jobs:
              ./tools/deb-build.sh
              ls -l
 
-          - name: Upload deb packages
-            uses: actions/upload-artifact@v2
-            with:
+         - name: Upload deb packages
+           uses: actions/upload-artifact@v2
+           with:
              name: deb-packages
              path: ./*.deb
