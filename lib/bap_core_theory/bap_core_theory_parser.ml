@@ -56,6 +56,8 @@ type ('e,'r,'s) t = {
 
 type ('e,'r,'s) parser = ('e,'r,'s) t
 
+type label = program KB.obj
+
 let bits = Bitv.define
 let bool = Bool.t
 
@@ -388,16 +390,22 @@ module Make(S : Core) = struct
         let rna = rna
       end)
 
-  let rec run : type e s r. (e,r,s) parser -> s list -> unit eff =
-    fun parser code -> bil [] parser code
+  let rec start : type e s r.
+    (e,r,s) parser -> label -> s list -> unit eff =
+    fun parser lbl code -> bil [] parser lbl code
 
-  and bil : type e s r. context -> (e,r,s) parser -> s list -> unit eff =
-    fun ctxt parser xs -> stmts ctxt parser xs
+  and run : type e s r. (e,r,s) parser -> s list -> unit eff =
+    fun parser code ->
+    newlabel >>= fun lbl ->
+    bil [] parser lbl code
+
+  and bil : type e s r. context -> (e,r,s) parser -> label -> s list -> unit eff =
+    fun ctxt parser lbl xs -> stmts ctxt parser lbl xs
 
   and stmts : type e s r.
     context ->
-    (e,r,s) parser -> s list -> unit eff = fun ctxt self -> function
-    | [] -> newlabel >>= fun lbl -> blk lbl pass skip
+    (e,r,s) parser -> label -> s list -> unit eff = fun ctxt self lbl -> function
+    | [] -> blk lbl pass skip
     | x :: xs ->
       self.stmt (module struct
         type nonrec t = unit eff
@@ -405,63 +413,64 @@ module Make(S : Core) = struct
         type stmt = s
         type rmode = r
 
-        let next = stmts ctxt self
-
-        let bind exp body =
-          exp >>-> fun s exp ->
-          Var.fresh s >>= fun v ->
-          newlabel >>= fun lbl ->
-          let b1 = blk lbl (set v !!exp) skip in
-          seq b1 (body v)
+        let next xs =
+          newlabel >>= fun lbl -> stmts ctxt self lbl xs
 
         let error = Knowledge.fail Error
 
         let special _ =
-          newlabel >>= fun lbl ->
           seq (blk lbl pass skip) (next xs)
 
         let cpuexn n =
           Label.for_ivec n >>= fun dst ->
-          newlabel >>= fun lbl ->
           seq (blk lbl pass (goto dst)) (next xs)
 
         let while_ cnd ys =
-          newlabel >>= fun lbl ->
           seq
             (blk lbl (repeat (expb ctxt self cnd) (stmtd ctxt self ys)) skip)
             (next xs)
 
         let if_ cnd yes nay =
+          newlabel >>= fun l1 ->
+          newlabel >>= fun l2 ->
           seq
-            (branch (expb ctxt self cnd)
-               (bil ctxt self yes)
-               (bil ctxt self nay))
-            (next xs)
+            (blk lbl pass skip)
+            (seq
+               (branch (expb ctxt self cnd)
+                  (bil ctxt self l1 yes)
+                  (bil ctxt self l2 nay))
+               (next xs))
 
         let jmp exp =
-          newlabel >>= fun lbl ->
           seq (blk lbl pass (jmp (expw ctxt self exp))) (next xs)
 
         let call name =
-          newlabel >>= fun lbl ->
           Label.for_name name >>= fun dst ->
           Knowledge.provide Label.is_subroutine dst (Some true) >>= fun () ->
           seq (blk lbl pass (goto dst)) (next xs)
 
         let goto addr =
-          newlabel >>= fun lbl ->
           Label.for_addr addr >>= fun dst ->
           seq (blk lbl pass (goto dst)) (next xs)
 
         let move eff =
-          newlabel >>= fun lbl ->
           seq (blk lbl eff skip) (next xs)
         let set_bit var exp = move (set_bit ctxt self var exp)
         let set_reg var sz exp = move (set_reg ctxt self var sz exp)
         let set_mem var ks vs exp = move (set_mem ctxt self var ks vs exp)
         let set_ieee754 var s exp = move (set_ieee754 ctxt self var s exp)
         let set_rmode var exp = move (set_rmode ctxt self var exp)
-        let push var r = stmts ((var, Var.ident r) :: ctxt) self xs
+
+        let push var r =
+          newlabel >>= fun lbl ->
+          stmts ((var, Var.ident r) :: ctxt) self lbl xs
+
+        let bind exp body =
+          exp >>-> fun s exp ->
+          Var.fresh s >>= fun v ->
+          let b1 = blk lbl (set v !!exp) skip in
+          seq b1 (body v)
+
         let tmp_bit var exp = bind (expb ctxt self exp) (push var)
         let tmp_reg var exp = bind (expw ctxt self exp) (push var)
         let tmp_mem var exp = bind (expm ctxt self exp) (push var)
@@ -469,7 +478,7 @@ module Make(S : Core) = struct
         let tmp_rmode var exp = bind (expr ctxt self exp) (push var)
         let let_gen t var exp body =
           seq (bind (t ctxt self exp)
-                 (fun r -> stmts ((var, Var.ident r) :: ctxt) self [body]))
+                 (fun r -> stmts ((var, Var.ident r) :: ctxt) self lbl [body]))
             (next xs)
 
         let let_bit = let_gen expb

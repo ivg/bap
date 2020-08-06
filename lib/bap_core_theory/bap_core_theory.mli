@@ -3362,11 +3362,19 @@ module Theory : sig
     (** [Make(Theory)] parses AST to the specified [Theory] terms.  *)
     module Make(S : Core) : sig
 
-
-      (** [run parser program] the starting rule of the parser.
+      (** [start parser label program] the starting rule of the parser.
 
           Applies the parser to a sequence of statements and computes
-          a denotation of [program] in a Core Theory terms.
+          a denotation of a [program] with the given [label] in the
+          Core Theory terms.
+
+          @since 2.2.0
+
+      *)
+      val start : ('e,'r,'s) parser -> label -> 's list -> unit eff
+
+      (** [run parser program] is [start parser label program],
+          where the [label] is freshly generated.
       *)
       val run : ('e,'r,'s) parser -> 's list -> unit eff
     end

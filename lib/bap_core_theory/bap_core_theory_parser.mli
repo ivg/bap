@@ -48,5 +48,6 @@ type ('e,'r,'s) t = {
 type ('e,'r,'s) parser = ('e,'r,'s) t
 
 module Make(S : Core) : sig
+  val start : ('e,'r,'s) parser -> program Knowledge.obj -> 's list -> unit eff
   val run : ('e,'r,'s) parser -> 's list -> unit eff
 end
