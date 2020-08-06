@@ -34,3 +34,15 @@ jobs:
            with:
              name: deb-packages
              path: bap/*.deb
+
+         - name: Upload rpm packages
+           uses: actions/upload-artifact@v2
+           with:
+             name: rpm-packages
+             path: bap/*.rpm
+
+         - name: Upload archives
+           uses: actions/upload-artifact@v2
+           with:
+             name: tgz-packages
+             path: bap/*.tgz

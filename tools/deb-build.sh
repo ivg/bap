@@ -2,23 +2,22 @@
 
 set -e
 
+sudo apt-get update
+sudo apt-get install alien autoconf --yes
+
+
 GITHUB=https://github.com/BinaryAnalysisPlatform/
 SOURCE=$GITHUB/bap
 BINDINGS=$GITHUB/bap-bindings
 BINARIES="bap bapbundle bapbuild bap-mc"
 PREFIX=/usr/local
 ARCH=$(dpkg-architecture -qDEB_BUILD_ARCH)
-
 CONFDIR=$PREFIX/etc/bap
 SWITCH=$(date +%s)
-
 TMPDIR=$(mktemp -d)
 
 eval $(opam config env)
 echo OCaml is at `which ocaml`
-
-sudo apt-get update
-
 echo "Looking in the dev-repo for the current list of dependencies"
 opam pin add bap --dev-repo --yes -n
 echo "Installing System dependenices"
@@ -114,8 +113,6 @@ opam install ctypes ctypes-foreign --yes
 [ -d bap-bindings ] || git clone $BINDINGS bap-bindings
 
 
-sudo apt-get install autoconf # MOVE it?
-
 cd bap-bindings
 git pull
 autoconf
@@ -191,3 +188,17 @@ chmod a+x $DEBIAN/postinst
 chmod a+x $DEBIAN/postrm
 sudo chown -R root:root bap/libbap-dev_$BAP_VERSION
 dpkg-deb --build bap/libbap-dev_$BAP_VERSION
+
+
+for pkg in "bap libbap libbap-dev"; do
+    deb=$pkg_$BAP_VERSION
+    dir=$pkg-$BAP_VERSION
+    sudo alien --to-rpm -g $deb.deb
+    cd $dir
+    spec=`mktemp`
+    awk '/%dir.*bap/ {print} /%dir/ {next} {print}' $pkg-$BAP_VERSION-2.spec > $spec
+    sudo cp $spec $pkg-$BAP_VERSION-2.spec
+    sudo rpmbuild -bb $pkg-$BAP_VERSION-2.spec --buildroot=`pwd`
+    cd ..
+    sudo rm -rf $dir
+done
