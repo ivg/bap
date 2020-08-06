@@ -199,19 +199,49 @@ let provide_bir () =
   KB.Value.put Term.slot sema bir
 
 
-module Fixup = struct
+
+(* We shall not interpret literally programs that contain fixups,
+   because their code is not yet finalized and will be rewritten to
+   something else during the linking process. For example, `jmp PC`,
+   is not really a self-recursive jump, but a placeholder which will
+   be changed by the linker to a jump to the real destination. If we
+   will interpret it literally we will break the control flow
+   graph. Theoretically, we could first apply the loader and rewrite
+   all relocations, but in the loader we would like to have the
+   semantics of the program and, unlike many chicken and the egg
+   problems that could be solved with a fixed point, this one is
+   different since the semantics of the program is changed, e.g.,
+   there is no join for `jmp 0x8043` and `jmp 0xDEADBEEF`, therefore
+   we need a staged approach, which is probably correct, but is too
+   cubersome to implement.
+
+   This property should be made public, but we need to think more
+   about its semantics and probably find a better name. Until that
+   time it will reside in this module, since it is needed for the
+   brancher analysis (also (mis)placed in this module) to prevent it
+   from reporting false destinations.
+*)
+
+module Fixup : sig
+  val has : (Theory.program, bool option) KB.slot
+end = struct
 
   type t = {
     fixups : Set.M(Bitvec_order).t;
   }
 
-  module Request = struct
+  let has =
+    KB.Class.property Theory.Program.cls "is-fixup" KB.Domain.bool
+      ~package:"bap"
+      ~public:true
+      ~desc: "the program contains a fixup and should be \
+              rewritten by a loader."
+
+  module From_spec : sig
+    val create : Ogre.doc -> t
+  end = struct
     open Image.Scheme
     open Ogre.Syntax
-
-    let of_aseq s =
-      Seq.fold s ~init:Addr.Map.empty ~f:(fun m (key,data) ->
-          Map.set m ~key ~data)
 
     let addr_width =
       Ogre.require Image.Scheme.bits >>| Int64.to_int_trunc
@@ -228,12 +258,13 @@ module Fixup = struct
       collect relocation >>= fun rels ->
       collect external_reference >>| fun exts ->
       {fixups = Set.union rels exts}
+
+    let create spec =
+      match Ogre.eval all spec with
+      | Ok fixups -> fixups
+      | Error e -> Error.raise e
   end
 
-  let of_spec spec =
-    match Ogre.eval Request.all spec with
-    | Ok fixups -> fixups
-    | Error e -> Error.raise e
 
 
   let addresses mem =
@@ -242,47 +273,71 @@ module Fixup = struct
     Seq.init len ~f:(Addr.nsucc start) |>
     Seq.map ~f:Word.to_bitvec
 
-
   let is_fixup {fixups} mem =
     Seq.exists ~f:(Set.mem fixups) (addresses mem)
 
-  let subscribe () =
-    let open Future.Syntax in
-    Stream.hd Project.Info.spec >>|
-    of_spec
-
-  let override_fixup =
-    Stmt.map (object inherit Stmt.mapper
-      method! map_jmp _ = [Bil.Special "fixup"]
-    end)
-
-  let erase fixups mem bil =
-    match Future.peek fixups with
-    | None -> bil
-    | Some fixups ->
-      if is_fixup fixups mem
-      then override_fixup bil
-      else bil
+  let () =
+    KB.Rule.(declare ~package "fixup-relocations" |>
+             dynamic ["spec:relocation"; "spec:external-reference"] |>
+             require Memory.slot |>
+             provide has |>
+             comment "computes fixups from the image specification");
+    Stream.(observe Project.Info.(zip file spec)) @@ fun (file,spec) ->
+    let fixups = From_spec.create spec in
+    KB.promise has @@ fun label ->
+    KB.collect Memory.slot label >>=? fun mem ->
+    KB.collect Theory.Label.unit label >>=? fun unit ->
+    KB.collect Theory.Unit.path unit >>|? fun path ->
+    if path <> file then None
+    else Some (is_fixup fixups mem)
 end
 
 module Brancher = struct
   include Theory.Empty
+  type t = Fixup | Dests of Set.M(Theory.Label).t [@@deriving sexp]
+
+  let merge x y = match x,y with
+    | Fixup,_ | _,Fixup -> Fixup
+    | Dests xs, Dests ys -> (Dests (Set.union xs ys))
+
+  let join x y = Ok (merge x y)
+
+  let order x y : KB.Order.partial = match x, y with
+    | Fixup,Fixup -> EQ
+    | _,Fixup -> LT
+    | Fixup,_ -> GT
+    | Dests x, Dests y ->
+      if Set.equal x y then EQ else
+      if Set.is_subset x y then LT else
+      if Set.is_subset y x then GT else NC
+
+  let inspect = sexp_of_t
+
+  let empty = Dests (Set.empty (module Theory.Label))
+
+  let domain = KB.Domain.define ~inspect ~empty ~order ~join
+      "bracher-dests"
+
+  let slot = KB.Class.property ~package:"bap-internal"
+      Theory.Program.Semantics.cls "insn-dests" domain
+      ~public:true
 
   let pack kind dsts =
-    KB.Value.put Insn.Slot.dests (Theory.Effect.empty kind) dsts
+    KB.Value.put slot (Theory.Effect.empty kind) dsts
 
-  let get x = KB.Value.get Insn.Slot.dests x
+  let get x = KB.Value.get slot x
 
   let union k e1 e2 =
-    pack k @@ match get e1, get e2 with
-    | None,s|s,None -> s
-    | Some e1, Some e2 -> Some (Set.union e1 e2)
+    pack k @@
+    merge (get e1) (get e2)
 
   let ret kind dst =
     let dsts = Set.singleton (module Theory.Label) dst in
-    KB.return @@ pack kind (Some dsts)
+    KB.return @@ pack kind (Dests dsts)
 
-  let goto dst = ret Theory.Effect.Sort.jump dst
+  let goto dst =
+    info "putting %a into dsts" Sexp.pp (Theory.Label.sexp_of_t dst);
+    ret Theory.Effect.Sort.jump dst
 
   let jmp _ =
     KB.Object.create Theory.Program.cls >>= fun dst ->
@@ -294,19 +349,33 @@ module Brancher = struct
     let k = Theory.Effect.sort x in
     KB.return (union k x y)
 
-  let blk _ data ctrl =
-    data >>= fun data ->
-    ctrl >>= fun ctrl ->
-    let k = Theory.Effect.Sort.join
-        [Theory.Effect.sort data]
-        [Theory.Effect.sort ctrl] in
-    KB.return (union k data ctrl)
+  let blk label data ctrl =
+    KB.collect Fixup.has label >>= function
+    | Some true ->
+      KB.Object.repr Theory.Program.cls label >>= fun label ->
+      info "returning an empty set of destinations for %s" label;
+      KB.return @@ pack Theory.Effect.Sort.top Fixup
+    | _ ->
+      data >>= fun data ->
+      ctrl >>= fun ctrl ->
+      let k = Theory.Effect.Sort.join
+          [Theory.Effect.sort data]
+          [Theory.Effect.sort ctrl] in
+      KB.return (union k data ctrl)
 
   let branch _cnd yes nay =
     yes >>= fun yes ->
     nay >>= fun nay ->
     let k = Theory.Effect.sort yes in
     KB.return (union k yes nay)
+
+  let () =
+    KB.promise Theory.Program.Semantics.slot @@ fun label ->
+    KB.collect Theory.Program.Semantics.slot label >>| fun insn ->
+    match KB.Value.get slot insn with
+    | Fixup -> insn
+    | Dests xs ->
+      KB.Value.put Insn.Slot.dests insn (Some xs)
 end
 
 let base_context = [
@@ -409,7 +478,6 @@ let lift ~enable_intrinsics:{for_all; for_unk; for_special; predicates}
 
 let provide_lifter ~enable_intrinsics ~with_fp () =
   info "providing a lifter for all BIL lifters";
-  let fixups = Fixup.subscribe () in
   let unknown = Theory.Program.Semantics.empty in
   let context arch =
     sprintf "arch-%a" Arch.str arch ::
@@ -435,8 +503,7 @@ let provide_lifter ~enable_intrinsics ~with_fp () =
       let module Lifter = Theory.Parser.Make(Core) in
       Optimizer.run BilParser.t bil >>= fun sema ->
       let bil = Insn.bil sema in
-      let bil = Fixup.erase fixups mem bil in
-      Lifter.run BilParser.t bil >>| fun sema ->
+      Lifter.start BilParser.t obj bil >>| fun sema ->
       let bil = Insn.bil sema in
       KB.Value.merge ~on_conflict:`drop_left
         sema (Insn.of_basic ~bil insn) in
