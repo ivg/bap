@@ -190,7 +190,7 @@ sudo chown -R root:root bap/libbap-dev_$BAP_VERSION
 dpkg-deb --build bap/libbap-dev_$BAP_VERSION
 
 
-for pkg in "bap libbap libbap-dev"; do
+for pkg in bap libbap libbap-dev; do
     deb=$pkg_$BAP_VERSION
     dir=$pkg-$BAP_VERSION
     sudo alien --to-rpm -g $deb.deb
