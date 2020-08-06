@@ -9,7 +9,10 @@ include Self ()
 
 let width = Ogre.(require Image.Scheme.bits >>| Int64.to_int_trunc)
 
-type ref = Addr of Bitvec.t | Name of string
+type ref =
+  | Addr of Bitvec_order.t
+  | Name of string
+[@@deriving compare]
 
 module Plt : sig
   type t
@@ -53,20 +56,40 @@ module References : sig
 end = struct
   open Image.Scheme
   open Ogre.Syntax
-  type t = ref list Map.M(Bitvec_order).t
+  type value = Ref of ref | Bad [@@deriving compare]
+  type t = value Map.M(Bitvec_order).t
 
   let empty = Map.empty (module Bitvec_order)
 
-  let collect init map src =
+  let collect init merge map src =
     width >>| Bitvec.modulus >>= fun m ->
     Ogre.collect Ogre.Query.(select (from src)) >>|
     Seq.fold ~init ~f:(fun exts (addr, value) ->
-        Map.add_multi exts Bitvec.(int64 addr mod m) (map m value))
+        Map.update exts Bitvec.(int64 addr mod m) ~f:(function
+            | None -> map m value
+            | Some value' -> merge m value' value))
 
-  let name _ x = Name x and addr m x = Addr Bitvec.(int64 x mod m)
+  let name _ x = Ref (Name x)
+  and addr m x = Ref (Addr Bitvec.(int64 x mod m))
+
+  let merge_name m x y =
+    let y = name m y in
+    match x with
+    | Bad -> Bad
+    | Ref (Addr _) as y -> y
+    | Ref (Name _) as x ->
+      if compare_value x y = 0 then y else Bad
+
+  let merge_addr m x y =
+    let y = addr m y in
+    match x with
+    | Bad -> Bad
+    | Ref (Addr _) as x when compare_value x y <> 0 -> Bad
+    | _ -> y
+
   let extract =
-    collect empty name external_reference >>= fun names ->
-    collect names addr relocation
+    collect empty merge_name name external_reference >>= fun names ->
+    collect names merge_addr addr relocation
 
   let create doc = match Ogre.eval extract doc with
     | Ok exts -> exts
@@ -75,8 +98,9 @@ end = struct
       empty
 
   let lookup exts addr = match Map.find exts addr with
-    | Some [name] -> Some name
-    | _ -> None
+    | Some Bad -> None
+    | Some Ref x -> Some x
+    | None -> None
   let search exts addr = lookup exts (Word.to_bitvec addr)
 end
 
@@ -140,8 +164,19 @@ let resolve_plt_entries refs plt path =
 
 
 let label_for_ref = function
-  | Name s -> Theory.Label.for_name s
-  | Addr x -> Theory.Label.for_addr x
+  | Name s ->
+    Theory.Label.for_name s >>= fun lbl ->
+    KB.Object.repr Theory.Program.cls lbl >>| fun repr ->
+    info "generating a label for external destination %s: %s (%a)" s repr
+      Sexp.pp_hum ([%sexp_of : Theory.Label.t] lbl);
+    lbl
+
+  | Addr x ->
+    Theory.Label.for_addr x >>| fun lbl ->
+    info "generating a label for internal destination %a: (%a)"
+      Bitvec.pp x Sexp.pp_hum ([%sexp_of : Theory.Label.t] lbl);
+    lbl
+
 
 let addresses mem =
   let start = Memory.min_addr mem in
@@ -154,7 +189,7 @@ let matches refs addr mem =
   Seq.append addr (addresses mem) |>
   Seq.find_map ~f:(References.search refs)
 
-let provide_dests refs plt path =
+let provide_dests refs path =
   let (>>=?) x f = x >>= function
     | None -> KB.return Insn.empty
     | Some x -> f x in
@@ -163,11 +198,12 @@ let provide_dests refs plt path =
   KB.collect Theory.Label.unit label >>=? fun unit ->
   KB.collect Memory.slot label >>=? fun mem ->
   KB.collect Theory.Unit.path unit >>=? fun file ->
-  if file <> path || Plt.mem plt addr then KB.return Insn.empty
+  if file <> path then KB.return Insn.empty
   else collect_insns 1 addr >>| find_reference >>= fun addr ->
     match matches refs addr mem with
     | None -> KB.return Insn.empty
     | Some ref ->
+      info "providing a dest for addr: %a" Addr.pp (Memory.min_addr mem);
       label_for_ref ref >>| fun dst ->
       KB.Value.put Insn.Slot.dests Insn.empty @@
       Some (Set.singleton (module Theory.Label) dst)
@@ -178,7 +214,7 @@ let init () =
   let refs = References.create spec in
   let plts = Plt.create spec in
   resolve_plt_entries refs plts file;
-  provide_dests refs plts file
+  provide_dests refs file
 
 let () =
   Config.manpage [
