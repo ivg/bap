@@ -191,7 +191,7 @@ dpkg-deb --build bap/libbap-dev_$BAP_VERSION
 
 
 for pkg in bap libbap libbap-dev; do
-    deb=$pkg_$BAP_VERSION
+    deb=$pkg\_$BAP_VERSION
     dir=$pkg-$BAP_VERSION
     sudo alien --to-rpm -g $deb.deb
     cd $dir
