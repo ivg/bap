@@ -62,7 +62,6 @@ end = struct
       empty
 end
 
-
 let mark_plt_as_stub () : unit =
   KB.Rule.(declare ~package:"bap" "stub-resolver" |>
            dynamic ["code"] |>
@@ -77,6 +76,32 @@ let mark_plt_as_stub () : unit =
   KB.collect Theory.Unit.path unit >>=? fun path ->
   KB.collect Theory.Label.addr label >>|? fun addr ->
   Option.some_if (path = file && Plt.mem plts addr) ()
+
+
+
+let detect_ppc_plt () : unit =
+  (* these are the common plt entries starting instructions,
+   * that we have seen so far. If better method for identifying
+   * PLT entries exist, please tell us! *)
+  let signatures = [
+    0x3d601001l; (* lis     r11,4097 *)
+    0x3d601002l; (* lis     r11,4098 *)
+    0x3d601003l; (* lis     r11,4099 *)
+    0x3d601004l; (* lis     r11,4100 *)
+  ] |> List.map ~f:Word.of_int32 in
+  let word_of_mem mem =
+    let pos_ref = ref (Memory.min_addr mem) in
+    ok_exn @@ Memory.Input.int32 mem ~pos_ref in
+  let matches mem =
+    Memory.length mem = 4 &&
+    List.exists signatures ~f:(Word.equal (word_of_mem mem)) in
+  Project.Info.(Stream.(observe @@ zip file arch)) @@ fun (file,arch) ->
+  if arch = `ppc then
+    KB.promise (Value.Tag.slot Sub.stub) @@ fun label ->
+    KB.collect Theory.Label.unit label >>=? fun unit ->
+    KB.collect Theory.Unit.path unit >>=? fun path ->
+    KB.collect Memory.slot label >>|? fun mem ->
+    Option.some_if (path = file && matches mem) ()
 
 let update prog = relink prog (Stub_resolver.run prog)
 
@@ -95,4 +120,5 @@ let () = Extension.documentation {|
 let () = Extension.declare @@ fun _ctxt ->
   Bap_abi.register_pass main;
   mark_plt_as_stub ();
+  detect_ppc_plt ();
   Ok ()
