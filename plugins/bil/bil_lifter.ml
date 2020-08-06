@@ -199,70 +199,126 @@ let provide_bir () =
   KB.Value.put Term.slot sema bir
 
 
-module Fixup = struct
+module Relocations = struct
 
   type t = {
-    fixups : Set.M(Bitvec_order).t;
+    rels : addr Addr.Map.t;
+    exts : string Addr.Map.t;
   }
+
+  module Fact = Ogre.Make(Monad.Ident)
 
   module Request = struct
     open Image.Scheme
-    open Ogre.Syntax
+    open Fact.Syntax
 
     let of_aseq s =
       Seq.fold s ~init:Addr.Map.empty ~f:(fun m (key,data) ->
           Map.set m ~key ~data)
 
-    let addr_width =
-      Ogre.require Image.Scheme.bits >>| Int64.to_int_trunc
+    let arch =
+      Fact.collect Ogre.Query.(select (from arch)) >>= fun s ->
+      Fact.Seq.reduce ~f:(fun a1 a2 ->
+          if Arch.equal a1 a2 then Fact.return a1
+          else Fact.failf "arch is ambiguous: %a <> %a"
+              Arch.pp a1 Arch.pp a2 ())
+        (Seq.filter_map ~f:Arch.of_string s) >>= fun a ->
+      match a with
+      | Some a -> Fact.return a
+      | None -> Fact.failf "unknown/unsupported architecture" ()
 
-    let empty = Set.empty (module Bitvec_order)
 
-    let collect src =
-      addr_width >>| Bitvec.modulus >>= fun m ->
-      Ogre.collect Ogre.Query.(select (from src)) >>|
-      Seq.fold ~init:empty ~f:(fun fixups (addr,_) ->
-          Set.add fixups Bitvec.(int64 addr mod m))
+    let arch_width =
+      arch >>| fun arch -> Arch.addr_size arch |> Size.in_bits
 
-    let all =
-      collect relocation >>= fun rels ->
-      collect external_reference >>| fun exts ->
-      {fixups = Set.union rels exts}
+    let relocations =
+      arch_width >>= fun width ->
+      Fact.collect Ogre.Query.(select (from relocation)) >>= fun s ->
+      Fact.return
+        (of_aseq @@ Seq.map s ~f:(fun (addr, data) ->
+             Addr.of_int64 ~width addr, Addr.of_int64 ~width data))
+
+    let external_symbols  =
+      arch_width >>= fun width ->
+      Fact.collect Ogre.Query.(select (from external_reference)) >>| fun s ->
+      Seq.fold s ~init:Addr.Map.empty ~f:(fun addrs (addr, name) ->
+          Map.set addrs
+            ~key:(Addr.of_int64 ~width addr)
+            ~data:name)
   end
 
+  let relocations = Fact.eval Request.relocations
+  let external_symbols = Fact.eval Request.external_symbols
+  let empty = {rels = Addr.Map.empty; exts = Addr.Map.empty}
+
   let of_spec spec =
-    match Ogre.eval Request.all spec with
-    | Ok fixups -> fixups
-    | Error e -> Error.raise e
+    match relocations spec, external_symbols spec with
+    | Ok rels, Ok exts -> {rels; exts}
+    | Error e, _  | _, Error e -> Error.raise e
 
 
-  let addresses mem =
+  let reference_analyzer = object
+    inherit [addr Var.Map.t * Addr.Set.t] Stmt.visitor
+    method! enter_move var exp (vars,refs) =
+      match exp with
+      | Bil.Int const -> Map.set vars var const,refs
+      | _ -> vars,refs
+    method! enter_load ~mem:_ ~addr _ _ (vars,refs) =
+      let const = match addr with
+        | Bil.Int const -> Some const
+        | Bil.Var var -> Map.find vars var
+        | _ -> None in
+      match const with
+      | Some const -> vars, Set.add refs const
+      | None -> vars,refs
+  end
+
+  let references bil = snd @@
+    reference_analyzer#run bil
+      (Var.Map.empty, Addr.Set.empty)
+
+  let addresses bil mem =
     let start = Memory.min_addr mem in
     let len = Memory.length mem in
-    Seq.init len ~f:(Addr.nsucc start) |>
-    Seq.map ~f:Word.to_bitvec
+    Seq.append
+      (Set.to_sequence (references bil))
+      (Seq.init len ~f:(Addr.nsucc start))
 
+  let find_external {exts} bil mem =
+    Seq.find_map ~f:(Map.find exts) (addresses bil mem)
 
-  let is_fixup {fixups} mem =
-    Seq.exists ~f:(Set.mem fixups) (addresses mem)
+  let find_internal {rels} bil mem =
+    Seq.find_map ~f:(Map.find rels) (addresses bil mem)
 
   let subscribe () =
     let open Future.Syntax in
     Stream.hd Project.Info.spec >>|
     of_spec
 
-  let override_fixup =
+
+  let override_internal dst =
     Stmt.map (object inherit Stmt.mapper
-      method! map_jmp _ = [Bil.Special "fixup"]
+      method! map_jmp _ = [Bil.Jmp (Int dst)]
     end)
 
-  let erase fixups mem bil =
-    match Future.peek fixups with
+  let override_external is_stub name =
+    let name = if is_stub then name ^ "@external" else name in
+    Stmt.map (object inherit Stmt.mapper
+      method! map_jmp _ = [Call.create name]
+    end)
+
+  let fixup info is_stub mem bil =
+    match Future.peek info with
     | None -> bil
-    | Some fixups ->
-      if is_fixup fixups mem
-      then override_fixup bil
-      else bil
+    | Some info ->
+      match find_internal info bil mem with
+      | Some dst ->
+        override_internal dst bil
+      | None ->
+        match find_external info bil mem with
+        | Some name ->
+          override_external is_stub name bil
+        | None -> bil
 end
 
 module Brancher = struct
@@ -409,7 +465,7 @@ let lift ~enable_intrinsics:{for_all; for_unk; for_special; predicates}
 
 let provide_lifter ~enable_intrinsics ~with_fp () =
   info "providing a lifter for all BIL lifters";
-  let fixups = Fixup.subscribe () in
+  let relocations = Relocations.subscribe () in
   let unknown = Theory.Program.Semantics.empty in
   let context arch =
     sprintf "arch-%a" Arch.str arch ::
@@ -435,7 +491,11 @@ let provide_lifter ~enable_intrinsics ~with_fp () =
       let module Lifter = Theory.Parser.Make(Core) in
       Optimizer.run BilParser.t bil >>= fun sema ->
       let bil = Insn.bil sema in
-      let bil = Fixup.erase fixups mem bil in
+      KB.collect (Value.Tag.slot Sub.stub) obj >>|
+      Option.is_some >>= fun is_stub ->
+      info "%a - %s" Addr.pp (Memory.min_addr mem)
+        (if is_stub then "is stub" else "is not a stub");
+      let bil = Relocations.fixup relocations is_stub mem bil in
       Lifter.run BilParser.t bil >>| fun sema ->
       let bil = Insn.bil sema in
       KB.Value.merge ~on_conflict:`drop_left

@@ -14,39 +14,6 @@ type ref =
   | Name of string
 [@@deriving compare]
 
-module Plt : sig
-  type t
-  val create : Ogre.doc -> t
-  val mem : t -> Bitvec.t -> bool
-end = struct
-  open Image.Scheme
-  open Ogre.Syntax
-  type t = {lower : Bitvec.t; upper : Bitvec.t}
-
-  let empty = {lower = Bitvec.zero; upper = Bitvec.zero}
-  let find =
-    width >>= fun width ->
-    let module Addr = Bitvec.Make(struct
-        let modulus = Bitvec.modulus width
-      end) in
-    Ogre.request named_region ~that:(fun {info=name} ->
-        name = ".plt") >>| function
-    | Some {addr; size} -> {
-        lower = Addr.int64 addr;
-        upper = Addr.(int64 addr + int64 size)
-      }
-    | None -> empty
-
-  let mem {lower; upper} addr =
-    Bitvec.(lower <= addr) &&
-    Bitvec.(upper > addr)
-
-  let create doc = match Ogre.eval find doc with
-    | Ok plt -> plt
-    | Error err ->
-      warning "failed to find plt entries: %a" Error.pp err;
-      empty
-end
 
 module References : sig
   type t
@@ -139,82 +106,62 @@ let plt_size_of_arch : arch -> int option = function
 let plt_size label =
   KB.collect Arch.slot label >>| plt_size_of_arch
 
+let extract_external s =
+  Option.map
+    (String.chop_prefix s ~prefix:"external:")
+    (fun s -> match String.chop_suffix s ~suffix:"@external" with
+       | None -> Name s
+       | Some s -> Name s)
 
 let find_reference = List.find_map ~f:(function
     | Bil.Jmp (Load (_,Int dst,_,_))
     | Bil.Jmp (Int dst)
-    | Bil.Move (_, Load (_,Int dst,_,_)) -> Some dst
+    | Bil.Move (_, Load (_,Int dst,_,_)) -> Some (Addr (Word.to_bitvec dst))
+    | Bil.Special dst -> extract_external dst
     | _ -> None)
 
-let resolve_plt_entries refs plt path =
+let resolve_stubs refs path =
   KB.propose plt_agent Theory.Label.possible_name @@ fun label ->
   KB.collect Theory.Label.addr label >>=? fun addr ->
   KB.collect Theory.Label.unit label >>=? fun unit ->
   KB.collect Theory.Unit.path unit >>=? fun file ->
+  KB.collect (Value.Tag.slot Sub.stub) label >>= fun is_stub ->
   plt_size label >>=? fun size ->
-  if file <> path || not (Plt.mem plt addr) then KB.return None
+  if file <> path || not (Option.is_some is_stub) then KB.return None
   else collect_insns size addr >>| fun bil ->
     match find_reference bil with
     | None ->
-      info "PLT at %a@\n%a@\n" Bitvec.pp addr Bil.pp bil;
+      info "skipping a PLT at %a@\n%a@\n" Bitvec.pp addr Bil.pp bil;
       None
-    | Some dst -> match References.search refs dst with
+    | Some Name s -> Some s
+    | Some Addr dst -> match References.lookup refs dst with
       | Some (Name s) -> Some s
       | _ -> None
 
-
 let label_for_ref = function
-  | Name s ->
-    Theory.Label.for_name s >>= fun lbl ->
-    KB.Object.repr Theory.Program.cls lbl >>| fun repr ->
-    info "generating a label for external destination %s: %s (%a)" s repr
-      Sexp.pp_hum ([%sexp_of : Theory.Label.t] lbl);
-    lbl
-
-  | Addr x ->
-    Theory.Label.for_addr x >>| fun lbl ->
-    info "generating a label for internal destination %a: (%a)"
-      Bitvec.pp x Sexp.pp_hum ([%sexp_of : Theory.Label.t] lbl);
-    lbl
-
+  | Name s -> Theory.Label.for_name s
+  | Addr x -> Theory.Label.for_addr x
 
 let addresses mem =
   let start = Memory.min_addr mem in
   let len = Memory.length mem in
-  Seq.init len ~f:(Addr.nsucc start)
+  Seq.init len ~f:(Addr.nsucc start) |>
+  Seq.map ~f:Word.to_bitvec
 
-let matches refs addr mem =
-  let addr =
-    Option.value_map addr ~default:Seq.empty ~f:Seq.singleton in
-  Seq.append addr (addresses mem) |>
-  Seq.find_map ~f:(References.search refs)
-
-let provide_dests refs path =
-  let (>>=?) x f = x >>= function
-    | None -> KB.return Insn.empty
-    | Some x -> f x in
-  KB.promise Theory.Program.Semantics.slot @@ fun label ->
-  KB.collect Theory.Label.addr label >>=? fun addr ->
-  KB.collect Theory.Label.unit label >>=? fun unit ->
-  KB.collect Memory.slot label >>=? fun mem ->
-  KB.collect Theory.Unit.path unit >>=? fun file ->
-  if file <> path then KB.return Insn.empty
-  else collect_insns 1 addr >>| find_reference >>= fun addr ->
-    match matches refs addr mem with
-    | None -> KB.return Insn.empty
-    | Some ref ->
-      info "providing a dest for addr: %a" Addr.pp (Memory.min_addr mem);
-      label_for_ref ref >>| fun dst ->
-      KB.Value.put Insn.Slot.dests Insn.empty @@
-      Some (Set.singleton (module Theory.Label) dst)
+let matches refs ref mem = match ref with
+  | Some Name _ as ref -> ref
+  | ref ->
+    let addr = match ref with
+      | Some (Addr addr) -> Seq.singleton addr
+      | _ -> Seq.empty in
+    Seq.append addr (addresses mem) |>
+    Seq.find_map ~f:(References.lookup refs)
 
 let init () =
   Stream.observe (Stream.zip Project.Info.spec Project.Info.file)
   @@ fun (spec, file) ->
   let refs = References.create spec in
-  let plts = Plt.create spec in
-  resolve_plt_entries refs plts file;
-  provide_dests refs file
+  resolve_stubs refs file
 
 let () =
   Config.manpage [
