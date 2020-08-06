@@ -189,6 +189,7 @@ chmod a+x $DEBIAN/postrm
 sudo chown -R root:root bap/libbap-dev_$BAP_VERSION
 dpkg-deb --build bap/libbap-dev_$BAP_VERSION
 
+cd bap/
 
 for pkg in bap libbap libbap-dev; do
     deb=$pkg\_$BAP_VERSION

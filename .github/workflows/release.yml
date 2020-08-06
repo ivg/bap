@@ -27,7 +27,7 @@ jobs:
          - name: Build deb packages
            run: |
              ./tools/deb-build.sh
-             ls -l
+             ls -l bap/
 
          - name: Upload deb packages
            uses: actions/upload-artifact@v2
