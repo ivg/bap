@@ -200,6 +200,9 @@ for pkg in bap libbap libbap-dev; do
     awk '/%dir.*bap/ {print} /%dir/ {next} {print}' $pkg-$BAP_VERSION-2.spec > $spec
     sudo cp $spec $pkg-$BAP_VERSION-2.spec
     sudo rpmbuild -bb $pkg-$BAP_VERSION-2.spec --buildroot=`pwd`
+    echo "trying to run alien"
+    echo alien --to-tgz $deb.deb
+    ls -l
     alien --to-tgz $deb.deb
     cd ..
     sudo rm -rf $dir
