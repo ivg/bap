@@ -90,7 +90,8 @@ let collect_insns number_of_instructions entry =
       Theory.Label.for_addr addr >>= fun label ->
       KB.collect Theory.Program.Semantics.slot label >>= fun insn ->
       KB.collect Memory.slot label >>= function
-      | None -> return bils
+      | None ->
+        failwithf "no memory for %s" (Bitvec.to_string addr) ();
       | Some mem ->
         let next = Addr.to_bitvec @@ Addr.succ @@ Memory.max_addr mem in
         collect (Insn.bil insn :: bils) next (collected+1)
@@ -129,14 +130,22 @@ let resolve_stubs refs path =
   plt_size label >>=? fun size ->
   if file <> path || not (Option.is_some is_stub) then KB.return None
   else collect_insns size addr >>| fun bil ->
+    info "%a: got a PLT:@\n%a" Bitvec.pp addr Bil.pp bil;
     match find_reference bil with
     | None ->
-      info "skipping a PLT at %a@\n%a@\n" Bitvec.pp addr Bil.pp bil;
+      info "skipping a PLT, no references";
       None
-    | Some Name s -> Some s
+    | Some Name s ->
+      info "providing name from the special call: %s"
+        s;
+      Some s
     | Some Addr dst -> match References.lookup refs dst with
-      | Some (Name s) -> Some s
-      | _ -> None
+      | Some (Name s) ->
+        info "found a relocation to %s" s;
+        Some s
+      | _ ->
+        info "skipping a PLT, no relocation for reference %a" Bitvec.pp dst;
+        None
 
 let label_for_ref = function
   | Name s -> Theory.Label.for_name s

@@ -109,7 +109,7 @@ module Repository : sig
   val addr : t -> ?size:int -> ?bias:Bitvec.t -> path:string -> string -> Bitvec.t option
 end = struct
   type info = {
-    names : string Map.M(Bitvec_order).t;
+    names : string list Map.M(Bitvec_order).t;
     addrs : Bitvec.t list Map.M(String).t;
   }
 
@@ -128,7 +128,7 @@ end = struct
     | Some info -> info
     | None ->
       let accept name addr {names; addrs} = {
-        names = Map.set names addr name;
+        names = Map.add_multi names addr name;
         addrs = Map.add_multi addrs name addr;
       } in
       let info = parse path accept {
@@ -152,7 +152,9 @@ end = struct
 
   let name repo ?(size=32) ?bias ~path addr =
     let {names} = lookup repo path in
-    Map.find names (to_real size bias addr)
+    match Map.find names (to_real size bias addr) with
+    | Some [name] -> Some name
+    | _ -> None
 
   let addr repo ?(size=32) ?bias ~path name =
     let {addrs} = lookup repo path in
@@ -188,8 +190,8 @@ let provide_function_starts_and_names ctxt : unit =
   declare "names" addr possible_name;
   declare "addrs" name addr;
   property Repository.name KB.promise is_subroutine addr is_known;
-  property Repository.name (KB.propose agent) possible_name addr ident;
-  property Repository.addr KB.promise addr name ident
+  property Repository.name (KB.propose agent) possible_name addr ident
+(* property Repository.addr KB.promise addr name ident *)
 
 let main ctxt =
   provide_function_starts_and_names ctxt;
