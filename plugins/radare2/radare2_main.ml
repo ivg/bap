@@ -69,7 +69,7 @@ let provide_radare2 file =
       let compare = Z.compare and hash = Z.hash
       let sexp_of_t x = Sexp.Atom (Z.to_string x)
     end) in
-  let accept name addr =  Hashtbl.set funcs addr name in
+  let accept name addr =  Hashtbl.add_multi funcs addr name in
   List.iter (extract_symbols file) ~f:(function
       | (name,addr,"FUNC") -> accept (strip name) addr
       | _ -> ());
@@ -78,8 +78,8 @@ let provide_radare2 file =
   let symbolizer = Symbolizer.create @@ fun addr ->
     let addr = Bitvec.to_bigint (Word.to_bitvec addr) in
     match Hashtbl.find funcs addr with
-    | Some name -> name
-    | None -> None in
+    | Some [name] -> name
+    | _ -> None in
   let symbolizer = Symbolizer.set_path symbolizer file in
   Symbolizer.provide agent symbolizer;
   provide_roots file funcs
