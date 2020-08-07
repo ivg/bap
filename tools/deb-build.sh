@@ -202,8 +202,8 @@ for pkg in bap libbap libbap-dev; do
     sudo rpmbuild -bb $pkg-$BAP_VERSION-2.spec --buildroot=`pwd`
     echo "trying to run alien"
     echo alien --to-tgz $deb.deb
+    cd ..
     ls -l
     alien --to-tgz $deb.deb
-    cd ..
     sudo rm -rf $dir
 done
