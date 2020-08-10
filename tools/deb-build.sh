@@ -51,6 +51,7 @@ git pull
             --disable-ida \
             --with-llvm-version=$LLVM_VERSION \
             --with-llvm-config=$LLVM_CONFIG \
+            --enable-llvm-static \
             --libdir=$PREFIX/lib/bap \
             --plugindir=$PREFIX/lib/bap \
             --prefix=$PREFIX \
@@ -189,21 +190,21 @@ chmod a+x $DEBIAN/postrm
 sudo chown -R root:root bap/libbap-dev_$BAP_VERSION
 dpkg-deb --build bap/libbap-dev_$BAP_VERSION
 
-cd bap/
+# cd bap/
 
-for pkg in bap libbap libbap-dev; do
-    deb=$pkg\_$BAP_VERSION
-    dir=$pkg-$BAP_VERSION
-    sudo alien --to-rpm -g $deb.deb
-    cd $dir
-    spec=`mktemp`
-    awk '/%dir.*bap/ {print} /%dir/ {next} {print}' $pkg-$BAP_VERSION-2.spec > $spec
-    sudo cp $spec $pkg-$BAP_VERSION-2.spec
-    sudo rpmbuild -bb $pkg-$BAP_VERSION-2.spec --buildroot=`pwd`
-    echo "trying to run alien"
-    echo alien --to-tgz $deb.deb
-    cd ..
-    ls -l
-    alien --to-tgz $deb.deb
-    sudo rm -rf $dir
-done
+# for pkg in bap libbap libbap-dev; do
+#     deb=$pkg\_$BAP_VERSION
+#     dir=$pkg-$BAP_VERSION
+#     sudo alien --to-rpm -g $deb.deb
+#     cd $dir
+#     spec=`mktemp`
+#     awk '/%dir.*bap/ {print} /%dir/ {next} {print}' $pkg-$BAP_VERSION-2.spec > $spec
+#     sudo cp $spec $pkg-$BAP_VERSION-2.spec
+#     sudo rpmbuild -bb $pkg-$BAP_VERSION-2.spec --buildroot=`pwd`
+#     echo "trying to run alien"
+#     echo alien --to-tgz $deb.deb
+#     cd ..
+#     ls -l
+#     alien --to-tgz $deb.deb
+#     sudo rm -rf $dir
+# done
