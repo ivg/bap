@@ -73,7 +73,7 @@ let parse_func_start input accept init =
         ~stop:(Re.Group.stop groups 1)
     and name = Re.Group.get groups 2 in
     info "%s => %s" (Bitvec.to_string addr) name;
-    accept name addr init
+    accept init addr name
   with _ -> init
 
 let run cmd ~f ~init : _ Base.Continue_or_stop.t =
@@ -104,71 +104,54 @@ let agent =
 module Repository : sig
   type t
   type info
-  val create : (string -> (string -> Bitvec.t -> info -> info) -> info -> info) -> t
+  val create : (string -> (info -> Bitvec.t -> string -> info) -> info -> info) -> t
   val name : t -> ?size:int -> ?bias:Bitvec.t -> path:string -> Bitvec.t -> string option
 end = struct
-  type info = {
-    names : string list Map.M(Bitvec_order).t;
-    addrs : Bitvec.t list Map.M(String).t;
-  }
+  type info = (Bitvec.t, String.t) Bap_relation.t
 
   type t = {
-    parse : string -> (string -> Bitvec.t -> info -> info) -> info -> info;
+    parse : string -> (info -> Bitvec.t -> string  -> info) -> info -> info;
     files : (string, string Map.M(Bitvec_order).t) Hashtbl.t
   }
 
-  let empty = {
-    names = Map.empty (module Bitvec_order);
-    addrs = Map.empty (module String);
-  }
-
+  let empty = Bap_relation.empty
+      Bitvec.compare
+      String.compare
 
   let create parse = {
     parse;
     files = Hashtbl.create (module String);
   }
 
-  let of_info {names; addrs} =
-    let init = Map.empty (module Bitvec_order) in
-    Map.fold names ~init ~f:(fun ~key:addr ~data:addr_names names' ->
-        match addr_names with
-        | [] | _ :: _ :: _ ->
-          info "skipping %a, it has more than one name: %s"
-            Bitvec.pp addr (String.concat ~sep:", " addr_names);
-          names'
-        | [name] -> match Map.find addrs name with
-          | None | Some [] ->
-            info "skipping %a, as it is not reflective"
-              Bitvec.pp addr ;
-            names';
-          | Some [addr'] ->
-            if Bitvec.equal addr addr'
-            then Map.add_exn names' addr name
-            else begin info "skipping %a, its name belongs \
-                             to other address %a"
-                Bitvec.pp addr Bitvec.pp addr';
-              names'
-            end
-          | Some addrs ->
-            info "skipping %a, its name is also shared with %s"
-              Bitvec.pp addr (String.concat ~sep:"," @@
-                              List.map addrs ~f:Bitvec.to_string);
-            names')
+  let string_of_addrs addrs =
+    String.concat ~sep:", " @@ List.map addrs ~f:Bitvec.to_string
+
+  let string_of_names names =
+    String.concat ~sep:", " names
+
+  let pp_reason ppf = function
+    | Bap_relation.Non_injective_fwd (addrs,name) ->
+      Format.fprintf ppf "skipping addresses (%s) that has the same name %S"
+        (string_of_addrs addrs) name
+    | Bap_relation.Non_injective_bwd (names,addr) ->
+      Format.fprintf ppf "skipping names (%s) that has the same address %a"
+        (string_of_names names) Bitvec.pp addr
+
+  let of_info symbols =
+    Bap_relation.matching symbols (Map.empty (module Bitvec_order))
+      ~saturated:(fun key data mapping ->
+          Map.add_exn mapping key data)
+      ~unmatched:(fun reason mapping ->
+          info "%a" pp_reason reason;
+          mapping)
 
 
   let lookup {parse; files} path =
     match Hashtbl.find files path with
     | Some info -> info
     | None ->
-      let accept name addr {names; addrs} = {
-        names = Map.add_multi names addr name;
-        addrs = Map.add_multi addrs name addr;
-      } in
-      let info = parse path accept {
-          names = Map.empty (module Bitvec_order);
-          addrs = Map.empty (module String);
-        } in
-      if Map.is_empty info.names
+      let info = parse path Bap_relation.add empty in
+      if Bap_relation.is_empty info
       then warning "failed to obtain symbols";
       let names = of_info info in
       Hashtbl.set files path names;
