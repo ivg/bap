@@ -106,7 +106,6 @@ module Repository : sig
   type info
   val create : (string -> (string -> Bitvec.t -> info -> info) -> info -> info) -> t
   val name : t -> ?size:int -> ?bias:Bitvec.t -> path:string -> Bitvec.t -> string option
-  val addr : t -> ?size:int -> ?bias:Bitvec.t -> path:string -> string -> Bitvec.t option
 end = struct
   type info = {
     names : string list Map.M(Bitvec_order).t;
@@ -115,13 +114,47 @@ end = struct
 
   type t = {
     parse : string -> (string -> Bitvec.t -> info -> info) -> info -> info;
-    files : (string, info) Hashtbl.t
+    files : (string, string Map.M(Bitvec_order).t) Hashtbl.t
   }
+
+  let empty = {
+    names = Map.empty (module Bitvec_order);
+    addrs = Map.empty (module String);
+  }
+
 
   let create parse = {
     parse;
     files = Hashtbl.create (module String);
   }
+
+  let of_info {names; addrs} =
+    let init = Map.empty (module Bitvec_order) in
+    Map.fold names ~init ~f:(fun ~key:addr ~data:addr_names names' ->
+        match addr_names with
+        | [] | _ :: _ :: _ ->
+          info "skipping %a, it has more than one name: %s"
+            Bitvec.pp addr (String.concat ~sep:", " addr_names);
+          names'
+        | [name] -> match Map.find addrs name with
+          | None | Some [] ->
+            info "skipping %a, as it is not reflective"
+              Bitvec.pp addr ;
+            names';
+          | Some [addr'] ->
+            if Bitvec.equal addr addr'
+            then Map.add_exn names' addr name
+            else begin info "skipping %a, its name belongs \
+                             to other address %a"
+                Bitvec.pp addr Bitvec.pp addr';
+              names'
+            end
+          | Some addrs ->
+            info "skipping %a, its name is also shared with %s"
+              Bitvec.pp addr (String.concat ~sep:"," @@
+                              List.map addrs ~f:Bitvec.to_string);
+            names')
+
 
   let lookup {parse; files} path =
     match Hashtbl.find files path with
@@ -137,8 +170,9 @@ end = struct
         } in
       if Map.is_empty info.names
       then warning "failed to obtain symbols";
-      Hashtbl.set files path info;
-      info
+      let names = of_info info in
+      Hashtbl.set files path names;
+      names
 
   let to_real size = function
     | None -> ident
@@ -151,16 +185,7 @@ end = struct
       Bitvec.((addr + bias) mod modulus size)
 
   let name repo ?(size=32) ?bias ~path addr =
-    let {names} = lookup repo path in
-    match Map.find names (to_real size bias addr) with
-    | Some [name] -> Some name
-    | _ -> None
-
-  let addr repo ?(size=32) ?bias ~path name =
-    let {addrs} = lookup repo path in
-    match Map.find addrs name with
-    | Some [addr] -> Some (of_real size bias addr)
-    | _ -> None
+    Map.find (lookup repo path) (to_real size bias addr)
 end
 
 let provide_function_starts_and_names ctxt : unit =
@@ -174,14 +199,14 @@ let provide_function_starts_and_names ctxt : unit =
              require input |>
              provide output |>
              comment @@ sprintf "extracts %s from objdump" name) in
-  let property lookup promise slot key_slot f =
+  let property promise slot key_slot f =
     promise slot @@ fun label ->
     KB.collect Theory.Label.unit label >>=? fun unit ->
     KB.collect Theory.Unit.path unit >>=? fun path ->
     KB.collect Theory.Unit.bias unit >>= fun bias ->
     KB.collect Theory.Unit.Target.bits unit >>= fun size ->
     KB.collect key_slot label >>|? fun key ->
-    f (lookup repo ?size ?bias ~path key) in
+    f (Repository.name repo ?size ?bias ~path key) in
   let is_known = function
     | None -> None
     | Some _ -> Some true in
@@ -189,9 +214,8 @@ let provide_function_starts_and_names ctxt : unit =
   declare "subroutines"  addr is_subroutine;
   declare "names" addr possible_name;
   declare "addrs" name addr;
-  property Repository.name KB.promise is_subroutine addr is_known;
-  property Repository.name (KB.propose agent) possible_name addr ident
-(* property Repository.addr KB.promise addr name ident *)
+  property KB.promise is_subroutine addr is_known;
+  property (KB.propose agent) possible_name addr ident
 
 let main ctxt =
   provide_function_starts_and_names ctxt;
