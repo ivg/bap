@@ -1,32 +1,93 @@
+let doc = {|
+# DESCRIPTION
+
+Identifies functions that are stubs and redirects calls to stubs to
+the calls to the implemenations, in case if the latter is present in
+the binary.
+
+A stub is piece of binary code that is used to call a function
+implementation. Most commonly stubs are employed for external
+functions, whose implementation is later loaded from some library,
+however some ABIs are using stubs for internal functions, in case if
+they have external linkage.
+
+Usually, it is easy to identify whether a function is a stub or not,
+since most of the ABIs put them in a specially named section. Some
+of the section names are already known to BAP, but you can specify
+more with using the $(b,--stub-resolver-names) parameter.
+
+However, some architectures, in particular PowerPC are storing stub
+functions directly in the text section with other code without any
+indicators. To catch them we employ a simple signature matching
+approach. The signatures, could be specified in a file, named
+$(b,<triple>.stubs), e.g., for $(b,powerpc.stubs) with the following
+contents (see the $(b,--stub-resolve-signatures) parameter description
+for more details on the format of accepted inputs):
+
+```
+; a list of words that commonly start a stub,
+; one per line, with `;' for comments.
+
+3d601001 ; lis r11, 4097
+3d601002 ; lis r11, 4098
+3d601003 ; lis r11, 4099
+3d601004 ; lis r11, 4100
+
+```
+
+|}
+
 open Core_kernel
 open Bap.Std
 open Bap_core_theory
 open Bap_knowledge
 open Bap_future.Std
-include Self ()
-
 open Bap_main
 open KB.Syntax
 
-let relink prog links =
-  (object
-    inherit Term.mapper
+include Loggers()
 
-    method! map_jmp jmp =
-      match Jmp.alt jmp with
-      | None -> jmp
-      | Some alt -> match Jmp.resolve alt with
-        | Second _ -> jmp
-        | First tid -> match Map.find links tid with
-          | Some tid' ->
-            Jmp.with_alt jmp (Some (Jmp.resolved tid'))
-          | _ -> jmp
-  end)#run prog
+let known_stub_names = [
+  ".plt";
+  "__stubs";
+  ".MIPS.stubs";
+]
 
+let default_signatures_folder = Stub_resolver_config.signatures_path
 
-module Plt : sig
+let names = Extension.Configuration.parameters
+    Extension.Type.(list string) "names"
+    ~doc:(sprintf "The list of known sections that contain \
+                   function stubs. The names specified with this \
+                   parameter are appended to the existing list \
+                   that includes: %s" @@
+          String.concat ~sep:", " @@
+          List.map known_stub_names ~f:(sprintf "$(b,%s)"))
+
+let signatures = Extension.Configuration.parameters
+    Extension.Type.(list path) "signatures"
+    ~doc:("A list of folders and files that contain signatures for \
+           stubs identification. Each file shall have a name of the \
+           form $(b,<triple>.stubs) and contain a list of words each \
+           denoting a possible starting sequence of a bytes for a \
+           stub. The triple has the form \
+           $(b,<arch><subarch>-<system>-<abi>). Only $(b,<arch>) is \
+           required, all other fileds could be omitted (or filled in \
+           with $(b,unknown). E.g., $(b,arm.stubs), \
+           $(b,armv7-linux-gnueabi.stubs), etc. Each word denoting a \
+           signature must be encoded as an ASCII number and be binary \
+           (start with $(b,0b)), octal (start with $(b,0o), or \
+           hexadecimal (start with $(b,0x), e.g., $(b,0xDEADBEEF). If \
+           the prefix is omitted then the hexadecimal notation is \
+           assumed, e.g., $(b,DEADBEEF) is also acceptable. The \
+           signature length is automatically inferred from the word, \
+           i.e., the leading zeros are not discarded. By default we \
+           search in the current working folder and in " ^
+          default_signatures_folder)
+
+module Stubs : sig
   type t
-  val create : Ogre.doc -> t
+  val create : ctxt -> Ogre.doc -> t
   val mem : t -> Bitvec.t -> bool
 end = struct
   open Image.Scheme
@@ -38,13 +99,13 @@ end = struct
 
   let width = Ogre.(require Image.Scheme.bits >>| Int64.to_int_trunc)
 
-  let find =
+  let find stubs =
     width >>= fun width ->
     let module Addr = Bitvec.Make(struct
         let modulus = Bitvec.modulus width
       end) in
     Ogre.request named_region ~that:(fun {info=name} ->
-        name = ".plt") >>| function
+        Set.mem stubs name) >>| function
     | Some {addr; size} -> {
         lower = Addr.int64 addr;
         upper = Addr.(int64 addr + int64 size)
@@ -55,14 +116,117 @@ end = struct
     Bitvec.(lower <= addr) &&
     Bitvec.(upper > addr)
 
-  let create doc = match Ogre.eval find doc with
+  let stubs ctxt =
+    List.fold (Extension.Configuration.get ctxt names)
+      ~init:(Set.of_list (module String) known_stub_names)
+      ~f:(fun init -> List.fold ~init ~f:Set.add)
+
+  let create ctxt doc = match Ogre.eval (find (stubs ctxt)) doc with
     | Ok plt -> plt
     | Error err ->
       warning "failed to find plt entries: %a" Error.pp err;
       empty
 end
 
-let mark_plt_as_stub () : unit =
+module Signatures : sig
+  type t
+  val collect : ctxt -> t
+  val matching : ?arch:string -> ?subarch:string -> ?system:string ->
+    ?abi:string -> t -> Word.Set.t
+end = struct
+  type parser_outcome =
+    | Success of word
+    | Failure of string
+    | Empty
+    | Comment
+
+  let is_prefixed s =
+    String.length s > 1 && match s.[0],s.[1] with
+    | '0',('b'|'o'|'x') -> true
+    | _ -> false
+
+  let prepend_0x s = if is_prefixed s then s else "0x"^s
+
+  let parse_word s =
+    let s = prepend_0x s in
+    let n = String.length s - 2 in
+    Word.create (Bitvec.of_string s) @@ match s.[0], s.[1] with
+    | '0','b' -> n
+    | '0','o' -> n * 3
+    | '0','x' -> n * 4
+    | _ -> assert false
+
+  let parse_line s = match String.strip s with
+    | "" -> Empty
+    | s when s.[0] = ';' -> Comment
+    | s when String.for_all s ~f:Char.is_whitespace -> Empty
+    | s ->
+      let s = String.strip @@
+        List.hd_exn (String.split s ~on:';') in
+      try Success (parse_word s)
+      with Invalid_argument err -> Failure err
+
+  let parse_file file =
+    In_channel.read_lines file |>
+    List.foldi ~init:Word.Set.empty ~f:(fun number words line ->
+        match parse_line line with
+        | Empty | Comment -> words
+        | Success word -> Set.add words word
+        | Failure msg ->
+          error "File %S, line %d:@\n\
+                 Failed to parse the stub signature:@\n%s"
+            file (number+1) msg;
+          words)
+
+  let parse_triple s = String.split s ~on:'-' |> List.map ~f:(function
+      | "" -> "unknown"
+      | s -> s)
+
+  let parse_filename s =
+    match String.split (Filename.basename s) ~on:'.' with
+    | [""; "stubs"] -> None      (* for .stubs *)
+    | [triple; "stubs"] -> Some (parse_triple triple)
+    | _ -> None
+
+  let matches xs ys =
+    let rec next xs ys = match xs,ys with
+      | x :: xs, y::ys -> matches x y xs ys
+      | _,[]|[],_ -> true
+    and matches x y xs ys = match x,y with
+      | _,"unknown" | "unknown",_
+      | _,"" | "",_ -> next xs ys
+      | x,y -> x = y && next xs ys in
+    next xs ys
+
+  type t = (string list * Word.Set.t) list
+
+  let collect ctxt : t =
+    let signatures = Extension.Configuration.get ctxt signatures in
+    let paths = Filename.current_dir_name ::
+                default_signatures_folder ::
+                List.concat signatures in
+    let add_file sigs path = match parse_filename path with
+      | None -> sigs
+      | Some triple ->
+        (triple, parse_file path) :: sigs in
+    let add_files sigs folder =
+      try Array.fold (Sys.readdir folder) ~init:sigs ~f:(fun sigs path ->
+          add_file sigs (Filename.concat folder path))
+      with _ -> sigs in
+    List.fold paths ~init:[] ~f:(fun sigs path ->
+        if Sys.file_exists path && Sys.is_directory path
+        then add_files sigs path
+        else add_file sigs path)
+
+  let matching ?(arch="unknown") ?(subarch="") ?(system="unknown")
+      ?(abi="unknown") : t -> Word.Set.t = fun sigs ->
+    let all t = Word.Set.union_list @@
+      List.filter_map sigs ~f:(fun (t' ,s) ->
+          Option.some_if (matches t t') s) in
+    Set.union (all [arch; system; abi]) (all [arch^subarch; system; abi])
+end
+
+let mark_plt_as_stub ctxt : unit =
   KB.Rule.(declare ~package:"bap" "stub-resolver" |>
            dynamic ["code"] |>
            require Theory.Label.addr |>
@@ -70,55 +234,65 @@ let mark_plt_as_stub () : unit =
            comment "Locates .plt entries in the project code
                         sections and tags them as stubs.");
   Project.Info.(Stream.(observe @@ zip file spec)) @@ fun (file,spec) ->
-  let plts = Plt.create spec in
+  let stubs = Stubs.create ctxt spec in
   KB.promise (Value.Tag.slot Sub.stub) @@ fun label ->
   KB.collect Theory.Label.unit label >>=? fun unit ->
   KB.collect Theory.Unit.path unit >>=? fun path ->
   KB.collect Theory.Label.addr label >>|? fun addr ->
-  Option.some_if (path = file && Plt.mem plts addr) ()
+  Option.some_if (path = file && Stubs.mem stubs addr) ()
 
 
+let bitvec_of_memory mem =
+  Bitvec.of_binary @@
+  String.rev @@
+  Bigsubstring.to_string (Memory.to_buffer mem)
 
-let detect_ppc_plt () : unit =
-  (* these are the common plt entries starting instructions,
-   * that we have seen so far. If better method for identifying
-   * PLT entries exist, please tell us! *)
-  let signatures = [
-    0x3d601001l; (* lis     r11,4097 *)
-    0x3d601002l; (* lis     r11,4098 *)
-    0x3d601003l; (* lis     r11,4099 *)
-    0x3d601004l; (* lis     r11,4100 *)
-  ] |> List.map ~f:Word.of_int32 in
-  let word_of_mem mem =
-    let pos_ref = ref (Memory.min_addr mem) in
-    ok_exn @@ Memory.Input.int32 mem ~pos_ref in
-  let matches mem =
-    Memory.length mem = 4 &&
-    List.exists signatures ~f:(Word.equal (word_of_mem mem)) in
+let word_of_memory mem =
+  let width = Memory.length mem * 8 in
+  Word.create (bitvec_of_memory mem) width
+
+let detect_stubs_by_signatures ctxt : unit =
+  let matches sigs mem =
+    let mem = word_of_memory mem in
+    Set.mem sigs mem ||
+    Set.exists sigs ~f:(fun s ->
+        Word.bitwidth s < Word.bitwidth mem &&
+        Word.equal s @@
+        Word.extract_exn mem
+          ~lo:(Word.bitwidth mem - Word.bitwidth s)) in
+  let sigs = Signatures.collect ctxt in
   Project.Info.(Stream.(observe @@ zip file arch)) @@ fun (file,arch) ->
-  if arch = `ppc then
-    KB.promise (Value.Tag.slot Sub.stub) @@ fun label ->
-    KB.collect Theory.Label.unit label >>=? fun unit ->
-    KB.collect Theory.Unit.path unit >>=? fun path ->
-    KB.collect Memory.slot label >>|? fun mem ->
-    Option.some_if (path = file && matches mem) ()
+  KB.promise (Value.Tag.slot Sub.stub) @@ fun label ->
+  KB.collect Theory.Label.unit label >>=? fun unit ->
+  KB.collect Theory.Unit.path unit >>=? fun path ->
+  KB.collect Theory.Unit.Target.arch unit >>= fun arch ->
+  KB.collect Theory.Unit.Target.subarch unit >>= fun subarch ->
+  KB.collect Theory.Unit.Target.system unit >>= fun system ->
+  KB.collect Theory.Unit.Target.abi unit >>= fun abi ->
+  KB.collect Memory.slot label >>|? fun mem ->
+  let sigs = Signatures.matching ?arch ?subarch ?system ?abi sigs in
+  Option.some_if (path = file && matches sigs mem) ()
 
-let update prog = relink prog (Stub_resolver.run prog)
+let update prog =
+  let links = Stub_resolver.run prog in
+  (object inherit Term.mapper
+    method! map_jmp jmp =
+      match Jmp.alt jmp with
+      | None -> jmp
+      | Some alt -> match Jmp.resolve alt with
+        | Second _ -> jmp
+        | First tid -> match Map.find links tid with
+          | Some tid' ->
+            Jmp.with_alt jmp (Some (Jmp.resolved tid'))
+          | _ -> jmp
+  end)#run prog
 
 let main proj =
   Project.with_program proj (update @@ Project.program proj)
 
-let () = Extension.documentation {|
-  # DESCRIPTION
 
-  Provides an abi pass that transforms a program by substituting calls
-  to stubs with calls to real subroutines when they are present in
-  the binary.
-
-|}
-
-let () = Extension.declare @@ fun _ctxt ->
+let () = Extension.declare ~doc @@ fun ctxt ->
   Bap_abi.register_pass main;
-  mark_plt_as_stub ();
-  detect_ppc_plt ();
+  mark_plt_as_stub ctxt;
+  detect_stubs_by_signatures ctxt;
   Ok ()
