@@ -66,3 +66,4 @@ jobs:
            with:
              upload_url: ${{ steps.create_release.outputs.upload_url }}
              asset_path: bap/*.deb
+             asset_name: bap.deb
