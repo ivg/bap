@@ -22,7 +22,7 @@ jobs:
          - name: Fake deb
            run: |
              echo "Hello" > bap_2.2.0.deb
-             echo "World" > libbap_2.2.0_deb
+             echo "World" > libbap_2.2.0.deb
 
          # - name: Install OCaml
          #   uses: avsm/setup-ocaml@v1
