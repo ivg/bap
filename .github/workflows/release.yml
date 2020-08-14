@@ -52,14 +52,30 @@ jobs:
          #     name: tgz-packages
          #     path: bap/*.tgz
 
+         - name: Create Release
+           id: create_release
+           uses: actions/create-release@v1
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+           with:
+             tag_name: bap.2.2.0
+             release_name: Release bap.2.2.0
+             draft: false
+             prerelease: true
+
+         - name: Check URL
+           run: |
+             echo url is ${{ steps.create_release.outputs.upload_url }}
+             echo "====="
+
          - name: Upload Release Asset
            id: upload-release-asset
            uses: actions/upload-release-asset@v1
            env:
              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
            with:
-             #upload_url: ${{ steps.create_release.outputs.upload_url }}
-             upload_url: https://github.com/repos/gitoleg/bap/releases/bap.2.2-test/assets{?name,label}
+             upload_url: ${{ steps.create_release.outputs.upload_url }}
+             #upload_url: https://github.com/repos/gitoleg/bap/releases/bap.2.2-test/assets{?name,label}
              asset_path: bap_2.2.0.deb
              asset_name: bap_2.2.0.deb
              asset_content_type: application/zip
