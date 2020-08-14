@@ -19,44 +19,38 @@ jobs:
            with:
              submodules: recursive
 
-         - name: Install OCaml
-           uses: avsm/setup-ocaml@v1
-           with:
-             ocaml-version: 4.09.1+flambda
-
-         - name: Build deb packages
+         - name: Fake deb
            run: |
-             ./tools/deb-build.sh
-             ls -l bap/
+             echo "Hello" > bap_2.2.0.deb
+             echo "World" > libbap_2.2.0_deb
 
-         - name: Upload deb packages
-           uses: actions/upload-artifact@v2
-           with:
-             name: deb-packages
-             path: bap/*.deb
+         # - name: Install OCaml
+         #   uses: avsm/setup-ocaml@v1
+         #   with:
+         #     ocaml-version: 4.09.1+flambda
 
-         - name: Upload rpm packages
-           uses: actions/upload-artifact@v2
-           with:
-             name: rpm-packages
-             path: bap/*.rpm
+         # - name: Build deb packages
+         #   run: |
+         #     ./tools/deb-build.sh
+         #     ls -l bap/
 
-         - name: Upload archives
-           uses: actions/upload-artifact@v2
-           with:
-             name: tgz-packages
-             path: bap/*.tgz
+         # - name: Upload deb packages
+         #   uses: actions/upload-artifact@v2
+         #   with:
+         #     name: deb-packages
+         #     path: bap/*.deb
 
-         - name: Create Release
-           id: create_release
-           uses: actions/create-release@v1
-           env:
-             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-           with:
-             tag_name: bap.2.2-test
-             release_name: Release bap.2.2-test
-             draft: false
-             prerelease: true
+         # - name: Upload rpm packages
+         #   uses: actions/upload-artifact@v2
+         #   with:
+         #     name: rpm-packages
+         #     path: bap/*.rpm
+
+         # - name: Upload archives
+         #   uses: actions/upload-artifact@v2
+         #   with:
+         #     name: tgz-packages
+         #     path: bap/*.tgz
 
          - name: Check URL
            run: echo ${{ steps.create_release.outputs.upload_url }}
@@ -67,7 +61,8 @@ jobs:
            env:
              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
            with:
-             upload_url: ${{ steps.create_release.outputs.upload_url }}
-             asset_path: bap/*.deb
-             asset_name: bap.debg
+             #upload_url: ${{ steps.create_release.outputs.upload_url }}
+             upload_url: https://uploads.github.com/repos/gitoleg/bap/releases/bap.2.2-test/assets?name
+             asset_path: bap_2.1.0.deb
+             asset_name: bap_2.1.0.deb
              asset_content_type: application/zip
