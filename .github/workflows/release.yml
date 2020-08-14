@@ -53,8 +53,8 @@ jobs:
            env:
              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
            with:
-             tag_name: ${{ github.ref }}
-             release_name: Release ${{ github.ref }}
+             tag_name: bap.2.0-test
+             release_name: Release bap.2.0-test
              draft: false
              prerelease: true
 
@@ -66,4 +66,4 @@ jobs:
            with:
              upload_url: ${{ steps.create_release.outputs.upload_url }}
              asset_path: bap/*.deb
-             asset_name: bap.deb
+             asset_name: bap.debg
