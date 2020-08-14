@@ -46,3 +46,21 @@ jobs:
            with:
              name: tgz-packages
              path: bap/*.tgz
+
+         - name: Create Release
+           uses: actions/create-release@v1
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+             with:
+               tag_name: test.2.2
+               release_name: Release test.2.2
+               draft: false
+               prerelease: true
+
+         - name: Upload Release Asset
+           uses: actions/upload-release-asset@v1
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+             with:
+               upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: bap/*.deb
