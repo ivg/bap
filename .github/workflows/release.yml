@@ -76,6 +76,6 @@ jobs:
            with:
              #upload_url: ${{ steps.create_release.outputs.upload_url }}
              upload_url: https://uploads.github.com/repos/gitoleg/bap/releases/29717181/assets{?name,label}
-             asset_path: bap_2.2.0.deb
-             asset_name: bap_2.2.0.deb
+             asset_path: libbap_2.2.0.deb
+             asset_name: libbap_2.2.0.deb
              asset_content_type: application/zip
