@@ -51,7 +51,6 @@ git pull
             --disable-ida \
             --with-llvm-version=$LLVM_VERSION \
             --with-llvm-config=$LLVM_CONFIG \
-            --enable-llvm-static \
             --libdir=$PREFIX/lib/bap \
             --plugindir=$PREFIX/lib/bap \
             --prefix=$PREFIX \
