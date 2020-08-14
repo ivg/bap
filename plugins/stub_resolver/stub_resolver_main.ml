@@ -130,15 +130,22 @@ end
 
 module Signatures : sig
   type t
+  type triple
   val collect : ctxt -> t
-  val matching : ?arch:string -> ?subarch:string -> ?system:string ->
-    ?abi:string -> t -> Word.Set.t
+
+  val triple : ?arch:string -> ?subarch:string -> ?system:string ->
+    ?abi:string -> unit -> triple
+  val matching : triple -> t -> Word.Set.t
 end = struct
   type parser_outcome =
     | Success of word
     | Failure of string
     | Empty
     | Comment
+
+  type triple = string list list
+  type t = (string list * Word.Set.t) list
+
 
   let is_prefixed s =
     String.length s > 1 && match s.[0],s.[1] with
@@ -198,7 +205,6 @@ end = struct
       | x,y -> x = y && next xs ys in
     next xs ys
 
-  type t = (string list * Word.Set.t) list
 
   let collect ctxt : t =
     let signatures = Extension.Configuration.get ctxt signatures in
@@ -218,12 +224,21 @@ end = struct
         then add_files sigs path
         else add_file sigs path)
 
-  let matching ?(arch="unknown") ?(subarch="") ?(system="unknown")
-      ?(abi="unknown") : t -> Word.Set.t = fun sigs ->
+  let triple
+      ?(arch="unknown")
+      ?(subarch="")
+      ?(system="unknown")
+      ?(abi="unknown") () = [
+    [arch; system; abi];
+    [arch^subarch; system; abi];
+  ]
+
+  let matching triple sigs =
     let all t = Word.Set.union_list @@
       List.filter_map sigs ~f:(fun (t' ,s) ->
           Option.some_if (matches t t') s) in
-    Set.union (all [arch; system; abi]) (all [arch^subarch; system; abi])
+    Set.union_list (module Word) @@
+    List.map triple ~f:all
 end
 
 let mark_plt_as_stub ctxt : unit =
@@ -251,9 +266,29 @@ let word_of_memory mem =
   let width = Memory.length mem * 8 in
   Word.create (bitvec_of_memory mem) width
 
+
+let collect_triple unit =
+  KB.collect Theory.Unit.Target.arch unit >>= fun arch ->
+  KB.collect Theory.Unit.Target.subarch unit >>= fun subarch ->
+  KB.collect Theory.Unit.Target.system unit >>= fun system ->
+  KB.collect Theory.Unit.Target.abi unit >>| fun abi ->
+  Signatures.triple ?arch ?subarch ?system ?abi ()
+
+let with_path_and_unit label f =
+  KB.collect Theory.Label.unit label >>=? fun unit ->
+  KB.collect Theory.Unit.path unit >>=? fun path ->
+  f path unit
+
+let with_context label f =
+  with_path_and_unit label @@ fun path unit ->
+  collect_triple unit >>= fun triple ->
+  f path triple
+
 let detect_stubs_by_signatures ctxt : unit =
   let matches sigs mem =
     let mem = word_of_memory mem in
+    info "Searching %a in %a"
+      Word.pp mem Sexp.pp_hum ([%sexp_of: Word.Set.t] sigs);
     Set.mem sigs mem ||
     Set.exists sigs ~f:(fun s ->
         Word.bitwidth s < Word.bitwidth mem &&
@@ -263,14 +298,9 @@ let detect_stubs_by_signatures ctxt : unit =
   let sigs = Signatures.collect ctxt in
   Project.Info.(Stream.(observe @@ zip file arch)) @@ fun (file,arch) ->
   KB.promise (Value.Tag.slot Sub.stub) @@ fun label ->
-  KB.collect Theory.Label.unit label >>=? fun unit ->
-  KB.collect Theory.Unit.path unit >>=? fun path ->
-  KB.collect Theory.Unit.Target.arch unit >>= fun arch ->
-  KB.collect Theory.Unit.Target.subarch unit >>= fun subarch ->
-  KB.collect Theory.Unit.Target.system unit >>= fun system ->
-  KB.collect Theory.Unit.Target.abi unit >>= fun abi ->
+  with_context label @@ fun path triple ->
   KB.collect Memory.slot label >>|? fun mem ->
-  let sigs = Signatures.matching ?arch ?subarch ?system ?abi sigs in
+  let sigs = Signatures.matching triple sigs in
   Option.some_if (path = file && matches sigs mem) ()
 
 let update prog =

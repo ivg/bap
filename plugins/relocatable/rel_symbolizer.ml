@@ -1,3 +1,19 @@
+let doc = "
+# DESCRIPTION
+
+Extracts symbol information from the program relocations.
+
+The relocation symbolizer leverages the relocation information stored
+in files to extract symbol names. Since a relocation references an
+external symbol which doesn't have an address we use an address of a
+callsite.
+
+# SEE ALSO
+
+$(b,bap-plugin-llvm)(1)
+"
+
+open Bap_main
 open Bap_knowledge
 open Core_kernel
 open Bap.Std
@@ -5,7 +21,7 @@ open Bap_future.Std
 open Monads.Std
 open Bap_core_theory
 
-include Self ()
+include Loggers()
 
 let width = Ogre.(require Image.Scheme.bits >>| Int64.to_int_trunc)
 
@@ -28,6 +44,11 @@ end = struct
 
   let empty = Map.empty (module Bitvec_order)
 
+  let chop_version s =
+    match String.lfindi s ~f:(fun _ -> Char.equal '@') with
+    | None | Some 0 -> s
+    | Some len -> String.subo ~len s
+
   let collect init merge map src =
     width >>| Bitvec.modulus >>= fun m ->
     Ogre.collect Ogre.Query.(select (from src)) >>|
@@ -36,7 +57,7 @@ end = struct
             | None -> map m value
             | Some value' -> merge m value' value))
 
-  let name _ x = Ref (Name x)
+  let name _ x = Ref (Name (chop_version x))
   and addr m x = Ref (Addr Bitvec.(int64 x mod m))
 
   let merge_name m x y =
@@ -65,7 +86,10 @@ end = struct
       empty
 
   let lookup exts addr = match Map.find exts addr with
-    | Some Bad -> None
+    | Some Bad ->
+      warning "pruning a reference at %a for it being a bad reference"
+        Bitvec.pp addr;
+      None
     | Some Ref x -> Some x
     | None -> None
   let search exts addr = lookup exts (Word.to_bitvec addr)
@@ -121,36 +145,6 @@ let find_reference = List.find_map ~f:(function
     | Bil.Special dst -> extract_external dst
     | _ -> None)
 
-let resolve_stubs refs path =
-  KB.propose plt_agent Theory.Label.possible_name @@ fun label ->
-  KB.collect Theory.Label.addr label >>=? fun addr ->
-  KB.collect Theory.Label.unit label >>=? fun unit ->
-  KB.collect Theory.Unit.path unit >>=? fun file ->
-  KB.collect (Value.Tag.slot Sub.stub) label >>= fun is_stub ->
-  plt_size label >>=? fun size ->
-  if file <> path || not (Option.is_some is_stub) then KB.return None
-  else collect_insns size addr >>| fun bil ->
-    info "%a: got a PLT:@\n%a" Bitvec.pp addr Bil.pp bil;
-    match find_reference bil with
-    | None ->
-      info "skipping a PLT, no references";
-      None
-    | Some Name s ->
-      info "providing name from the special call: %s"
-        s;
-      Some s
-    | Some Addr dst -> match References.lookup refs dst with
-      | Some (Name s) ->
-        info "found a relocation to %s" s;
-        Some s
-      | _ ->
-        info "skipping a PLT, no relocation for reference %a" Bitvec.pp dst;
-        None
-
-let label_for_ref = function
-  | Name s -> Theory.Label.for_name s
-  | Addr x -> Theory.Label.for_addr x
-
 let addresses mem =
   let start = Memory.min_addr mem in
   let len = Memory.length mem in
@@ -166,21 +160,58 @@ let matches refs ref mem = match ref with
     Seq.append addr (addresses mem) |>
     Seq.find_map ~f:(References.lookup refs)
 
-let init () =
-  Stream.observe (Stream.zip Project.Info.spec Project.Info.file)
-  @@ fun (spec, file) ->
+let resolve_stubs refs path =
+  KB.propose plt_agent Theory.Label.possible_name @@ fun label ->
+  KB.collect Theory.Label.addr label >>=? fun addr ->
+  KB.collect Theory.Label.unit label >>=? fun unit ->
+  KB.collect Theory.Unit.path unit >>=? fun file ->
+  KB.collect (Value.Tag.slot Sub.stub) label >>= fun is_stub ->
+  if file <> path || not (Option.is_some is_stub) then KB.return None
+  else match References.lookup refs addr with
+    | Some (Name s) -> KB.return (Some s)
+    | _ ->
+      plt_size label >>=? fun size ->
+      collect_insns size addr >>| fun bil ->
+      info "%a: got a PLT:@\n%a" Bitvec.pp addr Bil.pp bil;
+      match find_reference bil with
+      | None ->
+        info "skipping a PLT, no references";
+        None
+      | Some Name s ->
+        info "providing name from the special call: %s"
+          s;
+        Some s
+      | Some Addr dst -> match References.lookup refs dst with
+        | Some (Name s) ->
+          info "found a relocation to %s" s;
+          Some s
+        | _ ->
+          info "skipping a PLT, no relocation for reference %a" Bitvec.pp dst;
+          None
+
+let label_for_ref = function
+  | Name s -> Theory.Label.for_name s
+  | Addr x -> Theory.Label.for_addr x
+
+let mark_mips_stubs_as_functions refs file : unit =
+  KB.promise Theory.Label.is_subroutine @@ fun label ->
+  KB.collect Theory.Label.addr label >>=? fun addr ->
+  KB.collect Theory.Label.unit label >>=? fun unit ->
+  KB.collect Theory.Unit.path unit >>=? fun path ->
+  KB.collect Theory.Unit.Target.arch unit >>=? fun arch ->
+  KB.collect (Value.Tag.slot Sub.stub) label >>| fun stub ->
+
+  let is_entry = path = file &&
+                 (arch = "mips" || arch = "mips64") &&
+                 Option.is_some stub &&
+                 Option.is_some (References.lookup refs addr) in
+  if is_entry then info "reporting %a as a function start"
+      Bitvec.pp addr;
+  Option.some_if is_entry true
+
+let () = Extension.declare ~doc @@ fun _ctxt ->
+  Result.return @@
+  Stream.(observe Project.Info.(zip spec file)) @@ fun (spec, file) ->
   let refs = References.create spec in
-  resolve_stubs refs file
-
-let () =
-  Config.manpage [
-    `S "DESCRIPTION";
-    `P "Extracts symbol information from the program relocations.";
-
-    `P "The relocation symbolizer leverages the relocation information stored in files
-        to extract symbol names. Since a relocation references an external symbol which
-        doesn't have an address we use an address of a callsite.";
-    `S "SEE ALSO";
-    `P "$(b,bap-plugin-llvm)(1) code";
-  ];
-  Config.when_ready (fun _ -> init ())
+  resolve_stubs refs file;
+  mark_mips_stubs_as_functions refs file;
