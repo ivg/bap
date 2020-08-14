@@ -166,16 +166,19 @@ void emit_symbol_entry(const ELFObjectFile<T> &obj, const SymbolRef &sym, ogre_d
     auto name = prim::symbol_name(sym);
     auto addr = prim::symbol_address(sym);
     auto off = symbol_file_offset(obj, sym);
-    if (name && addr && off && !name->empty() &&
-        !is_external(*addr, *off, sym_elf->st_size)) {
-        s.entry("llvm:symbol-entry") << *name
-                                     << *addr
-                                     << sym_elf->st_size
-                                     << *off
-                                     << sym_elf->st_value;
+    if (name && addr && off && !name->empty()) {
+        if (is_external(*addr, *off, sym_elf->st_size) && sym_elf->st_value) {
+            s.entry("llvm:name-reference") << sym_elf->st_value << *name;
+        } else {
+            s.entry("llvm:symbol-entry") << *name
+                                         << *addr
+                                         << sym_elf->st_size
+                                         << *off
+                                         << sym_elf->st_value;
 
-        if (sym_elf->getType() == ELF::STT_FUNC)
-            s.entry("llvm:code-entry") << *name << *off << sym_elf->st_size ;
+            if (sym_elf->getType() == ELF::STT_FUNC)
+                s.entry("llvm:code-entry") << *name << *off << sym_elf->st_size ;
+        }
     }
 }
 
