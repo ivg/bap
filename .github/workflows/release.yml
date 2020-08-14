@@ -74,8 +74,8 @@ jobs:
            env:
              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
            with:
-             upload_url: ${{ steps.create_release.outputs.upload_url }}
-             #upload_url: https://github.com/repos/gitoleg/bap/releases/bap.2.2-test/assets{?name,label}
+             #upload_url: ${{ steps.create_release.outputs.upload_url }}
+             upload_url: https://uploads.github.com/repos/gitoleg/bap/releases/29717181/assets{?name,label}
              asset_path: bap_2.2.0.deb
              asset_name: bap_2.2.0.deb
              asset_content_type: application/zip
