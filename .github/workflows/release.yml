@@ -53,17 +53,22 @@ jobs:
            env:
              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
            with:
-             tag_name: bap.2.0-test
-             release_name: Release bap.2.0-test
+             tag_name: bap.2.2-test
+             release_name: Release bap.2.2-test
              draft: false
              prerelease: true
 
+         - name: Check URL
+           run: echo ${{ steps.create_release.outputs.upload_url }}
+
          - name: Upload Release Asset
            id: upload-release-asset
-           uses: actions/upload-release-asset@v1
+           uses: actions/upload-release-
+           asset@v1
            env:
              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
            with:
              upload_url: ${{ steps.create_release.outputs.upload_url }}
              asset_path: bap/*.deb
              asset_name: bap.debg
+             asset_content_type: application/zip
