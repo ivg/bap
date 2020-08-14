@@ -2513,13 +2513,18 @@ module Knowledge = struct
   let status
     : ('a,_) slot -> 'a obj -> slot_status knowledge =
     fun slot obj ->
-    objects slot.cls >>| fun {comp} ->
+    objects slot.cls >>| fun {comp; vals} ->
     match Map.find comp obj with
     | None -> Sleep
     | Some slots -> match Map.find slots (uid slot) with
       | None -> Sleep
       | Some Work _ -> Awoke
-      | Some Done -> Ready
+      | Some Done -> match Map.find vals obj with
+        | None -> Sleep
+        | Some v ->
+          let x = Record.get slot.key slot.dom v in
+          if Domain.is_empty slot.dom x then Sleep else Ready
+
 
   let update_slot
     : ('a,_) slot -> 'a obj -> _ -> unit knowledge =
@@ -2536,8 +2541,7 @@ module Knowledge = struct
 
   let enter_slot : ('a,_) slot -> 'a obj -> unit knowledge = fun s x ->
     update_slot s x @@ function
-    | Some _ -> assert false
-    | None ->  Work {
+    | _ ->  Work {
         waiting = Set.empty (module Pid);
         current = Set.empty (module Pid)
       }
