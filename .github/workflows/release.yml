@@ -52,21 +52,21 @@ jobs:
          #     name: tgz-packages
          #     path: bap/*.tgz
 
-         - name: Create Release
-           id: create_release
-           uses: actions/create-release@v1
-           env:
-             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-           with:
-             tag_name: bap.2.2.0
-             release_name: Release bap.2.2.0
-             draft: false
-             prerelease: true
+         # - name: Create Release
+         #   id: create_release
+         #   uses: actions/create-release@v1
+         #   env:
+         #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+         #   with:
+         #     tag_name: bap.2.2.0
+         #     release_name: Release bap.2.2.0
+         #     draft: false
+         #     prerelease: true
 
-         - name: Check URL
-           run: |
-             echo url is ${{ steps.create_release.outputs.upload_url }}
-             echo "====="
+         # - name: Check URL
+         #   run: |
+         #     echo url is ${{ steps.create_release.outputs.upload_url }}
+         #     echo "====="
 
          - name: Upload Release Asset
            id: upload-release-asset
