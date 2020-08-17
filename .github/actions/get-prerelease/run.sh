@@ -4,7 +4,7 @@ set -e
 
 #TODO: change  the repo name!!!
 echo "get the releases"
-RELEASES=`curl -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/gitoleg/bap/releases`
+RELEASES=`curl -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/gitoleg/bap/releases | sed 's/\n//g'`
 echo $RELEASES
 
 
