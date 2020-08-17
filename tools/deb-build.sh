@@ -42,7 +42,7 @@ cd bap-repo
 LLVM_VERSION=`opam config var conf-bap-llvm:package-version`
 LLVM_CONFIG=`opam config var conf-bap-llvm:config`
 
-SIGURL=$GITHUB/bap/releases/download/v$BAP_VERSION/sigs.zip
+SIGURL=https://github.com/BinaryAnalysisPlatform/bap/releases/download/v2.1.0/sigs.zip
 echo BAP version is $BAP_VERSION
 echo LLVM is $LLVM_VERSION
 
@@ -191,21 +191,21 @@ chmod a+x $DEBIAN/postrm
 sudo chown -R root:root bap/libbap-dev_$BAP_VERSION
 dpkg-deb --build bap/libbap-dev_$BAP_VERSION
 
-# cd bap/
+cd bap/
 
-# for pkg in bap libbap libbap-dev; do
-#     deb=$pkg\_$BAP_VERSION
-#     dir=$pkg-$BAP_VERSION
-#     sudo alien --to-rpm -g $deb.deb
-#     cd $dir
-#     spec=`mktemp`
-#     awk '/%dir.*bap/ {print} /%dir/ {next} {print}' $pkg-$BAP_VERSION-2.spec > $spec
-#     sudo cp $spec $pkg-$BAP_VERSION-2.spec
-#     sudo rpmbuild -bb $pkg-$BAP_VERSION-2.spec --buildroot=`pwd`
-#     echo "trying to run alien"
-#     echo alien --to-tgz $deb.deb
-#     cd ..
-#     ls -l
-#     alien --to-tgz $deb.deb
-#     sudo rm -rf $dir
-# done
+for pkg in bap libbap libbap-dev; do
+    deb=$pkg\_$BAP_VERSION
+    dir=$pkg-$BAP_VERSION
+    sudo alien --to-rpm -g $deb.deb
+    cd $dir
+    spec=`mktemp`
+    awk '/%dir.*bap/ {print} /%dir/ {next} {print}' $pkg-$BAP_VERSION-2.spec > $spec
+    sudo cp $spec $pkg-$BAP_VERSION-2.spec
+    sudo rpmbuild -bb $pkg-$BAP_VERSION-2.spec --buildroot=`pwd`
+    echo "trying to run alien"
+    echo alien --to-tgz $deb.deb
+    cd ..
+    ls -l
+    alien --to-tgz $deb.deb
+    sudo rm -rf $dir
+done
