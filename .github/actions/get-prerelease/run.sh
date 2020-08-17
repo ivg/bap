@@ -9,7 +9,7 @@ RELEASES=`curl -H "Accept: application/vnd.github.v3+json" https://api.github.co
 IsPRERELEASE=`echo $RELEASES | jq '.[0].prerelease'`
 
 PRERELEASE=
-if [ "check$IsPRERELEASE" == "checktrue" ]; then
+if [ "check$IsPRERELEASE" = "checktrue" ]; then
     PRERELEASE=`echo $RELEASES | jq '.[0].id'`
 fi
 
