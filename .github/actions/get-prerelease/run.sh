@@ -9,7 +9,7 @@ RELEASES=`curl -H "Accept: application/vnd.github.v3+json" https://api.github.co
 
 # check if the first argument in the list (the most recent one) is
 # a prerelease
-IsPRERELEASE=`echo $RELEASES | jq -r '.[0].prerelease'`
+IsPRERELEASE=`echo "$RELEASES" | jq -r '.[0].prerelease'`
 
 echo "check is it's true"
 PRERELEASE=
