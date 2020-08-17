@@ -284,6 +284,14 @@ let with_context label f =
   collect_triple unit >>= fun triple ->
   f path triple
 
+let find_mem bits code addr =
+  let addr = Word.create addr bits in
+  Memmap.lookup code addr |>
+  Seq.find_map ~f:(fun (mem,_) ->
+      match Memory.view ~from:addr mem with
+      | Ok view -> Some view
+      | Error _ -> None)
+
 let detect_stubs_by_signatures ctxt : unit =
   let matches sigs mem =
     let mem = word_of_memory mem in
@@ -296,12 +304,15 @@ let detect_stubs_by_signatures ctxt : unit =
         Word.extract_exn mem
           ~lo:(Word.bitwidth mem - Word.bitwidth s)) in
   let sigs = Signatures.collect ctxt in
-  Project.Info.(Stream.(observe @@ zip file arch)) @@ fun (file,arch) ->
+  Project.Info.(Stream.(observe @@ zip file code)) @@ fun (file,code) ->
   KB.promise (Value.Tag.slot Sub.stub) @@ fun label ->
-  with_context label @@ fun path triple ->
-  KB.collect Memory.slot label >>|? fun mem ->
-  let sigs = Signatures.matching triple sigs in
-  Option.some_if (path = file && matches sigs mem) ()
+  KB.collect Theory.Label.addr label >>=? fun addr ->
+  with_path_and_unit label @@ fun path unit ->
+  collect_triple unit >>= fun triple ->
+  KB.collect Theory.Unit.Target.bits unit >>|? fun bits ->
+  Option.bind (find_mem bits code addr) ~f:(fun mem ->
+      let sigs = Signatures.matching triple sigs in
+      Option.some_if (path = file && matches sigs mem) ())
 
 let update prog =
   let links = Stub_resolver.run prog in
