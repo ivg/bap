@@ -58,7 +58,7 @@ sed -i "s/-j 2/-j 4/" oasis/common
             --sysconfdir=$CONFDIR
 
 make
-sudo sh -c "make reinstall"
+sudo sh -c "PATH=$PATH make reinstall"
 cd ..
 
 echo "Packing a bap debian package"
