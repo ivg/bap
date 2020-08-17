@@ -48,8 +48,8 @@ jobs:
            with:
              tag_name: ${{ env.RELEASE }}
              release_name: Release ${{ env.RELEASE }}
-          draft: true
-          prerelease: true
+             draft: true
+             prerelease: true
 
          # - name: Install OCaml
          #   uses: avsm/setup-ocaml@v1
