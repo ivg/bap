@@ -1,19 +1,20 @@
 #!/bin/sh
 
-#TODO: change  the repo name!!!
+set -e
 
+#TODO: change  the repo name!!!
+echo "get the releases"
 RELEASES=`curl -H "Accept: application/vnd.github.v3+json" https://api.github.com/repos/gitoleg/bap/releases`
 
 # check if the first argument in the list (the most recent one) is
 # a prerelease
+echo "get the latest prerelease flag"
 IsPRERELEASE=`echo $RELEASES | jq '.[0].prerelease'`
 
+echo "check is it's true"
 PRERELEASE=
-TAG=
 if [ "check$IsPRERELEASE" = "checktrue" ]; then
     PRERELEASE=`echo $RELEASES | jq '.[0].id'`
-    TAG=`echo $RELEASES | jq '.[0].tag_name'`
 fi
 
 echo "::set-output name=id::$PRERELEASE"
-echo "::set-output name=tag::$TAG"
