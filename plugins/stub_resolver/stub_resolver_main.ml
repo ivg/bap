@@ -295,8 +295,6 @@ let find_mem bits code addr =
 let detect_stubs_by_signatures ctxt : unit =
   let matches sigs mem =
     let mem = word_of_memory mem in
-    info "Searching %a in %a"
-      Word.pp mem Sexp.pp_hum ([%sexp_of: Word.Set.t] sigs);
     Set.mem sigs mem ||
     Set.exists sigs ~f:(fun s ->
         Word.bitwidth s < Word.bitwidth mem &&

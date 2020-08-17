@@ -167,9 +167,7 @@ module BilParser = struct
       | Mem (ks,vs) ->
         S.set_mem n (Size.in_bits ks) (Size.in_bits vs) x in
     fun s -> match Call.dst s with
-      | Some dst ->
-        info "translating a special to call(%s)" dst;
-        S.call dst
+      | Some dst -> S.call dst
       | None -> match s with
         | Move (v,x) -> set v x
         | Jmp (Int x) -> S.goto (Word.to_bitvec x)
@@ -369,7 +367,6 @@ let base_context = [
   "bil-lifter";
 ]
 
-
 let create_intrinsic arch mem insn =
   let module Insn = Disasm_expert.Basic.Insn in
   let width = Size.in_bits (Arch.addr_size arch) in
@@ -493,8 +490,6 @@ let provide_lifter ~enable_intrinsics ~with_fp () =
       let bil = Insn.bil sema in
       KB.collect (Value.Tag.slot Sub.stub) obj >>|
       Option.is_some >>= fun is_stub ->
-      info "%a - %s" Addr.pp (Memory.min_addr mem)
-        (if is_stub then "is stub" else "is not a stub");
       let bil = Relocations.fixup relocations is_stub mem bil in
       Lifter.run BilParser.t bil >>| fun sema ->
       let bil = Insn.bil sema in

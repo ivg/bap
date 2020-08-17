@@ -8,6 +8,7 @@ open KB.Syntax
 
 let agent =
   KB.Agent.register ~package:"bap" "radare2-symbolizer"
+    ~reliability:KB.Agent.doubtful
     ~desc:"extracts symbols radare2"
 
 let provide_roots file funcs =
@@ -83,9 +84,11 @@ let provide_radare2 file =
     end) in
   let rels =
     let init = Bap_relation.empty Z.compare String.compare in
-    List.fold ~init (extract_symbols file) ~f:(fun rels -> function
-        | (name,addr,"FUNC") -> Bap_relation.add rels addr name
-        | _ -> rels) in
+    List.fold ~init (extract_symbols file) ~f: (fun rels (name,addr,typ) ->
+        if typ = "FUNC" then match strip name with
+          | None -> rels
+          | Some name -> Bap_relation.add rels addr name
+        else rels) in
   Bap_relation.matching rels ()
     ~saturated:(fun addr name () -> Hashtbl.add_exn funcs addr name)
     ~unmatched:(fun reason () -> report_missing reason);
