@@ -35,7 +35,7 @@ jobs:
            if: steps.get_prerelease.outputs.id != ''
            uses: author/action-rollback@stable
            with:
-             id: ${{ steps.get_prerelease.outputs.id }}
+             release_id: ${{ steps.get_prerelease.outputs.id }}
            env:
              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
