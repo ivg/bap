@@ -24,6 +24,22 @@ jobs:
              echo "Hello" > bap_2.2.0.deb
              echo "World" > libbap_2.2.0.deb
 
+         - name: Get the previous pre-release
+           id: get_prerelease
+           uses: ./.github/actions/get-prerelease
+
+         - name: Check the get-prelease action
+           run: echo ${{ steps.get_prerelease.outputs.id }}
+
+         # - name: Delete previous pre-release
+         #   if: steps.get_prerelease.outputs.id != ''
+         #   uses: author/action-rollback@stable
+         #   with:
+         #     id: ${{ steps.get_prerelease.outputs.id }}
+         #   env:
+         #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+
          # - name: Install OCaml
          #   uses: avsm/setup-ocaml@v1
          #   with:
