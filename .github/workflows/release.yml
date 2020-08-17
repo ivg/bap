@@ -27,7 +27,7 @@ jobs:
 
          - name: Build deb packages
            run: |
-             ./tools/deb-build.sh
+             ./tools/deb-build.sh ${{ env.VERSION }}
              ls -l bap/
 
          # - name: Fake deb
