@@ -14,10 +14,10 @@ jobs:
        OPAMRETRES: 8
 
      steps:
-         # - name: Checkout code
-         #   uses: actions/checkout@v2
-         #   with:
-         #     submodules: recursive
+         - name: Checkout code
+           uses: actions/checkout@v2
+           with:
+             submodules: recursive
 
          - name: Fake deb
            run: |
