@@ -48,7 +48,7 @@ jobs:
            with:
              tag_name: ${{ env.RELEASE }}
              release_name: Release ${{ env.RELEASE }}
-             draft: true
+             draft: false
              prerelease: true
 
          # - name: Install OCaml
@@ -101,8 +101,7 @@ jobs:
            env:
              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
            with:
-             #upload_url: ${{ steps.create_release.outputs.upload_url }}
-             upload_url: https://uploads.github.com/repos/gitoleg/bap/releases/29717181/assets{?name,label}
+             upload_url: ${{ steps.create_release.outputs.upload_url }}
              asset_path: libbap_2.2.0.deb
              asset_name: libbap_2.2.0.deb
              asset_content_type: application/zip
