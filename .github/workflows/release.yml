@@ -12,6 +12,7 @@ jobs:
      env:
        OPAMJOBS: 2
        OPAMRETRES: 8
+       RELEASE: bap.2.2.0
 
      steps:
          - name: Checkout code
@@ -31,7 +32,7 @@ jobs:
          - name: Check the get-prelease action
            run: echo ${{ steps.get_prerelease.outputs.id }}
 
-         - name: Delete previous pre-release
+         - name: Delete previous prerelease
            if: steps.get_prerelease.outputs.id != ''
            uses: author/action-rollback@stable
            with:
@@ -39,6 +40,16 @@ jobs:
            env:
              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+         - name: Create a new prerelease
+           id: create_release
+           uses: actions/create-release@v1
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
+           with:
+             tag_name: ${{ env.RELEASE }}
+             release_name: Release ${{ env.RELEASE }}
+          draft: true
+          prerelease: true
 
          # - name: Install OCaml
          #   uses: avsm/setup-ocaml@v1
