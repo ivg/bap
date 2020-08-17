@@ -1,6 +1,6 @@
 FROM ubuntu:latest
 
-RUN sudo apt-get update && sudo apt-get install jq curl --yes
+RUN apt-get update && apt-get install jq curl --yes
 
 COPY run.sh /run.sh
 
