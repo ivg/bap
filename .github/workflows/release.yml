@@ -31,13 +31,13 @@ jobs:
          - name: Check the get-prelease action
            run: echo ${{ steps.get_prerelease.outputs.id }}
 
-         # - name: Delete previous pre-release
-         #   if: steps.get_prerelease.outputs.id != ''
-         #   uses: author/action-rollback@stable
-         #   with:
-         #     id: ${{ steps.get_prerelease.outputs.id }}
-         #   env:
-         #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+         - name: Delete previous pre-release
+           if: steps.get_prerelease.outputs.id != ''
+           uses: author/action-rollback@stable
+           with:
+             id: ${{ steps.get_prerelease.outputs.id }}
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
          # - name: Install OCaml

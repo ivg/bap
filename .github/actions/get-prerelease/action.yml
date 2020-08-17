@@ -4,6 +4,8 @@ description: 'Get the latest pre-release id'
 outputs:
   id:
     description: "The release id"
+  tag:
+    description: "The tag name"
 runs:
   using: 'docker'
   image: 'Dockerfile'
