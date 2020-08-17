@@ -48,7 +48,6 @@ echo LLVM is $LLVM_VERSION
 
 sed -i "s/-j 2/-j 4/" oasis/common
 
-git pull
 ./configure --enable-everything \
             --disable-ida \
             --with-llvm-version=$LLVM_VERSION \
@@ -59,7 +58,7 @@ git pull
             --sysconfdir=$CONFDIR
 
 make
-sudo sh -c "PATH=$PATH make reinstall"
+sudo sh -c "make reinstall"
 cd ..
 
 echo "Packing a bap debian package"
@@ -192,6 +191,7 @@ sudo chown -R root:root bap/libbap-dev_$BAP_VERSION
 dpkg-deb --build bap/libbap-dev_$BAP_VERSION
 
 cd bap/
+curl -L $SIGURL > sigs.zip
 
 for pkg in bap libbap libbap-dev; do
     deb=$pkg\_$BAP_VERSION

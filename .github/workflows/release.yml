@@ -20,20 +20,14 @@ jobs:
            with:
              submodules: recursive
 
-         - name: Install OCaml
-           uses: avsm/setup-ocaml@v1
-           with:
-             ocaml-version: 4.09.1+flambda
+         # - name: Install OCaml
+         #   uses: avsm/setup-ocaml@v1
+         #   with:
+         #     ocaml-version: 4.09.1+flambda
 
-         - name: Build deb packages
-           run: |
-             ./tools/deb-build.sh ${{ env.VERSION }}
-             ls -l bap/
-
-         # - name: Fake deb
+         # - name: Build deb packages
          #   run: |
-         #     echo "Hello" > bap_2.2.0.deb
-         #     echo "World" > libbap_2.2.0.deb
+         #     ./tools/deb-build.sh ${{ env.VERSION }}
 
          - name: Get the previous pre-release
            id: get_prerelease
@@ -50,11 +44,11 @@ jobs:
            env:
              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-         - name: Create a new prerelease
-           uses: "marvinpinto/action-automatic-releases@latest"
-           with:
-             repo_token: "${{ secrets.GITHUB_TOKEN }}"
-             automatic_release_tag: v${{ env.VERSION }}
-             prerelease: true
-             title: "Development Build"
-             files: bap/*
+         # - name: Create a new prerelease
+         #   uses: "marvinpinto/action-automatic-releases@latest"
+         #   with:
+         #     repo_token: "${{ secrets.GITHUB_TOKEN }}"
+         #     automatic_release_tag: v${{ env.VERSION }}
+         #     prerelease: true
+         #     title: "Development Build"
+         #     files: bap/*
