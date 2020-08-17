@@ -5,6 +5,9 @@ set -e
 sudo apt-get update
 sudo apt-get install alien autoconf --yes
 
+BAP_VERSION=$1
+echo "version is $BAP_VERSION"
+
 
 GITHUB=https://github.com/BinaryAnalysisPlatform/
 SOURCE=$GITHUB/bap
@@ -39,7 +42,6 @@ cd bap-repo
 LLVM_VERSION=`opam config var conf-bap-llvm:package-version`
 LLVM_CONFIG=`opam config var conf-bap-llvm:config`
 
-BAP_VERSION=`git tag | tail -n 1 | sed "s/v//"`
 SIGURL=$GITHUB/bap/releases/download/v$BAP_VERSION/sigs.zip
 echo BAP version is $BAP_VERSION
 echo LLVM is $LLVM_VERSION

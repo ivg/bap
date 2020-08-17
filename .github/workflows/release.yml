@@ -20,20 +20,20 @@ jobs:
            with:
              submodules: recursive
 
-         # - name: Install OCaml
-         #   uses: avsm/setup-ocaml@v1
-         #   with:
-         #     ocaml-version: 4.09.1+flambda
+         - name: Install OCaml
+           uses: avsm/setup-ocaml@v1
+           with:
+             ocaml-version: 4.09.1+flambda
 
-         # - name: Build deb packages
-         #   run: |
-         #     ./tools/deb-build.sh
-         #     ls -l bap/
-
-         - name: Fake deb
+         - name: Build deb packages
            run: |
-             echo "Hello" > bap_2.2.0.deb
-             echo "World" > libbap_2.2.0.deb
+             ./tools/deb-build.sh
+             ls -l bap/
+
+         # - name: Fake deb
+         #   run: |
+         #     echo "Hello" > bap_2.2.0.deb
+         #     echo "World" > libbap_2.2.0.deb
 
          - name: Get the previous pre-release
            id: get_prerelease
@@ -61,13 +61,95 @@ jobs:
              draft: false
              prerelease: true
 
-         - name: Upload Release Asset
-           id: upload-release-asset
+# upload DEB packages
+         - name: Upload bap deb package
            uses: actions/upload-release-asset@v1
            env:
              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
            with:
              upload_url: ${{ steps.create_release.outputs.upload_url }}
-             asset_path: libbap_${{ env.VERSION }}.deb
+             asset_path: bap/bap_${{ env.VERSION }}.deb
+             asset_name: bap_${{ env.VERSION }}.deb
+             asset_content_type: application/zip
+
+         - name: Upload libbap deb package
+           uses: actions/upload-release-asset@v1
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+           with:
+             upload_url: ${{ steps.create_release.outputs.upload_url }}
+             asset_path: bap/libbap_${{ env.VERSION }}.deb
              asset_name: libbap_${{ env.VERSION }}.deb
+             asset_content_type: application/zip
+
+         - name: Upload libbap-dev deb package
+           uses: actions/upload-release-asset@v1
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+           with:
+             upload_url: ${{ steps.create_release.outputs.upload_url }}
+             asset_path: bap/libbap-dev_${{ env.VERSION }}.deb
+             asset_name: libbap-dev_${{ env.VERSION }}.deb
+             asset_content_type: application/zip
+
+# upload RPM packages
+         - name: Upload bap rpm package
+           uses: actions/upload-release-asset@v1
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+           with:
+             upload_url: ${{ steps.create_release.outputs.upload_url }}
+             asset_path: bap/bap-${{ env.VERSION }}-2.x86_64.rpm
+             asset_name: bap-${{ env.VERSION }}-2.x86_64.rpm
+             asset_content_type: application/zip
+
+         - name: Upload libbap rpm package
+           uses: actions/upload-release-asset@v1
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+           with:
+             upload_url: ${{ steps.create_release.outputs.upload_url }}
+             asset_path: bap/libbap-${{ env.VERSION }}-2.x86_64.rpm
+             asset_name: libbap-${{ env.VERSION }}-2.x86_64.rpm
+             asset_content_type: application/zip
+
+         - name: Upload libbap-dev rpm package
+           uses: actions/upload-release-asset@v1
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+           with:
+             upload_url: ${{ steps.create_release.outputs.upload_url }}
+             asset_path: bap/libbap-dev-${{ env.VERSION }}-2.x86_64.rpm
+             asset_name: libbap-dev-${{ env.VERSION }}-2.x86_64.rpm
+             asset_content_type: application/zip
+
+# upload TGZ packages
+         - name: Upload bap tgz package
+           uses: actions/upload-release-asset@v1
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+           with:
+             upload_url: ${{ steps.create_release.outputs.upload_url }}
+             asset_path: bap/bap-${{ env.VERSION }}.tgz
+             asset_name: bap-${{ env.VERSION }}.tgz
+             asset_content_type: application/zip
+
+         - name: Upload libbap tgz package
+           uses: actions/upload-release-asset@v1
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+           with:
+             upload_url: ${{ steps.create_release.outputs.upload_url }}
+             asset_path: bap/libbap-${{ env.VERSION }}.tgz
+             asset_name: libbap-${{ env.VERSION }}.tgz
+             asset_content_type: application/zip
+
+         - name: Upload libbap-dev tgz package
+           uses: actions/upload-release-asset@v1
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+           with:
+             upload_url: ${{ steps.create_release.outputs.upload_url }}
+             asset_path: bap/libbap-dev-${{ env.VERSION }}.tgz
+             asset_name: libbap-dev-${{ env.VERSION }}.tgz
              asset_content_type: application/zip
