@@ -17,9 +17,9 @@ jobs:
      steps:
          - name: Check repo tags
            run: |
-             X=`git ls-remote --tags https://github.com/${{ GITHUB_REPOSITORY }} | grep v${{ $VERSION }}`
+             X=`git ls-remote --tags https://github.com/${{ env.GITHUB_REPOSITORY }} | grep v${{ env.VERSION }}`
              if [ "has$X" != "has" ]; then
-                echo "the repository already has tag v${{ VERSION}"
+                echo "the repository already has tag v${{ env.VERSION }}"
              fi
 
 
