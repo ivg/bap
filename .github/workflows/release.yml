@@ -23,7 +23,7 @@ jobs:
            id: get_prerelease
            uses: ./.github/actions/get-prerelease
 
-         - name: Delete the previous prerelease
+         - name: Delete the previous prerelease, if any
            if: steps.get_prerelease.outputs.id != ''
            uses: author/action-rollback@stable
            with:
@@ -31,9 +31,9 @@ jobs:
            env:
              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-         # The action marvinpinto/action-automatic-releases@latest below
-         # will delete the tag if such one already exists. We need to
-         # protect ourselves and don't let this happen.
+           # The action marvinpinto/action-automatic-releases below
+           # will delete the tag if such one already exists. We need to
+           # protect ourselves and don't let this happen.
          - name: Check if the tag is already exists
            run: |
              TAG=`git ls-remote --tags https://github.com/$GITHUB_REPOSITORY | grep v${{ env.VERSION }} || true`
@@ -48,11 +48,10 @@ jobs:
              ocaml-version: 4.09.1+flambda
 
          - name: Build deb packages
-           run: |
-             ./tools/deb-build.sh ${{ env.VERSION }}
+           run: ./tools/deb-build.sh ${{ env.VERSION }}
 
          - name: Create a new prerelease
-           uses: "marvinpinto/action-automatic-releases@latest"
+           uses: "marvinpinto/action-automatic-releases@v1.0.0"
            with:
              repo_token: "${{ secrets.GITHUB_TOKEN }}"
              automatic_release_tag: v${{ env.VERSION }}
