@@ -19,30 +19,13 @@ jobs:
            with:
              submodules: recursive
 
-         # - name: Get the previous prerelease ID
-         #   id: get_prerelease
-         #   uses: ./.github/actions/get-prerelease
+         - name: Install OCaml
+           uses: avsm/setup-ocaml@v1
+           with:
+             ocaml-version: 4.09.1+flambda
 
-         # - name: Delete the previous prerelease, if any
-         #   if: steps.get_prerelease.outputs.id != ''
-         #   uses: author/action-rollback@stable
-         #   with:
-         #     release_id: ${{ steps.get_prerelease.outputs.id }}
-         #   env:
-         #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-         # - name: Install OCaml
-         #   uses: avsm/setup-ocaml@v1
-         #   with:
-         #     ocaml-version: 4.09.1+flambda
-
-         # - name: Build deb packages
-         #   run: ./tools/deb-build.sh ${{ env.VERSION }}
-
-         - name: Fake
-           run: |
-             mkdir bap
-             echo "Hello" > bap/bap_2.2.0.dev
+         - name: Build deb packages
+           run: ./tools/deb-build.sh ${{ env.VERSION }}
 
            # caution: this action overwrite the tag and deletes
            # releases that are associated with it
