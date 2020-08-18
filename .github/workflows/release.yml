@@ -15,6 +15,14 @@ jobs:
        VERSION: 2.2.0
 
      steps:
+         - name: Check repo tags
+           run: |
+             X=`git ls-remote --tags https://github.com/${{ GITHUB_REPOSITORY }} | grep v${{ $VERSION }}`
+             if [ "has$X" != "has" ]; then
+                echo "the repository already has tag v${{ VERSION}"
+             fi
+
+
          - name: Checkout code
            uses: actions/checkout@v2
            with:
