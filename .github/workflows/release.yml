@@ -36,9 +36,9 @@ jobs:
          # protect ourselves and don't let this happen.
          - name: Check if the tag is already exists
            run: |
-             TAG=`git ls-remote --tags https://github.com/$GITHUB_REPOSITORY | grep v${{ env.VERSION }}`
+             TAG=`git ls-remote --tags https://github.com/$GITHUB_REPOSITORY | grep v${{ env.VERSION }} || true`
              if [ "has$TAG" != "has" ]; then
-                echo "the repository already has tag v${{ env.VERSION }}"
+                echo "The repository already has the tag v${{ env.VERSION }}"
                 exit 1
              fi
 
