@@ -20,6 +20,7 @@ jobs:
              X=`git ls-remote --tags https://github.com/$GITHUB_REPOSITORY | grep v${{ env.VERSION }}`
              if [ "has$X" != "has" ]; then
                 echo "the repository already has tag v${{ env.VERSION }}"
+                exit 1
              fi
 
 
