@@ -1,4 +1,3 @@
-
 name: release
 on:
   - push
@@ -15,19 +14,33 @@ jobs:
        VERSION: 2.2.0
 
      steps:
-         - name: Check repo tags
-           run: |
-             X=`git ls-remote --tags https://github.com/$GITHUB_REPOSITORY | grep v${{ env.VERSION }}`
-             if [ "has$X" != "has" ]; then
-                echo "the repository already has tag v${{ env.VERSION }}"
-                exit 1
-             fi
-
-
          - name: Checkout code
            uses: actions/checkout@v2
            with:
              submodules: recursive
+
+         - name: Get the previous prerelease ID
+           id: get_prerelease
+           uses: ./.github/actions/get-prerelease
+
+         - name: Delete the previous prerelease
+           if: steps.get_prerelease.outputs.id != ''
+           uses: author/action-rollback@stable
+           with:
+             release_id: ${{ steps.get_prerelease.outputs.id }}
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+         # The action marvinpinto/action-automatic-releases@latest below
+         # will delete the tag if such one already exists. We need to
+         # protect ourselves and don't let this happen.
+         - name: Check if the tag is already exists
+           run: |
+             TAG=`git ls-remote --tags https://github.com/$GITHUB_REPOSITORY | grep v${{ env.VERSION }}`
+             if [ "has$TAG" != "has" ]; then
+                echo "the repository already has tag v${{ env.VERSION }}"
+                exit 1
+             fi
 
          - name: Install OCaml
            uses: avsm/setup-ocaml@v1
@@ -37,21 +50,6 @@ jobs:
          - name: Build deb packages
            run: |
              ./tools/deb-build.sh ${{ env.VERSION }}
-
-         - name: Get the previous pre-release
-           id: get_prerelease
-           uses: ./.github/actions/get-prerelease
-
-         - name: Check the get-prelease action
-           run: echo ${{ steps.get_prerelease.outputs.id }}
-
-         - name: Delete previous prerelease
-           if: steps.get_prerelease.outputs.id != ''
-           uses: author/action-rollback@stable
-           with:
-             release_id: ${{ steps.get_prerelease.outputs.id }}
-           env:
-             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
          - name: Create a new prerelease
            uses: "marvinpinto/action-automatic-releases@latest"
