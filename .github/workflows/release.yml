@@ -31,17 +31,6 @@ jobs:
            env:
              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-           # The action marvinpinto/action-automatic-releases below
-           # will delete the tag if such one already exists. We need to
-           # protect ourselves and don't let this happen.
-         - name: Check if the tag is already exists
-           run: |
-             TAG=`git ls-remote --tags https://github.com/$GITHUB_REPOSITORY | grep v${{ env.VERSION }} || true`
-             if [ "has$TAG" != "has" ]; then
-                echo "The repository already has the tag v${{ env.VERSION }}"
-                exit 1
-             fi
-
          - name: Install OCaml
            uses: avsm/setup-ocaml@v1
            with:
@@ -54,7 +43,7 @@ jobs:
            uses: "marvinpinto/action-automatic-releases@latest"
            with:
              repo_token: "${{ secrets.GITHUB_TOKEN }}"
-             automatic_release_tag: v${{ env.VERSION }}
+             automatic_release_tag: dev
              prerelease: true
              title: "Development Build"
              files: bap/*
