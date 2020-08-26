@@ -215,6 +215,19 @@ let outputs =
     Extension.Type.("[<FMT>[:<FILE>]]" %: string)
     "dump"
 
+let rw_file = Extension.Type.define
+    ~name:"<FILE>" ~print:ident ~parse:ident
+    ~digest:(fun path ->
+        if Sys.file_exists path
+        then Caml.Digest.file path
+        else Caml.Digest.string "empty")
+    ""
+
+
+let knowledge =
+  Extension.Command.parameter
+    ~doc:"The path to the knowledge base"
+    ~aliases:["k"] (Extension.Type.some rw_file) "knowledge-base"
 
 let input = Extension.Command.argument
     ~doc:"The input file" Extension.Type.("FILE" %: string =? "a.out" )
@@ -299,37 +312,87 @@ let setup_gc_unless_overriden () =
   then setup_gc ()
   else info "GC parameters are overriden by a user"
 
-let create_and_process input outputs passes loader ctxt =
+let open_temp temp_dir =
+  let tmp = Caml.Filename.temp_file ~temp_dir "tmp" "index" in
+  try tmp, Unix.(openfile tmp [O_RDWR;] 0o600)
+  with e -> Sys.remove tmp; raise e
+
+let binable_to_file : type t.
+  ?temp_dir:string ->
+  (module Binable.S with type t = t) ->
+  string -> t -> unit =
+  fun ?temp_dir b file data ->
+  let module T = (val b) in
+  let temp_dir = Option.value ~default:(Filename.dirname file) temp_dir in
+  let tmp,fd = open_temp temp_dir in
+  let size = T.bin_size_t data in
+  protect ~f:(fun () ->
+      let buf =
+        Unix.map_file
+          fd Bigarray.char Bigarray.c_layout true [|size|] in
+      ignore @@
+      T.bin_write_t (Bigarray.array1_of_genarray buf) ~pos:0 data)
+    ~finally:(fun () ->
+        Unix.close fd;
+        Unix.chmod tmp 0o444;
+        Sys.rename tmp file)
+
+let binable_from_file : type t.
+  (module Binable.S with type t = t) -> string -> t = fun b file ->
+  let module T = (val b) in
+  let fd = Unix.(openfile file [O_RDONLY] 0o400) in
+  let data = Unix.map_file fd
+      Bigarray.char Bigarray.c_layout false [|-1|] in
+  let pos_ref = ref 0 in
+  T.bin_read_t (Bigarray.array1_of_genarray data) ~pos_ref
+
+module KB = struct
+  type t = Knowledge.state [@@deriving bin_io]
+end
+
+let load_knowledge digest = function
+  | None -> import_knowledge_from_cache digest
+  | Some path when not (Sys.file_exists path) ->
+    import_knowledge_from_cache digest
+  | Some path ->
+    Toplevel.set @@ binable_from_file (module KB) path
+
+let save_knowledge digest = function
+  | None -> store_knowledge_in_cache digest
+  | Some path ->
+    binable_to_file (module KB) path @@ Toplevel.current ()
+
+let create_and_process input outputs passes loader kb ctxt =
   let package = input in
   let digest = make_digest [
       Extension.Configuration.digest ctxt;
       Caml.Digest.file input;
       loader;
     ] in
-  import_knowledge_from_cache digest;
+  load_knowledge digest kb;
   let state = load_project_state_from_cache digest in
   let input = Project.Input.file ~loader ~filename:input in
   Project.create ~package ?state
     input |> proj_error >>= fun proj ->
   if Option.is_none state then begin
-    store_knowledge_in_cache digest;
+    save_knowledge digest kb;
     save_project_state_to_cache digest (Project.state proj);
   end;
   process passes outputs proj
 
 let _disassemble_command_registered : unit =
-  Extension.Command.(begin
-      declare ~doc:man "disassemble"
-        ~requires:features_used
-        (args $input $outputs $old_style_passes $passes $loader)
-    end) @@
-  fun input outputs old_style_passes passes loader ctxt ->
+  let args =
+    let open Extension.Command in
+    args $input $outputs $old_style_passes $passes $loader $knowledge in
+  Extension.Command.declare ~doc:man "disassemble"
+    ~requires:features_used args @@
+  fun input outputs old_style_passes passes loader kb ctxt ->
   setup_gc_unless_overriden ();
   validate_input input >>= fun () ->
   validate_passes_style old_style_passes (List.concat passes) >>=
   validate_passes >>= fun passes ->
   Dump_formats.parse outputs >>= fun outputs ->
-  create_and_process input outputs passes loader ctxt >>= fun _ ->
+  create_and_process input outputs passes loader kb ctxt >>= fun _ ->
   Ok ()
 
 let _compare_command_registered : unit =
@@ -358,12 +421,19 @@ let _compare_command_registered : unit =
 ```
 |} in
 
-  Extension.Command.(begin
-      declare "compare" ~doc
-        ~requires:features_used
-        (args $collator $base $inputs $outputs $old_style_passes $passes $loader)
-    end) @@
-  fun collator input inputs outputs old_style_passes passes loader ctxt ->
+  let args =
+    let open Extension.Command in
+    args
+    $collator
+    $base
+    $inputs
+    $outputs
+    $old_style_passes
+    $passes
+    $loader
+    $knowledge in
+  Extension.Command.declare "compare" ~doc ~requires:features_used args @@
+  fun collator input inputs outputs old_style_passes passes loader kb ctxt ->
   match Project.Collator.find ~package:"bap" collator with
   | None -> Error (Fail (Unknown_collator collator))
   | Some collator ->
@@ -374,7 +444,7 @@ let _compare_command_registered : unit =
     Dump_formats.parse outputs >>= fun outputs ->
     let projs =
       Seq.map (Seq.of_list (input::inputs)) ~f:(fun input ->
-          create_and_process input outputs passes loader ctxt) in
+          create_and_process input outputs passes loader kb ctxt) in
     let exception Escape of Extension.Error.t in
     try
       let projs = Seq.map projs ~f:(function
