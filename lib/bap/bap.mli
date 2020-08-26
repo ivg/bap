@@ -9370,8 +9370,11 @@ module Std : sig
         @since 2.2.0*)
     val specification : t -> Ogre.doc
 
-    val state : t -> state
 
+    (** [state project] returns the core state of the [project].
+
+        @since 2.0.0 *)
+    val state : t -> state
 
     (** [disasm project] returns results of disassembling  *)
     val disasm : t -> disasm
@@ -9381,6 +9384,17 @@ module Std : sig
 
     (** [with_program project program] updates a project program *)
     val with_program : t -> program term -> t
+
+
+    (** [map_program t ~f] maps the IR representation of the program
+        with function [f].
+
+        Note: since the program is computed lazily this function
+        should be preferred to [program] composed [with_program] for
+        passes that transform the program representation so that they
+        are not run if the program is never ever used.
+    *)
+    val map_program : t -> f:(program term -> program term) -> t
 
     (** [symbols t] returns reconstructed symbol table  *)
     val symbols : t -> symtab
@@ -9496,6 +9510,31 @@ module Std : sig
       (** occurs once image spec is known *)
       val spec : Ogre.Doc.t stream
     end
+
+
+    (** The core state of the project.
+
+        @since 2.2.0
+    *)
+    module State : sig
+
+      (** the abstract type for the project state.
+          See {!Project.state}.
+      *)
+      type t = state
+
+
+      (** [disassembly state] contains all disassembled instructions,
+          as well as their connection. To build control-flow graphs or
+          to explore the graph structure, use {!Disasm.Driver.explore}.
+      *)
+      val disassembly : t -> Disasm.Driver.state
+
+      (** [subroutines state] returns the partition of the set of
+          disassembled instructions into a set of subroutines.   *)
+      val subroutines : t -> Disasm.Subroutines.t
+    end
+
 
     (** Input information.
 

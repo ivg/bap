@@ -124,42 +124,45 @@ let with_filename spec arch data code path =
 
 module State = struct
   open KB.Syntax
-  module Driver = Bap_disasm_driver
-  module Calls = Bap_disasm_calls
-  module Disasm = Disasm_expert.Recursive
+  module Dis = Bap_disasm_driver
+  module Sub = Bap_disasm_calls
+  module Rec = Disasm_expert.Recursive
 
   type t = {
-    default : arch;
+    arch : arch;
     package : string option;
-    state : Driver.state;
-    calls : Calls.t;
+    disassembly : Dis.state;
+    subroutines : Sub.t;
   } [@@deriving bin_io]
 
-  let empty ?package arch = {
-    default = arch;
+  let create ?package ?(arch=`unknown) () = {
+    arch;
     package;
-    state = Driver.init;
-    calls = Calls.empty;
+    disassembly = Dis.init;
+    subroutines = Sub.empty;
   }
 
   let update self mem =
-    Driver.scan mem self.state >>= fun state ->
-    Calls.update self.calls state >>| fun calls ->
-    {self with state; calls}
+    Dis.scan mem self.disassembly >>= fun disassembly ->
+    Sub.update self.subroutines disassembly >>| fun subroutines ->
+    {self with disassembly; subroutines}
 
-  let symtab {state; calls} = Symtab.create state calls
-  let disasm {state} =
-    Disasm_expert.Recursive.global_cfg state
+  let symbols {disassembly; subroutines} =
+    Symtab.create disassembly subroutines
+
+  let cfg {disassembly} =
+    Disasm_expert.Recursive.global_cfg disassembly
+
+  let disassembly {disassembly=d} = d
+  let subroutines {subroutines=s} = s
 
   module Toplevel = struct
-    let result = Toplevel.var "result"
     let run spec arch ~code ~data file k =
+      let result = Toplevel.var "result" in
       Toplevel.put result begin
         with_arch arch code @@ fun () ->
         with_filename spec arch code data file @@ fun () ->
-        k >>= fun k ->
-        disasm k >>= fun g ->
-        symtab k >>| fun s -> g,s,k
+        k
       end;
       Toplevel.get result
   end
@@ -170,12 +173,12 @@ type state = State.t [@@deriving bin_io]
 type t = {
   arch    : arch;
   spec    : Ogre.doc;
-  core    : State.t;
-  disasm  : disasm;
+  state   : State.t;
+  disasm  : disasm Lazy.t;
   memory  : value memmap;
   storage : dict;
-  program : program term;
-  symbols : Symtab.t;
+  program : program term Lazy.t;
+  symbols : Symtab.t Lazy.t;
   passes  : string list;
 } [@@deriving fields]
 
@@ -249,11 +252,13 @@ module Input = struct
     let finish proj = {
       proj with
       storage = Dict.set proj.storage Image.specification spec;
-      program = Term.map sub_t proj.program ~f:(fun sub ->
-          match Term.get_attr sub address with
-          | Some a when Addr.equal a (Image.entry_point img) ->
-            Term.set_attr sub Sub.entry_point ()
-          | _ -> sub)
+      program =
+        Lazy.map proj.program ~f:(fun prog ->
+            Term.map sub_t prog ~f:(fun sub ->
+                match Term.get_attr sub address with
+                | Some a when Addr.equal a (Image.entry_point img) ->
+                  Term.set_attr sub Sub.entry_point ()
+                | _ -> sub))
     } in
     of_image finish filename img
 
@@ -327,8 +332,8 @@ let set_package package = match package with
   | None -> KB.return ()
   | Some pkg -> KB.Symbol.set_package pkg
 
-let state {core} = core
-let package {core={State.package}} = package
+let state {state} = state
+let package {state={State.package}} = package
 
 let unused_options =
   List.iter ~f:(Option.iter ~f:(fun name ->
@@ -363,18 +368,21 @@ let create
     Signal.send Info.got_spec spec;
     let init = match state with
       | Some state -> State.{state with package}
-      | None -> State.empty ?package arch in
-    let state =
+      | None -> State.create ?package ~arch () in
+    let compute_state =
       let open KB.Syntax in
       set_package package >>= fun () ->
       Memmap.to_sequence code |> KB.Seq.fold ~init ~f:(fun k (mem,_) ->
           State.update k mem) in
-    let cfg,symbols,core = State.Toplevel.run spec arch ~code ~data file state in
+    let run k = State.Toplevel.run spec arch ~code ~data file k in
+    let state = run compute_state in
+    let cfg = lazy (run @@ State.cfg state) in
+    let symbols = lazy (run @@ State.symbols state) in
     Result.return @@ finish {
-      core;
+      state;
       spec;
-      disasm = Disasm.create cfg;
-      program = Program.lift symbols;
+      disasm = Lazy.(cfg >>| Disasm.create);
+      program = Lazy.(symbols >>| Program.lift) ;
       symbols;
       arch; memory=union_memory code data;
       storage = Dict.set Dict.empty filename file;
@@ -391,15 +399,20 @@ let create
 
 let specification = spec
 
+let symbols {symbols} = Lazy.force symbols
+let disasm {disasm} = Lazy.force disasm
+let program {program} = Lazy.force program
+
+let with_symbols p x = {p with symbols = lazy x}
+let with_program p x = {p with program = lazy x}
+let map_program p ~f = {p with program = Lazy.map p.program ~f}
+
+let with_memory = Field.fset Fields.memory
+let with_storage = Field.fset Fields.storage
+
 let restore_state _ =
   failwith "Project.restore_state: this function should no be used.
     Please use the Toplevel module to save/restore the state."
-
-let with_memory = Field.fset Fields.memory
-let with_symbols = Field.fset Fields.symbols
-let with_program = Field.fset Fields.program
-
-let with_storage = Field.fset Fields.storage
 
 let set t tag x =
   with_storage t @@
@@ -444,12 +457,12 @@ let substitute project mem tag value : t =
         | None -> None) in
   let find_section = find_tag Image.section in
   let find_symbol mem =
-    Symtab.owners project.symbols (Memory.min_addr mem) |>
+    Symtab.owners (symbols project) (Memory.min_addr mem) |>
     List.hd |>
     Option.map ~f:(fun (name,entry,_) ->
         Block.memory entry, name) in
   let find_block mem =
-    Symtab.dominators project.symbols mem |>
+    Symtab.dominators (symbols project) mem |>
     List.find_map ~f:(fun (_,_,cfg) ->
         Seq.find_map (Cfg.nodes cfg) ~f:(fun block ->
             if Addr.(Block.addr block = Memory.min_addr mem)

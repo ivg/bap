@@ -47,6 +47,13 @@ val get : t -> 'a tag -> 'a option
 val has : t -> 'a tag -> bool
 val del : t -> 'a tag -> t
 
+val map_program : t -> f:(program term -> program term) -> t
+
+module State : sig
+  type t = state
+  val disassembly : t -> Bap_disasm_driver.state
+  val subroutines : t -> Bap_disasm_calls.t
+end
 
 module Info : sig
   val file : string stream
@@ -113,6 +120,20 @@ module Collator : sig
 
   val registered : unit -> info list
 end
+
+(* module Analysis : sig
+ *   type info
+ *
+ *   val apply : t -> project seq -> unit
+ *   val find : ?package:string -> string -> t option
+ *   val name : info -> Knowledge.Name.t
+ *   val desc : info -> string
+ *
+ *   val register : ?desc:string -> ?package:string -> string ->
+ *     unit knowledge -> unit
+ *
+ *   val registered : unit -> info list
+ * end *)
 
 val find_pass : string -> pass option
 
