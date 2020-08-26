@@ -142,10 +142,13 @@ module State = struct
     subroutines = Sub.empty;
   }
 
-  let update self mem =
-    Dis.scan mem self.disassembly >>= fun disassembly ->
-    Sub.update self.subroutines disassembly >>| fun subroutines ->
-    {self with disassembly; subroutines}
+  let disassemble self mem =
+    Dis.scan mem self.disassembly >>| fun disassembly ->
+    {self with disassembly}
+
+  let partition self =
+    Sub.update self.subroutines self.disassembly >>| fun subroutines ->
+    {self with subroutines}
 
   let symbols {disassembly; subroutines} =
     Symtab.create disassembly subroutines
@@ -366,16 +369,18 @@ let create
     Signal.send Info.got_data data;
     Signal.send Info.got_code code;
     Signal.send Info.got_spec spec;
-    let init = match state with
-      | Some state -> State.{state with package}
-      | None -> State.create ?package ~arch () in
-    let compute_state =
-      let open KB.Syntax in
-      set_package package >>= fun () ->
-      Memmap.to_sequence code |> KB.Seq.fold ~init ~f:(fun k (mem,_) ->
-          State.update k mem) in
     let run k = State.Toplevel.run spec arch ~code ~data file k in
-    let state = run compute_state in
+    let state = match state with
+      | Some state -> State.{state with package}
+      | None ->
+        let init = State.create ?package ~arch () in
+        let compute_state =
+          let open KB.Syntax in
+          set_package package >>= fun () ->
+          Memmap.to_sequence code |>
+          KB.Seq.fold ~init ~f:(fun k (mem,_) -> State.disassemble k mem) >>=
+          State.partition in
+        run compute_state in
     let cfg = lazy (run @@ State.cfg state) in
     let symbols = lazy (run @@ State.symbols state) in
     Result.return @@ finish {
