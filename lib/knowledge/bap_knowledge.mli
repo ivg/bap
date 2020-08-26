@@ -137,8 +137,12 @@ module Knowledge : sig
   (** an instance of the persistance type class  *)
   type 'a persistent
 
-  (** the knowledge base state  *)
-  type state
+  (** the knowledge base state
+
+
+      @since 2.2.0 implements the bin_io interface.
+  *)
+  type state [@@deriving bin_io]
 
   (** a set of possible conflicts  *)
   type conflict = ..

@@ -2063,7 +2063,7 @@ module Knowledge = struct
     } [@@deriving bin_io]
   end
 
-  type state = Env.t
+  type state = Env.t [@@deriving bin_io]
 
   let of_bigstring =
     Binable.of_bigstring (module Env)
