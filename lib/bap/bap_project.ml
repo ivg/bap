@@ -129,18 +129,19 @@ module State = struct
   module Rec = Disasm_expert.Recursive
 
   type t = {
-    arch : arch;
-    package : string option;
     disassembly : Dis.state;
     subroutines : Sub.t;
   } [@@deriving bin_io]
 
-  let create ?package ?(arch=`unknown) () = {
-    arch;
-    package;
+  let empty = {
     disassembly = Dis.init;
     subroutines = Sub.empty;
   }
+
+  let equal x y =
+    Dis.equal x.disassembly y.disassembly &&
+    Sub.equal x.subroutines y.subroutines
+
 
   let disassemble self mem =
     Dis.scan mem self.disassembly >>| fun disassembly ->
@@ -159,9 +160,16 @@ module State = struct
   let disassembly {disassembly=d} = d
   let subroutines {subroutines=s} = s
 
+  let slot = KB.Class.property Theory.Unit.cls
+      ~package:"bap" "disassembly"
+      ~persistent:(KB.Persistent.of_binable(module struct
+                     type nonrec t = t [@@deriving bin_io]
+                   end)) @@
+    KB.Domain.flat ~empty ~equal "disassembly"
+
   module Toplevel = struct
     let run spec arch ~code ~data file k =
-      let result = Toplevel.var "result" in
+      let result = Toplevel.var "disassembly-result" in
       Toplevel.put result begin
         with_arch arch code @@ fun () ->
         with_filename spec arch code data file @@ fun () ->
@@ -336,7 +344,6 @@ let set_package package = match package with
   | Some pkg -> KB.Symbol.set_package pkg
 
 let state {state} = state
-let package {state={State.package}} = package
 
 let unused_options =
   List.iter ~f:(Option.iter ~f:(fun name ->
@@ -369,17 +376,25 @@ let create
     Signal.send Info.got_data data;
     Signal.send Info.got_code code;
     Signal.send Info.got_spec spec;
-    let run k = State.Toplevel.run spec arch ~code ~data file k in
+    let run k =
+      State.Toplevel.run spec arch ~code ~data file k in
     let state = match state with
-      | Some state -> State.{state with package}
+      | Some state -> state
       | None ->
-        let init = State.create ?package ~arch () in
         let compute_state =
           let open KB.Syntax in
           set_package package >>= fun () ->
-          Memmap.to_sequence code |>
-          KB.Seq.fold ~init ~f:(fun k (mem,_) -> State.disassemble k mem) >>=
-          State.partition in
+          Theory.Unit.for_file file >>= fun unit ->
+          KB.collect State.slot unit >>= fun state ->
+          if KB.Domain.is_empty (KB.Slot.domain State.slot) state
+          then
+            Memmap.to_sequence code |>
+            KB.Seq.fold ~init:State.empty ~f:(fun k (mem,_) ->
+                State.disassemble k mem) >>=
+            State.partition >>= fun state ->
+            KB.provide State.slot unit state >>| fun () ->
+            state
+          else !!state in
         run compute_state in
     let cfg = lazy (run @@ State.cfg state) in
     let symbols = lazy (run @@ State.symbols state) in
@@ -620,40 +635,23 @@ end
 let passes () = DList.to_list passes
 let find_pass = Pass.find
 
-module Collator = struct
+module Registry(T : T) = struct
   open Bap_knowledge
-
   type info = {
     name : Knowledge.Name.t;
     desc : string option;
   }
 
-  type t = Collator : {
-      prepare : project -> 's;
-      collate : int -> 's -> project -> 's;
-      summary : 's -> unit;
-    } -> t
+  let registry : (Knowledge.name, string option * T.t) Hashtbl.t =
+    Hashtbl.create (module Knowledge.Name)
 
-  let registry = Hashtbl.create (module Knowledge.Name)
-
-  let apply (Collator {prepare; collate; summary}) projects =
-    match Seq.split_n projects 1 with
-    | [base],rest ->
-      summary @@
-      Seq.foldi ~init:(prepare base) rest ~f:collate
-    | _ -> ()
-
-  let register ?desc ?package name ~prepare ~collate ~summary =
+  let register ?desc ?package name entity =
     let name = Knowledge.Name.create ?package name in
     if Hashtbl.mem registry name then
-      invalid_argf "A collator with name %s is already registered \
-                    please choose another unique name"
+      invalid_argf "An element with name %s is already registered \
+                    please choose a unique name"
         (Knowledge.Name.show name) ();
-    Hashtbl.add_exn registry name (desc,Collator {
-        prepare;
-        collate;
-        summary;
-      })
+    Hashtbl.add_exn registry name (desc,entity)
 
   let find ?package name =
     let name = Knowledge.Name.read ?package name in
@@ -669,6 +667,37 @@ module Collator = struct
   let desc = function
     | {desc=None} -> "not provided"
     | {desc=Some txt} -> txt
+end
+
+module Collator = struct
+  type t = Collator : {
+      prepare : project -> 's;
+      collate : int -> 's -> project -> 's;
+      summary : 's -> unit;
+    } -> t
+
+  include Registry(struct type nonrec t = t end)
+
+  let apply (Collator {prepare; collate; summary}) projects =
+    match Seq.split_n projects 1 with
+    | [base],rest ->
+      summary @@
+      Seq.foldi ~init:(prepare base) rest ~f:collate
+    | _ -> ()
+
+  let register ?desc ?package name ~prepare ~collate ~summary =
+    register ?desc ?package name @@ Collator {
+      prepare;
+      collate;
+      summary;
+    }
+end
+
+module Analysis = struct
+  open Bap_knowledge
+  type t = unit knowledge
+  let apply = ident
+  include Registry(struct type t = unit knowledge end)
 end
 
 module type S = sig

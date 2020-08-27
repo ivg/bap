@@ -6914,12 +6914,18 @@ module Std : sig
       (** [init] the initial disassembler state.  *)
       val init : state
 
-
       (** [merge x y] is a sum of information in states [x] and [y].
 
           @since 2.2.0
       *)
       val merge : state -> state -> state
+
+
+      (** [equal x y] is [true] if [x] and [y] denote equal graphs.
+
+          @since 2.2.0
+      *)
+      val equal : state -> state -> bool
 
 
       (** [scan mem state] updates the state.
@@ -9683,6 +9689,8 @@ module Std : sig
         A collator is a pass that is folded over projects and computes
         differences between the base version and the number of
         alternative versions.
+
+        @since 2.2.0
     *)
     module Collator : sig
 
@@ -9732,7 +9740,42 @@ module Std : sig
       (** the collators description.  *)
       val desc : info -> string
 
-      (** information about registered collators  *)
+      (** information about currently registered collators  *)
+      val registered : unit -> info list
+    end
+
+
+    (** A knowledge base analysis.
+
+        A registry of the knowledge base computations that could be
+        used for exploring and refining the facts stored in the
+        knowledge base.
+    *)
+    module Analysis : sig
+      type t
+      type info
+
+
+      (** [apply analysis] is the computation performed by the analysis.  *)
+      val apply : t -> unit knowledge
+
+      (** [find ?package string] searches the analysis with the given
+          name in the registry.  *)
+      val find : ?package:string -> string -> t option
+
+      (** [name info] is the analysis unique name. *)
+      val name : info -> Knowledge.Name.t
+
+      (** [desc info] is the short description of the analysis  *)
+      val desc : info -> string
+
+      (** [register ?desc ?package name comp] registers the knowledge
+          computation as an analysis. The [package:name] pair should
+          be unique.  *)
+      val register : ?desc:string -> ?package:string -> string ->
+        unit knowledge -> unit
+
+      (** information about currently registered analyses  *)
       val registered : unit -> info list
     end
 

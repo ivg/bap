@@ -18,7 +18,7 @@ type jump = {
   barrier : bool;
   indirect : bool;
   resolved : Addr.Set.t;
-} [@@deriving bin_io]
+} [@@deriving bin_io, equal]
 
 module Machine : sig
   type task = private
@@ -378,6 +378,11 @@ let init = {
   mems = [];
   debt = [];
 }
+
+let equal x y =
+  phys_equal x y ||
+  Set.equal x.begs y.begs &&
+  Map.equal equal_jump x.jmps y.jmps
 
 let subroutines x = x.funs
 let blocks x = x.begs

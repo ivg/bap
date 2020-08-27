@@ -16,8 +16,6 @@ type state [@@deriving bin_io]
 type second = float
 
 val state : t -> state
-val package : t -> string option
-
 
 val create :
   ?package:string ->
@@ -121,19 +119,19 @@ module Collator : sig
   val registered : unit -> info list
 end
 
-(* module Analysis : sig
- *   type info
- *
- *   val apply : t -> project seq -> unit
- *   val find : ?package:string -> string -> t option
- *   val name : info -> Knowledge.Name.t
- *   val desc : info -> string
- *
- *   val register : ?desc:string -> ?package:string -> string ->
- *     unit knowledge -> unit
- *
- *   val registered : unit -> info list
- * end *)
+module Analysis : sig
+  type t
+  type info
+  val apply : t -> unit knowledge
+  val find : ?package:string -> string -> t option
+  val name : info -> Knowledge.Name.t
+  val desc : info -> string
+
+  val register : ?desc:string -> ?package:string -> string ->
+    unit knowledge -> unit
+
+  val registered : unit -> info list
+end
 
 val find_pass : string -> pass option
 
