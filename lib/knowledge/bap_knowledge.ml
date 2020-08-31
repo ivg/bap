@@ -2889,6 +2889,34 @@ module Knowledge = struct
               Format.fprintf ppf "@,%a)@]@\n"
                 (Sexp.pp_hum_indent 2) (Dict.sexp_of_t data)))
 
+
+  let load path =
+    let fd = Unix.openfile path Unix.[O_RDONLY] 0o400 in
+    try
+      let data =
+        Bigarray.array1_of_genarray @@
+        Unix.map_file fd
+          Bigarray.char Bigarray.c_layout false [| -1 |]in
+      let pos_ref = ref 0 in
+      let r = bin_read_state data ~pos_ref in
+      Unix.close fd;
+      r
+    with exn ->
+      Unix.close fd; raise exn
+
+  let save state path =
+    let fd = Unix.openfile path Unix.[O_WRONLY; O_CREAT; O_TRUNC] 0o660 in
+    try
+      let dim = [|bin_size_state state |]in
+      let buf =
+        Bigarray.array1_of_genarray @@
+        Unix.map_file fd Bigarray.char Bigarray.c_layout true dim in
+      let _p = bin_write_state ~pos:0 buf state in
+      Unix.close fd
+    with exn ->
+      Unix.close fd;
+      raise exn
+
   let objects cls = objects cls >>| fun {vals} ->
     Map.to_sequence vals |>
     Sequence.map ~f:fst

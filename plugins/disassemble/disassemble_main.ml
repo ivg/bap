@@ -338,8 +338,7 @@ let load_knowledge digest = function
     import_knowledge_from_cache digest
   | Some path ->
     info "importing knowledge from %S" path;
-    Toplevel.set @@
-    In_channel.with_file path ~f:(Data.Read.of_channel knowledge_reader);
+    Toplevel.set @@ Knowledge.load path;
     true
 
 let save_knowledge ~had_knowledge ~update digest = function
@@ -347,11 +346,8 @@ let save_knowledge ~had_knowledge ~update digest = function
     if not had_knowledge then store_knowledge_in_cache digest
   | Some path when update ->
     info "storing knowledge base to %S" path;
-    Out_channel.with_file path ~f:(fun chan ->
-        Data.Write.to_channel
-          knowledge_writer chan @@ Toplevel.current ())
+    Knowledge.save (Toplevel.current ()) path
   | Some _ -> ()
-
 
 let apply_analyses names =
   List.concat names |> List.map ~f:(fun name ->
