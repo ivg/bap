@@ -239,7 +239,7 @@ let knowledge =
           will be also updated with the new information. If \
           $(b,--update) is set, the the knowledge base might not \
           exist and it will be created"
-    ~aliases:["k"; "knowledge-base"; "import"]
+    ~aliases:["k"; "knowledge-base";]
     (Extension.Type.some rw_file) "project"
 
 let input = Extension.Command.argument
@@ -257,7 +257,7 @@ let validate_input file =
     ~error:(Fail (Expects_a_regular_file file))
 
 let validate_knowledge update kb = match kb with
-  | None -> Result.ok_if_true update
+  | None -> Result.ok_if_true (not update)
               ~error:(Fail No_knowledge)
   | Some path ->
     Result.ok_if_true (Sys.file_exists path || update)
@@ -533,7 +533,8 @@ let string_of_failure = function
   | Unknown_analysis s ->
     sprintf "There is no analysis with the name `%s'" s
   | No_knowledge ->
-    sprintf "Expected the path to an existing knowledge base"
+    sprintf "Expected the path to an existing knowledge base \
+             (either add or remove the --update option)"
 
 let () = Extension.Error.register_printer @@ function
   | Fail err -> Some (string_of_failure err)
