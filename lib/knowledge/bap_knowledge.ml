@@ -2039,7 +2039,7 @@ module Knowledge = struct
 
     type objects = {
       vals : Record.t Oid.Map.t;
-      comp : work Dict.Key.Uid.Map.t Oid.Map.t;
+      comp : work String.Map.t Oid.Map.t;
       syms : fullname Oid.Map.t;
       heap : cell Oid.Map.t;
       data : Oid.t Cell.Map.t;
@@ -2508,7 +2508,7 @@ module Knowledge = struct
     else provide s obj x
 
 
-  let uid {Slot.key} = Dict.Key.uid key
+  let uid {Slot.key} = Dict.Key.name key
 
   let status
     : ('a,_) slot -> 'a obj -> slot_status knowledge =
@@ -2527,7 +2527,7 @@ module Knowledge = struct
     objects slot.cls >>= fun ({comp} as objs) ->
     let comp = Map.update comp obj ~f:(fun slots ->
         let slots = match slots with
-          | None -> Map.empty (module Dict.Key.Uid)
+          | None -> Map.empty (module String)
           | Some slots -> slots in
         Map.update slots (uid slot) ~f) in
     get () >>= fun s ->
@@ -2889,33 +2889,206 @@ module Knowledge = struct
               Format.fprintf ppf "@,%a)@]@\n"
                 (Sexp.pp_hum_indent 2) (Dict.sexp_of_t data)))
 
+  module Io = struct
+    type version = V1 [@@deriving bin_io]
 
-  let load path =
-    let fd = Unix.openfile path Unix.[O_RDONLY] 0o400 in
-    try
-      let data =
-        Bigarray.array1_of_genarray @@
-        Unix.map_file fd
-          Bigarray.char Bigarray.c_layout false [| -1 |]in
-      let pos_ref = ref 0 in
-      let r = bin_read_state data ~pos_ref in
-      Unix.close fd;
-      r
-    with exn ->
-      Unix.close fd; raise exn
+    type sym = {
+      pack : int;
+      name : int;
+    } [@@deriving bin_io]
 
-  let save state path =
-    let fd = Unix.openfile path Unix.[O_WRONLY; O_CREAT; O_TRUNC] 0o660 in
-    try
-      let dim = [|bin_size_state state |]in
-      let buf =
-        Bigarray.array1_of_genarray @@
-        Unix.map_file fd Bigarray.char Bigarray.c_layout true dim in
-      let _p = bin_write_state ~pos:0 buf state in
-      Unix.close fd
-    with exn ->
-      Unix.close fd;
-      raise exn
+    type data = {
+      key : Oid.t;
+      sym : sym option;
+      data : (int * string) Sequence.t;
+      comp : int Sequence.t;
+    } [@@deriving bin_io]
+
+    type objects = data Sequence.t [@@deriving bin_io]
+    type strings = string Sequence.t [@@deriving bin_io]
+    type payload = (Cid.t * objects) Sequence.t [@@deriving bin_io]
+
+    type canonical = {
+      version : version;
+      strings : strings;
+      payload : payload;
+    } [@@deriving bin_io]
+
+    let magic = "CMU:KB"
+
+    let check_magic data =
+      let len = String.length magic in
+      if Bigstring.To_string.subo ~len data <> magic
+      then invalid_arg "Not a valid knowledge base";
+      len
+
+    let make_value str data =
+      let init = Record.empty in
+      Sequence.fold data ~init ~f:(fun record (name,data) ->
+          match Hashtbl.find Record.io (str name) with
+          | None -> record
+          | Some {Record.reader=read} ->
+            read data record)
+
+    let expand_comp str comp =
+      Sequence.fold comp
+        ~init:(Map.empty (module String))
+        ~f:(fun works slot ->
+            Map.add_exn works (str slot) Env.Done)
+
+    let add_object str
+        ({Env.vals; syms; objs} as self)
+        {key; sym; data; comp} =
+      let value = make_value str data in
+      let self = {self with vals = Map.add_exn vals key value} in
+      match sym with
+      | None -> self
+      | Some {pack; name} ->
+        let package = str pack and name = str name in {
+          self with
+          comp = Map.set self.comp key (expand_comp str comp);
+          syms = Map.add_exn syms key {package; name};
+          objs = Map.update objs package ~f:(function
+              | None -> Map.singleton (module String) name key
+              | Some objs -> Map.add_exn objs name key)
+        }
+
+    let names_in_vals = Map.fold
+        ~init:(Set.empty (module String))
+        ~f:(fun ~key:_ ~data init ->
+            Dict.foreach data ~init {
+              visit = fun k _ names ->
+                Set.add names (Record.Key.name k)
+            })
+
+    let names_in_syms = Map.fold
+        ~init:(Set.empty (module String))
+        ~f:(fun ~key:_ ~data:{package;name} names ->
+            Set.add (Set.add names package) name)
+
+    let names_in_comp = Map.fold
+        ~init:(Set.empty (module String))
+        ~f:(fun ~key:_ ~data:works names ->
+            Map.fold works ~init:names ~f:(fun ~key ~data:_ names ->
+                Set.add names key))
+
+    let names = Map.fold
+        ~init:(Set.empty (module String))
+        ~f:(fun ~key:_ ~data:{Env.vals; syms; comp} names ->
+            Set.union_list (module String) [
+              names;
+              names_in_syms syms;
+              names_in_vals vals;
+              names_in_comp comp;
+            ])
+
+    let to_index ss = fst @@ Set.fold ss
+        ~init:(Map.empty (module String), 0)
+        ~f:(fun (index,off) name ->
+            Map.add_exn index name off,off+1)
+
+    let serialize_record index record =
+      let fields = Dict.foreach record ~init:[] {
+          visit = fun k _ xs ->
+            let name = Record.Key.name k in
+            match Hashtbl.find Record.io name with
+            | None -> xs
+            | Some {writer} -> match writer record with
+              | None -> xs
+              | Some data -> (index name,data) :: xs
+        } in
+      let result = Array.of_list fields in
+      Array.sort result ~compare:(fun (k1,_) (k2,_) ->
+          compare_int k1 k2);
+      Array.to_sequence_mutable result
+
+    let find_symbol index syms oid =
+      match Map.find syms oid with
+      | None -> None
+      | Some {package; name} -> Some {
+          pack = index package;
+          name = index name;
+        }
+
+    let collect_comps index comp oid =
+      match Map.find comp oid with
+      | None -> Sequence.empty
+      | Some works ->
+        Map.to_sequence works |>
+        Sequence.map ~f:(fun (name,_) ->
+            index name)
+
+    let to_canonical {Env.classes} =
+      let strings = names classes in
+      let index = Map.find_exn (to_index strings) in
+      let payload =
+        Map.to_sequence classes |>
+        Sequence.map ~f:(fun (cid, {Env.vals; syms; comp}) ->
+            cid,
+            Map.to_sequence vals |>
+            Sequence.filter_map ~f:(fun (oid,value) ->
+                let data = serialize_record index value in
+                let sym = find_symbol index syms oid in
+                let comp = collect_comps index comp oid in
+                if Sequence.is_empty data && Option.is_none sym
+                then None
+                else Some {key=oid; sym; data; comp})) in {
+        version = V1;
+        strings = Set.to_sequence strings;
+        payload;
+      }
+
+    let of_canonical {strings; payload} =
+      let strings =
+        let init = Map.empty (module Int) in
+        Sequence.foldi strings ~init ~f:(fun key strings name ->
+            Map.add_exn strings ~key ~data:name) in
+      let str = Map.find_exn strings in
+      let init = Map.empty (module Cid) in
+      let classes =
+        Sequence.fold payload ~init ~f:(fun state (cid,objs) ->
+            Map.add_exn state ~key:cid
+              ~data:(Sequence.fold objs ~f:(add_object str)
+                       ~init:Env.empty_class)) in
+      {empty with classes}
+
+    let load path =
+      let fd = Unix.openfile path Unix.[O_RDONLY] 0o400 in
+      try
+        let data =
+          Bigarray.array1_of_genarray @@
+          Unix.map_file fd
+            Bigarray.char Bigarray.c_layout false [| -1 |]in
+        let pos_ref = ref (check_magic data) in
+        let V1 = bin_read_version data ~pos_ref in
+        let strings = bin_read_strings data ~pos_ref in
+        let payload = bin_read_payload data ~pos_ref in
+        Unix.close fd;
+        of_canonical {version=V1; strings; payload}
+      with exn ->
+        Unix.close fd; raise exn
+
+    let save state path =
+      let repr = to_canonical state in
+      let size = String.length magic +
+                 bin_size_canonical repr in
+      let fd = Unix.openfile path Unix.[O_RDWR; O_CREAT; O_TRUNC] 0o660 in
+      try
+        let dim = [|size |]in
+        let buf =
+          Bigarray.array1_of_genarray @@
+          Unix.map_file fd Bigarray.char Bigarray.c_layout true dim in
+        Bigstring.From_string.blito ~src:magic ~dst:buf ();
+        let pos = String.length magic in
+        let _p = bin_write_canonical ~pos buf repr in
+        Unix.close fd
+      with exn ->
+        Unix.close fd;
+        raise exn
+  end
+
+  let save = Io.save
+  and load = Io.load
 
   let objects cls = objects cls >>| fun {vals} ->
     Map.to_sequence vals |>
