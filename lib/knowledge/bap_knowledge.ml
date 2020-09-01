@@ -2033,9 +2033,9 @@ module Knowledge = struct
     type workers = {
       waiting : Pid.Set.t;
       current : Pid.Set.t;
-    } [@@deriving bin_io]
+    }
 
-    type work = Done | Work of workers [@@deriving bin_io]
+    type work = Done | Work of workers
 
     type objects = {
       vals : Record.t Oid.Map.t;
@@ -2045,7 +2045,7 @@ module Knowledge = struct
       data : Oid.t Cell.Map.t;
       objs : Oid.t String.Map.t String.Map.t;
       pubs : Oid.Set.t String.Map.t;
-    } [@@deriving bin_io]
+    }
 
     let empty_class = {
       vals = Map.empty (module Oid);
@@ -2060,16 +2060,11 @@ module Knowledge = struct
     type t = {
       classes : objects Cid.Map.t;
       package : string;
-    } [@@deriving bin_io]
+    }
   end
 
-  type state = Env.t [@@deriving bin_io]
+  type state = Env.t
 
-  let of_bigstring =
-    Binable.of_bigstring (module Env)
-
-  let to_bigstring =
-    Binable.to_bigstring (module Env)
 
   let empty : Env.t = {
     package = user_package;
@@ -3052,6 +3047,13 @@ module Knowledge = struct
                        ~init:Env.empty_class)) in
       {empty with classes}
 
+    let of_bigstring data =
+      let pos_ref = ref (check_magic data) in
+      let V1 = bin_read_version data ~pos_ref in
+      let strings = bin_read_strings data ~pos_ref in
+      let payload = bin_read_payload data ~pos_ref in
+      of_canonical {version=V1; strings; payload}
+
     let load path =
       let fd = Unix.openfile path Unix.[O_RDONLY] 0o400 in
       try
@@ -3059,14 +3061,25 @@ module Knowledge = struct
           Bigarray.array1_of_genarray @@
           Unix.map_file fd
             Bigarray.char Bigarray.c_layout false [| -1 |]in
-        let pos_ref = ref (check_magic data) in
-        let V1 = bin_read_version data ~pos_ref in
-        let strings = bin_read_strings data ~pos_ref in
-        let payload = bin_read_payload data ~pos_ref in
+        let r = of_bigstring data in
         Unix.close fd;
-        of_canonical {version=V1; strings; payload}
+        r
       with exn ->
         Unix.close fd; raise exn
+
+    let blit_canonical_to_bigstring repr buf =
+      Bigstring.From_string.blito ~src:magic ~dst:buf ();
+      let pos = String.length magic in
+      let _p = bin_write_canonical ~pos buf repr in
+      ()
+
+    let to_bigstring state =
+      let repr = to_canonical state in
+      let size = String.length magic +
+                 bin_size_canonical repr in
+      let data = Bigstring.create size in
+      blit_canonical_to_bigstring repr data;
+      data
 
     let save state path =
       let repr = to_canonical state in
@@ -3078,9 +3091,7 @@ module Knowledge = struct
         let buf =
           Bigarray.array1_of_genarray @@
           Unix.map_file fd Bigarray.char Bigarray.c_layout true dim in
-        Bigstring.From_string.blito ~src:magic ~dst:buf ();
-        let pos = String.length magic in
-        let _p = bin_write_canonical ~pos buf repr in
+        blit_canonical_to_bigstring repr buf;
         Unix.close fd
       with exn ->
         Unix.close fd;
@@ -3089,6 +3100,8 @@ module Knowledge = struct
 
   let save = Io.save
   and load = Io.load
+  and to_bigstring = Io.to_bigstring
+  and of_bigstring = Io.of_bigstring
 
   let objects cls = objects cls >>| fun {vals} ->
     Map.to_sequence vals |>
