@@ -2945,15 +2945,17 @@ module Knowledge = struct
   module Io = struct
     type version = V1 [@@deriving bin_io]
 
+    module List = Base.List
+
     type data = {
       key : Oid.t;
       sym : fullname option;
-      data : (Name.t * string) Sequence.t;
-      comp : Name.t Sequence.t;
+      data : (Name.t * string) array;
+      comp : Name.t list;
     } [@@deriving bin_io]
 
-    type objects = data Sequence.t [@@deriving bin_io]
-    type payload = (Name.t * objects) Sequence.t [@@deriving bin_io]
+    type objects = data list [@@deriving bin_io]
+    type payload = (Name.t * objects) list [@@deriving bin_io]
 
     type canonical = {
       version : version;
@@ -2970,14 +2972,14 @@ module Knowledge = struct
 
     let make_value data =
       let init = Record.empty in
-      Sequence.fold data ~init ~f:(fun record (name,data) ->
+      Array.fold data ~init ~f:(fun record (name,data) ->
           match Hashtbl.find Record.io name with
           | None -> record
           | Some {Record.reader=read} ->
             read data record)
 
     let expand_comp comp =
-      Sequence.fold comp
+      List.fold comp
         ~init:(Map.empty (module Name))
         ~f:(fun works slot ->
             Map.add_exn works slot Env.Done)
@@ -3023,26 +3025,24 @@ module Knowledge = struct
       let result = Array.of_list fields in
       Array.sort result ~compare:(fun (k1,_) (k2,_) ->
           Name.compare k1 k2);
-      Array.to_sequence_mutable result
+      result
 
     let collect_comps comp oid =
       match Map.find comp oid with
-      | None -> Sequence.empty
-      | Some works ->
-        Map.to_sequence works |>
-        Sequence.map ~f:fst
+      | None -> []
+      | Some works -> Map.keys works
+
 
     let to_canonical {Env.classes} =
       let payload =
-        Map.to_sequence classes |>
-        Sequence.map ~f:(fun (cid, {Env.vals; syms; comp}) ->
+        Map.to_alist classes |>
+        List.map ~f:(fun (cid, {Env.vals; syms; comp}) ->
             cid,
-            Map.to_sequence vals |>
-            Sequence.filter_map ~f:(fun (oid,value) ->
+            Map.to_alist vals |> List.filter_map ~f:(fun (oid,value) ->
                 let data = serialize_record value in
                 let sym = Map.find syms oid in
                 let comp = collect_comps comp oid in
-                if Sequence.is_empty data && Option.is_none sym
+                if Array.is_empty data && Option.is_none sym
                 then None
                 else Some {key=oid; sym; data; comp})) in {
         version = V1;
@@ -3052,9 +3052,9 @@ module Knowledge = struct
     let of_canonical {payload} =
       let init = Map.empty (module Name) in
       let classes =
-        Sequence.fold payload ~init ~f:(fun state (cid,objs) ->
+        List.fold payload ~init ~f:(fun state (cid,objs) ->
             Map.add_exn state ~key:cid
-              ~data:(Sequence.fold objs ~f:add_object
+              ~data:(List.fold objs ~f:add_object
                        ~init:Env.empty_class)) in
       {empty with classes}
 
