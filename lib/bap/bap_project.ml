@@ -695,9 +695,184 @@ end
 
 module Analysis = struct
   open Bap_knowledge
-  type t = unit knowledge
-  let apply = ident
-  include Registry(struct type t = unit knowledge end)
+  open Bap_core_theory
+  open Knowledge.Syntax
+
+  type ctxt = {
+    rule : string;
+    pos : int;
+    parsed : string list;
+    inputs : string list;
+  }
+
+  type 'a arg = {
+    parse : ctxt -> ('a * ctxt) knowledge;
+    desc : string;
+    rule : string;
+  }
+
+  type problem =
+    | No_input
+    | Bad_syntax of string
+    | Trailing_input
+
+  type parse_error = {
+    ctxt : ctxt;
+    problem : problem
+  }
+
+  type Knowledge.conflict += Fail of parse_error
+
+
+  let fail ctxt problem =
+    Knowledge.fail (Fail {ctxt; problem})
+
+
+  let required parse ctxt =
+    match ctxt.inputs with
+    | [] -> fail ctxt No_input
+    | x :: xs ->
+      let fail x = fail ctxt (Bad_syntax x) in
+      parse ~fail x >>| fun r -> r,{
+          ctxt with pos = ctxt.pos + 1;
+                    parsed = x :: ctxt.parsed;
+                    inputs = xs;
+        }
+
+  let argument ?(desc="No description") ~parse rule = {
+    parse=(required parse); rule; desc;
+  }
+
+  module Args = struct
+    let optional arg = {
+      rule = arg.rule ^ "?";
+      desc = arg.desc;
+      parse = fun ctxt -> match ctxt.inputs with
+        | [] -> KB.return (None,ctxt)
+        | _ -> arg.parse ctxt >>| fun (x,ctxt) -> Some x,ctxt
+    }
+
+    let pull_keyword kw inputs =
+      let rec loop searched = function
+        | [] -> None
+        | k :: x :: xs when String.equal k kw ->
+          Some (x :: List.rev_append searched xs)
+        | x :: xs -> loop (x::searched) xs in
+      loop [] inputs
+
+    let filter_flag kw inputs =
+      let rec loop searched = function
+        | [] -> None
+        | k :: xs when String.equal k kw ->
+          Some (List.rev_append searched xs)
+        | x :: xs -> loop (x::searched) xs in
+      loop [] inputs
+
+    let keyword key arg = {
+      rule = sprintf ":%s %s" key arg.rule;
+      desc = "an argument prefixed by the keyword";
+      parse = fun ctxt ->
+        match pull_keyword (":"^key) ctxt.inputs with
+        | None -> KB.return (None,ctxt)
+        | Some inputs -> arg.parse {ctxt with inputs} >>|
+          fun (x,ctxt) -> Some x,ctxt
+    }
+
+    let flag key = {
+      rule = sprintf ":%s" key;
+      desc = "an argument prefixed by the keyword";
+      parse = fun ctxt ->
+        match filter_flag (":"^key) ctxt.inputs with
+        | None -> KB.return (false,ctxt)
+        | Some inputs -> KB.return (true, {ctxt with inputs})
+    }
+
+    let apply_until_exhausted ctxt arg =
+      let rec loop rs ctxt = match ctxt.inputs with
+        | [] -> KB.return (List.rev rs,ctxt)
+        | _ -> arg.parse ctxt >>= fun (r,ctxt) ->
+          loop (r::rs) ctxt in
+      loop [] ctxt
+
+    let rest arg = {
+      rule = arg.rule ^ "*";
+      desc = arg.desc;
+      parse = fun ctxt -> apply_until_exhausted ctxt arg
+    }
+
+    let empty = {
+      rule = "empty";
+      desc = "no arguments are expected";
+      parse = fun ctxt -> match ctxt.inputs with
+        | [] -> KB.return ((),ctxt)
+        | _ -> fail ctxt Trailing_input
+    }
+
+
+    let parse_string ~fail:_ x = !!x
+
+    let string = argument "<string>"
+        ~parse:parse_string
+        ~desc:"a sequence of characters without whitespaces"
+
+    let parse_object cls ~fail:_ x = KB.Object.read cls x
+
+    let object_of cls =
+      let name = sprintf "<%s>" @@
+        KB.Name.to_string (KB.Class.name cls) in
+      argument name
+        ~parse:(parse_object cls)
+        ~desc:(sprintf "an object of the %s" name)
+
+    let program = object_of Theory.Program.cls
+    let unit = object_of Theory.Unit.cls
+
+    let parse_bitvec ~fail str =
+      try !!(Bitvec.of_string str)
+      with Invalid_argument msg ->
+        fail msg
+
+    let bitvec = argument "<bitvec>"
+        ~parse:parse_bitvec
+        ~desc:"a bitvector of arbitrary length"
+
+    include Variadic.Make(struct
+        type 'a t = 'a arg
+        let map arg ~f = {
+          arg with
+          parse = fun ctxt ->
+            arg.parse {ctxt with rule = arg.rule} >>| fun (x,ctxt) ->
+            f x,ctxt
+        }
+
+        let apply ({parse=f} as lhs) ({parse=x} as rhs) = {
+          rule = lhs.rule ^ " " ^ rhs.rule;
+          desc = "";
+          parse = fun ctxt ->
+            f {ctxt with rule = lhs.rule} >>= fun (f,ctxt) ->
+            x {ctxt with rule = rhs.rule} >>| fun (x,ctxt) ->
+            f x,ctxt
+        }
+      end)
+  end
+
+  let run inputs args code =
+    let ctxt = {rule = ""; pos=0; parsed=[]; inputs} in
+    (Args.apply args ~f:code).parse ctxt >>= fun (f,_ctxt) ->
+    f
+
+  type t = string list -> unit knowledge
+  include Registry(struct type nonrec t = t end)
+
+  let analyses = Hashtbl.create (module Knowledge.Name)
+  let infos = Hashtbl.create (module Knowledge.Name)
+
+  let register ?desc ?package name args analysis =
+    let code inputs = run inputs args analysis in
+    register ?desc ?package name code
+
+  let apply f xs = f xs
+
 end
 
 module type S = sig

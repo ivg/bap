@@ -204,13 +204,6 @@ let passes =
     ~aliases:["p"]
     Extension.Type.("PASSES" %: list string) "passes"
 
-let analyses =
-  Extension.Command.parameters
-    ~doc:"Apply the selected analyses after all passes"
-    ~aliases:["a"]
-    Extension.Type.("NAME" %: list string) "analyses"
-
-
 let outputs =
   Extension.Command.parameters
     ~doc:"Dumps the program to <FILE> (defaults to stdout) \
@@ -349,18 +342,9 @@ let save_knowledge ~had_knowledge ~update digest = function
     Knowledge.save (Toplevel.current ()) path
   | Some _ -> ()
 
-let apply_analyses names =
-  List.concat names |> List.map ~f:(fun name ->
-      match Project.Analysis.find ~package:"bap" name with
-      | None -> Error (Fail (Unknown_analysis name))
-      | Some found -> Ok found) |>
-  Err.all >>| fun analyses ->
-  Toplevel.exec @@
-  Knowledge.List.sequence @@
-  List.map ~f:Project.Analysis.apply analyses
 
 
-let create_and_process input outputs passes analyses loader update kb ctxt =
+let create_and_process input outputs passes loader update kb ctxt =
   let package = input in
   let digest = make_digest [
       Extension.Configuration.digest ctxt;
@@ -371,26 +355,25 @@ let create_and_process input outputs passes analyses loader update kb ctxt =
   let input = Project.Input.file ~loader ~filename:input in
   Project.create ~package
     input |> proj_error >>= fun proj ->
-  process passes outputs proj >>= fun proj ->
-  apply_analyses analyses >>| fun () ->
+  process passes outputs proj >>| fun proj ->
   save_knowledge ~had_knowledge ~update digest kb;
   proj
 
 let _disassemble_command_registered : unit =
   let args =
     let open Extension.Command in
-    args $input $outputs $old_style_passes $passes $analyses $loader
+    args $input $outputs $old_style_passes $passes $loader
     $update $knowledge in
   Extension.Command.declare ~doc:man "disassemble"
     ~requires:features_used args @@
-  fun input outputs old_style_passes passes analyses loader update kb ctxt ->
+  fun input outputs old_style_passes passes loader update kb ctxt ->
   setup_gc_unless_overriden ();
   validate_knowledge update kb >>= fun () ->
   validate_input input >>= fun () ->
   validate_passes_style old_style_passes (List.concat passes) >>=
   validate_passes >>= fun passes ->
   Dump_formats.parse outputs >>= fun outputs ->
-  create_and_process input outputs passes analyses loader update kb ctxt >>= fun _ ->
+  create_and_process input outputs passes loader update kb ctxt >>= fun _ ->
   Ok ()
 
 let _compare_command_registered : unit =
@@ -428,12 +411,11 @@ let _compare_command_registered : unit =
     $outputs
     $old_style_passes
     $passes
-    $analyses
     $loader
     $update
     $knowledge in
   Extension.Command.declare "compare" ~doc ~requires:features_used args @@
-  fun collator input inputs outputs old_style_passes passes analyses
+  fun collator input inputs outputs old_style_passes passes
     loader update kb ctxt ->
   match Project.Collator.find ~package:"bap" collator with
   | None -> Error (Fail (Unknown_collator collator))
@@ -445,7 +427,7 @@ let _compare_command_registered : unit =
     Dump_formats.parse outputs >>= fun outputs ->
     let projs =
       Seq.map (Seq.of_list (input::inputs)) ~f:(fun input ->
-          create_and_process input outputs passes analyses loader
+          create_and_process input outputs passes loader
             update kb ctxt) in
     let exception Escape of Extension.Error.t in
     try

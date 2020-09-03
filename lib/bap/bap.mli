@@ -9754,10 +9754,25 @@ module Std : sig
     module Analysis : sig
       type t
       type info
+      type 'a arg
 
+      module Args : sig
+        type ('a,'r) t
+
+        val empty : unit arg
+        val string : string arg
+        val bitvec : Bitvec.t arg
+        val program : Theory.Label.t arg
+        val unit : Theory.Unit.t arg
+
+        val optional : 'a arg -> 'a option arg
+        val keyword : string -> 'a arg -> 'a option arg
+        val flag : string -> bool arg
+        val rest : 'a arg -> 'a list arg
+      end
 
       (** [apply analysis] is the computation performed by the analysis.  *)
-      val apply : t -> unit knowledge
+      val apply : t -> string list -> unit knowledge
 
       (** [find ?package string] searches the analysis with the given
           name in the registry.  *)
@@ -9773,10 +9788,16 @@ module Std : sig
           computation as an analysis. The [package:name] pair should
           be unique.  *)
       val register : ?desc:string -> ?package:string -> string ->
-        unit knowledge -> unit
+        ('a,unit knowledge) Args.t -> 'a -> unit
 
       (** information about currently registered analyses  *)
       val registered : unit -> info list
+
+      val argument :
+        ?desc:string ->
+        parse:(fail:(string -> _ knowledge) -> string -> 'a knowledge) ->
+        string -> 'a arg
+
     end
 
     (**/**)

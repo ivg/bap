@@ -1,5 +1,5 @@
 open Bap_knowledge
-
+open Bap_core_theory
 open Core_kernel
 open Regular.Std
 open Bap_future.Std
@@ -122,15 +122,39 @@ end
 module Analysis : sig
   type t
   type info
-  val apply : t -> unit knowledge
+  type 'a arg
+
+
+  module Args : sig
+    type ('a,'r) t
+
+    val empty : unit arg
+    val string : string arg
+    val bitvec : Bitvec.t arg
+    val program : Theory.Label.t arg
+    val unit : Theory.Unit.t arg
+
+    val optional : 'a arg -> 'a option arg
+    val keyword : string -> 'a arg -> 'a option arg
+    val flag : string -> bool arg
+    val rest : 'a arg -> 'a list arg
+
+  end
+  val register : ?desc:string -> ?package:string -> string ->
+    ('a,unit knowledge) Args.t -> 'a -> unit
+
+  val registered : unit -> info list
+
+  val apply : t -> string list -> unit knowledge
   val find : ?package:string -> string -> t option
   val name : info -> Knowledge.Name.t
   val desc : info -> string
 
-  val register : ?desc:string -> ?package:string -> string ->
-    unit knowledge -> unit
+  val argument :
+    ?desc:string ->
+    parse:(fail:(string -> _ knowledge) -> string -> 'a knowledge) ->
+    string -> 'a arg
 
-  val registered : unit -> info list
 end
 
 val find_pass : string -> pass option
