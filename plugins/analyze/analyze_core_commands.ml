@@ -22,7 +22,6 @@ let list_objects cls () =
       Format.printf "%s@\n" str)
 
 
-
 let register () =
   let open Project.Analysis in
   register ~package "print-semantics"

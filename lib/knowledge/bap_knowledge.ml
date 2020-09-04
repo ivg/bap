@@ -2046,16 +2046,41 @@ module Record = struct
   let t_of_sexp = opaque_of_sexp
   let inspect = sexp_of_t
 
-  let pp ppf x = Sexp.pp_hum ppf (inspect x)
+  let pp_text ppf s =
+    Format.fprintf ppf "@[<1>\"%a\"@]" Format.pp_print_text s
+
+  let is_text = String.exists ~f:Char.is_whitespace
+
+  let rec pp_hum ppf = function
+    | Sexp.Atom s -> if is_text s
+      then pp_text ppf s
+      else Format.pp_print_string ppf s
+    | Sexp.List xs ->
+      Format.fprintf ppf "(@[<hv1>";
+      Format.pp_print_list pp_hum ppf xs
+        ~pp_sep:Format.pp_print_space;
+      Format.fprintf ppf "@])"
+
+  let pp_payload ppf = function
+    | [Sexp.Atom str] ->
+      Format.fprintf ppf "@[<1>\"%a\"@]" Format.pp_print_text str
+    | other ->
+      Format.fprintf ppf "%a" pp_hum (Sexp.List other)
+
+
+  let pp ppf x = pp_hum ppf (inspect x)
   let pp_slots slots ppf x =
     let slots = Set.of_list (module String) slots in
+    let no_name = Set.nth slots 1 = None in
     match (inspect x : Sexp.t) with
     | Atom _ -> assert false
     | List xs ->
       List.iter xs ~f:(function
-          | Sexp.List (Atom slot :: _ ) as data
+          | Sexp.List (Atom slot :: payload ) as data
             when Set.mem slots slot ->
-            Format.fprintf ppf "%a@\n" Sexp.pp_hum data
+            if no_name
+            then Format.fprintf ppf "%a@\n" pp_payload payload
+            else Format.fprintf ppf "%a@\n" pp_hum data
           | _ -> ())
 end
 
@@ -2941,7 +2966,7 @@ module Knowledge = struct
                   Format.fprintf ppf "@[<2>(%a@ "
                     (pp_fullname ~package) name in
               Format.fprintf ppf "@,%a)@]@\n"
-                (Sexp.pp_hum_indent 2) (Dict.sexp_of_t data)))
+                Record.pp_hum (Dict.sexp_of_t data)))
 
   module Io = struct
     type version = V1 [@@deriving bin_io]

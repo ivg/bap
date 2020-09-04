@@ -160,12 +160,28 @@ module State = struct
   let disassembly {disassembly=d} = d
   let subroutines {subroutines=s} = s
 
+  let set_length set =
+    Sexp.Atom (string_of_int @@ Set.length set)
+
+  let inspect {disassembly; subroutines} = Sexp.List [
+      List [
+        Atom ":number-of-basic-blocks";
+        set_length (Dis.blocks disassembly);
+      ];
+      List [
+        Atom ":number-of-subroutines";
+        set_length (Sub.entries subroutines);
+      ]
+    ]
+
+
+
   let slot = KB.Class.property Theory.Unit.cls
       ~package:"bap" "disassembly"
       ~persistent:(KB.Persistent.of_binable(module struct
                      type nonrec t = t [@@deriving bin_io]
                    end)) @@
-    KB.Domain.flat ~empty ~equal "disassembly"
+    KB.Domain.flat ~empty ~equal "disassembly" ~inspect
 
   module Toplevel = struct
     let run spec arch ~code ~data file k =
