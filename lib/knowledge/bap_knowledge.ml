@@ -2053,8 +2053,9 @@ module Record = struct
     | Atom _ -> assert false
     | List xs ->
       List.iter xs ~f:(function
-          | Sexp.List (Atom slot :: _ ) as data when Set.mem slots slot ->
-            Sexp.pp_hum ppf data
+          | Sexp.List (Atom slot :: _ ) as data
+            when Set.mem slots slot ->
+            Format.fprintf ppf "%a@\n" Sexp.pp_hum data
           | _ -> ())
 end
 
@@ -2434,7 +2435,7 @@ module Knowledge = struct
       | Some {Env.syms} -> match Map.find syms obj with
         | Some fname -> if String.equal fname.package package
           then fname.name
-          else Name.to_string cname
+          else Name.Full.to_string fname
         | None -> uninterned_repr cls obj
 
     let repr cls obj =
