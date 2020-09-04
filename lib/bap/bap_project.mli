@@ -123,25 +123,24 @@ module Analysis : sig
   type t
   type info
   type 'a arg
+  type ('a,'r) args
 
+  val args : 'a arg -> ('a -> 'b, 'b) args
+  val ($) : ('a, 'b -> 'c) args -> 'b arg -> ('a,'c) args
 
-  module Args : sig
-    type ('a,'r) t
+  val empty : unit arg
+  val string : string arg
+  val bitvec : Bitvec.t arg
+  val program : Theory.Label.t arg
+  val unit : Theory.Unit.t arg
 
-    val empty : unit arg
-    val string : string arg
-    val bitvec : Bitvec.t arg
-    val program : Theory.Label.t arg
-    val unit : Theory.Unit.t arg
+  val optional : 'a arg -> 'a option arg
+  val keyword : string -> 'a arg -> 'a option arg
+  val flag : string -> bool arg
+  val rest : 'a arg -> 'a list arg
 
-    val optional : 'a arg -> 'a option arg
-    val keyword : string -> 'a arg -> 'a option arg
-    val flag : string -> bool arg
-    val rest : 'a arg -> 'a list arg
-
-  end
   val register : ?desc:string -> ?package:string -> string ->
-    ('a,unit knowledge) Args.t -> 'a -> unit
+    ('a,unit knowledge) args -> 'a -> unit
 
   val registered : unit -> info list
 

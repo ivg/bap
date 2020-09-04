@@ -727,6 +727,18 @@ module Analysis = struct
   let fail ctxt problem =
     Knowledge.fail (Fail {ctxt; problem})
 
+  let string_of_problem = function
+    | No_input -> "expects an argument"
+    | Bad_syntax msg -> msg
+    | Trailing_input -> "too many arguments"
+
+  let string_of_parse_error {ctxt; problem} =
+    sprintf "Syntax error: when parsing rule %s of argument %d - %s"
+      ctxt.rule (ctxt.pos+1) (string_of_problem problem)
+
+  let () = Knowledge.Conflict.register_printer @@ function
+    | Fail err -> Some (string_of_parse_error err)
+    | _ -> None
 
   let required parse ctxt =
     match ctxt.inputs with
@@ -743,118 +755,120 @@ module Analysis = struct
     parse=(required parse); rule; desc;
   }
 
-  module Args = struct
-    let optional arg = {
-      rule = arg.rule ^ "?";
-      desc = arg.desc;
-      parse = fun ctxt -> match ctxt.inputs with
-        | [] -> KB.return (None,ctxt)
-        | _ -> arg.parse ctxt >>| fun (x,ctxt) -> Some x,ctxt
-    }
+  let optional arg = {
+    rule = arg.rule ^ "?";
+    desc = arg.desc;
+    parse = fun ctxt -> match ctxt.inputs with
+      | [] -> KB.return (None,ctxt)
+      | _ -> arg.parse ctxt >>| fun (x,ctxt) -> Some x,ctxt
+  }
 
-    let pull_keyword kw inputs =
-      let rec loop searched = function
-        | [] -> None
-        | k :: x :: xs when String.equal k kw ->
-          Some (x :: List.rev_append searched xs)
-        | x :: xs -> loop (x::searched) xs in
-      loop [] inputs
+  let pull_keyword kw inputs =
+    let rec loop searched = function
+      | [] -> None
+      | k :: x :: xs when String.equal k kw ->
+        Some (x :: List.rev_append searched xs)
+      | x :: xs -> loop (x::searched) xs in
+    loop [] inputs
 
-    let filter_flag kw inputs =
-      let rec loop searched = function
-        | [] -> None
-        | k :: xs when String.equal k kw ->
-          Some (List.rev_append searched xs)
-        | x :: xs -> loop (x::searched) xs in
-      loop [] inputs
+  let filter_flag kw inputs =
+    let rec loop searched = function
+      | [] -> None
+      | k :: xs when String.equal k kw ->
+        Some (List.rev_append searched xs)
+      | x :: xs -> loop (x::searched) xs in
+    loop [] inputs
 
-    let keyword key arg = {
-      rule = sprintf ":%s %s" key arg.rule;
-      desc = "an argument prefixed by the keyword";
-      parse = fun ctxt ->
-        match pull_keyword (":"^key) ctxt.inputs with
-        | None -> KB.return (None,ctxt)
-        | Some inputs -> arg.parse {ctxt with inputs} >>|
-          fun (x,ctxt) -> Some x,ctxt
-    }
+  let keyword key arg = {
+    rule = sprintf ":%s %s" key arg.rule;
+    desc = "an argument prefixed by the keyword";
+    parse = fun ctxt ->
+      match pull_keyword (":"^key) ctxt.inputs with
+      | None -> KB.return (None,ctxt)
+      | Some inputs -> arg.parse {ctxt with inputs} >>|
+        fun (x,ctxt) -> Some x,ctxt
+  }
 
-    let flag key = {
-      rule = sprintf ":%s" key;
-      desc = "an argument prefixed by the keyword";
-      parse = fun ctxt ->
-        match filter_flag (":"^key) ctxt.inputs with
-        | None -> KB.return (false,ctxt)
-        | Some inputs -> KB.return (true, {ctxt with inputs})
-    }
+  let flag key = {
+    rule = sprintf ":%s" key;
+    desc = "an argument prefixed by the keyword";
+    parse = fun ctxt ->
+      match filter_flag (":"^key) ctxt.inputs with
+      | None -> KB.return (false,ctxt)
+      | Some inputs -> KB.return (true, {ctxt with inputs})
+  }
 
-    let apply_until_exhausted ctxt arg =
-      let rec loop rs ctxt = match ctxt.inputs with
-        | [] -> KB.return (List.rev rs,ctxt)
-        | _ -> arg.parse ctxt >>= fun (r,ctxt) ->
-          loop (r::rs) ctxt in
-      loop [] ctxt
+  let apply_until_exhausted ctxt arg =
+    let rec loop rs ctxt = match ctxt.inputs with
+      | [] -> KB.return (List.rev rs,ctxt)
+      | _ -> arg.parse ctxt >>= fun (r,ctxt) ->
+        loop (r::rs) ctxt in
+    loop [] ctxt
 
-    let rest arg = {
-      rule = arg.rule ^ "*";
-      desc = arg.desc;
-      parse = fun ctxt -> apply_until_exhausted ctxt arg
-    }
+  let rest arg = {
+    rule = arg.rule ^ "*";
+    desc = arg.desc;
+    parse = fun ctxt -> apply_until_exhausted ctxt arg
+  }
 
-    let empty = {
-      rule = "empty";
-      desc = "no arguments are expected";
-      parse = fun ctxt -> match ctxt.inputs with
-        | [] -> KB.return ((),ctxt)
-        | _ -> fail ctxt Trailing_input
-    }
+  let empty = {
+    rule = "empty";
+    desc = "no arguments are expected";
+    parse = fun ctxt -> match ctxt.inputs with
+      | [] -> KB.return ((),ctxt)
+      | _ -> fail ctxt Trailing_input
+  }
 
 
-    let parse_string ~fail:_ x = !!x
+  let parse_string ~fail:_ x = !!x
 
-    let string = argument "<string>"
-        ~parse:parse_string
-        ~desc:"a sequence of characters without whitespaces"
+  let string = argument "<string>"
+      ~parse:parse_string
+      ~desc:"a sequence of characters without whitespaces"
 
-    let parse_object cls ~fail:_ x = KB.Object.read cls x
+  let parse_object cls ~fail:_ x = KB.Object.read cls x
 
-    let object_of cls =
-      let name = sprintf "<%s>" @@
-        KB.Name.to_string (KB.Class.name cls) in
-      argument name
-        ~parse:(parse_object cls)
-        ~desc:(sprintf "an object of the %s" name)
+  let object_of cls =
+    let name = sprintf "<%s>" @@
+      KB.Name.to_string (KB.Class.name cls) in
+    argument name
+      ~parse:(parse_object cls)
+      ~desc:(sprintf "an object of the %s" name)
 
-    let program = object_of Theory.Program.cls
-    let unit = object_of Theory.Unit.cls
+  let program = object_of Theory.Program.cls
+  let unit = object_of Theory.Unit.cls
 
-    let parse_bitvec ~fail str =
-      try !!(Bitvec.of_string str)
-      with Invalid_argument msg ->
-        fail msg
+  let parse_bitvec ~fail str =
+    try !!(Bitvec.of_string str)
+    with Invalid_argument msg ->
+      fail msg
 
-    let bitvec = argument "<bitvec>"
-        ~parse:parse_bitvec
-        ~desc:"a bitvector of arbitrary length"
+  let bitvec = argument "<bitvec>"
+      ~parse:parse_bitvec
+      ~desc:"a bitvector of arbitrary length"
 
-    include Variadic.Make(struct
-        type 'a t = 'a arg
-        let map arg ~f = {
-          arg with
-          parse = fun ctxt ->
-            arg.parse {ctxt with rule = arg.rule} >>| fun (x,ctxt) ->
-            f x,ctxt
-        }
+  module Args = Variadic.Make(struct
+      type 'a t = 'a arg
+      let map arg ~f = {
+        arg with
+        parse = fun ctxt ->
+          arg.parse {ctxt with rule = arg.rule} >>| fun (x,ctxt) ->
+          f x,ctxt
+      }
 
-        let apply ({parse=f} as lhs) ({parse=x} as rhs) = {
-          rule = lhs.rule ^ " " ^ rhs.rule;
-          desc = "";
-          parse = fun ctxt ->
-            f {ctxt with rule = lhs.rule} >>= fun (f,ctxt) ->
-            x {ctxt with rule = rhs.rule} >>| fun (x,ctxt) ->
-            f x,ctxt
-        }
-      end)
-  end
+      let apply ({parse=f} as lhs) ({parse=x} as rhs) = {
+        rule = lhs.rule ^ " " ^ rhs.rule;
+        desc = "";
+        parse = fun ctxt ->
+          f {ctxt with rule = lhs.rule} >>= fun (f,ctxt) ->
+          x {ctxt with rule = rhs.rule} >>| fun (x,ctxt) ->
+          f x,ctxt
+      }
+    end)
+
+  let ($) = Args.($)
+  let args = Args.args
+  type ('a,'r) args = ('a,'r) Args.t
 
   let run inputs args code =
     let ctxt = {rule = ""; pos=0; parsed=[]; inputs} in
