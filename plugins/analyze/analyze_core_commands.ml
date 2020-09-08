@@ -6,11 +6,14 @@ open Bap.Std
 
 open KB.Syntax
 
-let package = "bap"
+include Loggers()
 
 
 let print_semantics label slots =
-  KB.collect Theory.Program.Semantics.slot label >>| fun sema ->
+  KB.collect Theory.Program.Semantics.slot label >>= fun sema ->
+  KB.Symbol.package >>| fun package ->
+  let slots = List.map slots ~f:(fun name ->
+      KB.Name.to_string (KB.Name.read ~package name)) in
   match slots with
   | [] -> Format.printf "%a@\n" KB.Value.pp sema
   | slots -> Format.printf "%a@\n" (KB.Value.pp_slots slots) sema
@@ -24,6 +27,7 @@ let list_objects cls () =
 
 let register () =
   let open Project.Analysis in
+  let package = "bap" in
   register ~package "print-semantics"
     (args program $ rest string) print_semantics;
   register ~package "list-instructions"

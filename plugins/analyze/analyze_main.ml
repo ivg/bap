@@ -39,7 +39,7 @@ type ctxt = {
 
 let initial_ctxt path = {
   path;
-  package = "bap";
+  package = "user";
   quit = false;
 }
 
@@ -58,12 +58,17 @@ let exec_command ?(package="bap") cmd args =
     | Ok () -> Ok ()
     | Error err -> fail (Conflict (err,cmd,args))
 
+let in_package ctxt package =
+  Toplevel.exec @@ Knowledge.Symbol.set_package package;
+  {ctxt with package}
+
 let set_package args ctxt = match args with
-  | [package] -> Ok {ctxt with package}
+  | [pkg] -> Ok (in_package ctxt pkg)
   | _ -> fail (Bad_directive {
-      dir = "set-package";
+      dir = "in-package";
       msg = "expects exactly one argument";
     })
+
 
 let save_base args ctxt = match args with
   | [] | [_] ->
@@ -94,7 +99,7 @@ let list_commands = no_args "commands" @@ fun ctxt ->
   Ok ctxt
 
 let rec directives = [
-  "set-package", set_package, "sets the default package";
+  "in-package", set_package, "sets the default package";
   "save", save_base, "saves the knowledge base on disk";
   "quit", quit, "quits the interactive session";
   "clear", clear, "clears the screen";
@@ -127,7 +132,7 @@ let remember input =
 
 let rec interactive_loop ctxt =
   Format.printf "%!";
-  match LNoise.linenoise "> " with
+  match LNoise.linenoise (ctxt.package ^ "> ") with
   | None -> Ok ()
   | Some input ->
     remember input;
@@ -160,7 +165,7 @@ let () =
   fun base commands script _ctxt ->
   Analyze_core_commands.register ();
   Toplevel.set @@ Knowledge.load base;
-  let ctxt = initial_ctxt base in
+  let ctxt = in_package (initial_ctxt base) "bap" in
   match commands,script with
   | [], None -> interactive_loop ctxt
   | _ -> run_non_interactive commands script ctxt
