@@ -144,11 +144,27 @@ let remember ctxt input =
     | Ok () -> ()
     | Error msg -> warning "failed to write history: %s" msg
 
-
+let complete ctxt prefix completions =
+  let matches = String.is_prefix ~prefix in
+  List.iter directives ~f:(fun (name,_,_) ->
+      if matches name
+      then LNoise.add_completion completions name);
+  Project.Analysis.registered () |>
+  List.iter ~f:(fun info ->
+      let name = Project.Analysis.name info in
+      let pkg = Knowledge.Name.package name in
+      let short = Knowledge.Name.unqualified name in
+      let full = Knowledge.Name.to_string name in
+      if pkg = ctxt.package && matches short
+      then LNoise.add_completion completions short
+      else if matches full || matches short
+      then LNoise.add_completion completions full)
 
 let rec interactive_loop ctxt =
   Format.printf "%!";
+  LNoise.set_completion_callback (complete ctxt);
   match LNoise.linenoise (ctxt.package ^ "> ") with
+  | exception Sys.Break -> interactive_loop ctxt
   | None -> Ok ()
   | Some input ->
     remember ctxt input;
