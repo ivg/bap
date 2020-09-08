@@ -24,6 +24,8 @@ open Bap_main
 open Bap_knowledge
 open Bap.Std
 
+include Loggers()
+
 type problem =
   | Unknown_command of {package : string; name : string}
   | Conflict of Knowledge.Conflict.t * string * string list
@@ -34,13 +36,15 @@ type Extension.Error.t += Fail of problem
 type ctxt = {
   path : string;
   package : string;
+  history : string;
   quit : bool;
 }
 
-let initial_ctxt path = {
+let initial_ctxt ~history path = {
   path;
   package = "user";
   quit = false;
+  history;
 }
 
 let fail problem = Error (Fail problem)
@@ -125,17 +129,29 @@ let dispatch str ctxt = match break_line str with
 let report_error err =
   Format.eprintf "%a@\n%!" Extension.Error.pp err
 
-let remember input =
+let load_history filename =
+  if Sys.file_exists filename
+  then match LNoise.history_load ~filename with
+    | Ok () -> ()
+    | Error msg ->
+      Format.eprintf "Failed to load the history file: %s@\n%!" msg
+
+let remember ctxt input =
   match LNoise.history_add input with
-  | Ok () -> ()
-  | Error _ -> ()
+  | Error msg -> warning "failed to remember the input: %s" msg
+  | Ok () ->
+    match LNoise.history_save ~filename:ctxt.history with
+    | Ok () -> ()
+    | Error msg -> warning "failed to write history: %s" msg
+
+
 
 let rec interactive_loop ctxt =
   Format.printf "%!";
   match LNoise.linenoise (ctxt.package ^ "> ") with
   | None -> Ok ()
   | Some input ->
-    remember input;
+    remember ctxt input;
     match dispatch input ctxt with
     | Error err -> report_error err; interactive_loop ctxt
     | Ok {quit=true} -> Ok ()
@@ -161,13 +177,22 @@ let () =
   let script = parameter Type.("path" %: some file) "script"
       ~aliases:["s"]
       ~doc:"THe path to a script file with commands." in
-  declare "analyze" (args $knowledge $commands $script) @@
-  fun base commands script _ctxt ->
+  let history =
+    let history_location =
+      match Sys.getenv_opt "HOME" with
+      | None | Some "" -> ".bap_history"
+      | Some home -> Filename.concat home ".bap_history" in
+    parameter Type.("path" %: file =? history_location) "history"
+      ~aliases:["H"] in
+  declare "analyze" (args $knowledge $commands $script $history) @@
+  fun base commands script history _ctxt ->
   Analyze_core_commands.register ();
   Toplevel.set @@ Knowledge.load base;
-  let ctxt = in_package (initial_ctxt base) "bap" in
+  let ctxt = in_package (initial_ctxt history base) "bap" in
   match commands,script with
-  | [], None -> interactive_loop ctxt
+  | [], None ->
+    load_history history;
+    interactive_loop ctxt
   | _ -> run_non_interactive commands script ctxt
 
 
