@@ -17,9 +17,8 @@ let print_semantics label slots =
   KB.collect Theory.Program.Semantics.slot label >>= fun sema ->
   KB.List.map slots ~f:read_name >>| fun slots ->
   match slots with
-  | [] -> Format.printf "%a@\n" KB.Value.pp sema
-  | slots -> Format.printf "%a@\n" (KB.Value.pp_slots slots) sema
-
+  | [] -> Format.printf "%a" KB.Value.pp sema
+  | slots -> Format.printf "%a" (KB.Value.pp_slots slots) sema
 
 let require prop label has =
   KB.collect prop label >>= function
@@ -58,15 +57,19 @@ let ensure x yes =
   | true -> yes ()
   | false -> KB.return ()
 
-let list_insns unit subr =
+let list_insns unit subr slots =
   KB.objects Theory.Program.cls >>=
   KB.Seq.iter ~f:(fun obj ->
       ensure (belongs_to_unit unit obj) @@ fun () ->
       ensure (belongs_to_subr subr obj) @@ fun () ->
-      KB.Object.repr Theory.Program.cls obj >>| fun str ->
-      Format.printf "%s@\n" str)
-
-
+      KB.Object.repr Theory.Program.cls obj >>= fun str ->
+      match slots with
+      | None ->
+        Format.printf "%s@\n" str;
+        KB.return ()
+      | Some slots ->
+        Format.printf "%s@ " str;
+        print_semantics obj slots)
 
 let register () =
   let open Project.Analysis in
@@ -78,6 +81,7 @@ let register () =
   register ~package "instructions"
     (args @@
      keyword "unit" unit $
-     keyword "subroutine" program) list_insns;
+     keyword "subroutine" program $
+     keyword "semantics" (rest string)) list_insns;
   register ~package "units"
     (args empty) (list_objects Theory.Unit.cls)

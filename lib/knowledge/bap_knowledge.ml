@@ -1846,7 +1846,6 @@ module Dict = struct
   let pp_elt ppf (k,v) =
     Format.fprintf ppf "%a" Sexp.pp_hum (Key.to_sexp k v)
 
-
   let rec pp_tree ppf = function
     | T0 -> Format.fprintf ppf "()"
     | T1 (ka,a) ->
@@ -2953,20 +2952,25 @@ module Knowledge = struct
     else Format.fprintf ppf "%s:%s" p name
 
   let pp_state ppf {Env.classes; package} =
-    Format.fprintf ppf "(in-package %s)@\n" package;
+    Format.fprintf ppf "@[<v0>(in-package %s)@;" package;
     Map.iteri classes ~f:(fun ~key:name ~data:{vals;syms} ->
-        Format.fprintf ppf "(in-class %a)@\n"
-          (pp_fullname ~package) (Name.full name);
-        Map.iteri vals ~f:(fun ~key:oid ~data ->
-            if not (Dict.is_empty data) then
-              let () = match Map.find syms oid with
-                | None ->
-                  Format.fprintf ppf "@[<2>(%a@ " Oid.pp oid
-                | Some name ->
-                  Format.fprintf ppf "@[<2>(%a@ "
-                    (pp_fullname ~package) name in
-              Format.fprintf ppf "@,%a)@]@\n"
-                Record.pp_hum (Dict.sexp_of_t data)))
+        if not (Map.is_empty vals) then begin
+          Format.fprintf ppf "(in-class %a)@;"
+            (pp_fullname ~package) (Name.full name);
+          Format.fprintf ppf "@[<hv1";
+          Map.iteri vals ~f:(fun ~key:oid ~data ->
+              if not (Dict.is_empty data) then
+                let () = match Map.find syms oid with
+                  | None ->
+                    Format.fprintf ppf "(%a@ " Oid.pp oid
+                  | Some name ->
+                    Format.fprintf ppf "(%a@ "
+                      (pp_fullname ~package) name in
+                Format.fprintf ppf "%a)@;"
+                  Record.pp_hum (Dict.sexp_of_t data));
+          Format.fprintf ppf "@]@;"
+        end);
+    Format.fprintf ppf "@]";
 
   module Io = struct
     type version = V1 [@@deriving bin_io]
