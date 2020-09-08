@@ -51,6 +51,8 @@ module State : sig
   type t = state
   val disassembly : t -> Bap_disasm_driver.state
   val subroutines : t -> Bap_disasm_calls.t
+
+  val slot : (Theory.Unit.cls, state) KB.slot
 end
 
 module Info : sig
@@ -148,6 +150,7 @@ module Analysis : sig
   val find : ?package:string -> string -> t option
   val name : info -> Knowledge.Name.t
   val desc : info -> string
+  val grammar : info -> string list
 
   val argument :
     ?desc:string ->

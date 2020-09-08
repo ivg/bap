@@ -174,8 +174,6 @@ module State = struct
       ]
     ]
 
-
-
   let slot = KB.Class.property Theory.Unit.cls
       ~package:"bap" "disassembly"
       ~persistent:(KB.Persistent.of_binable(module struct
@@ -651,38 +649,40 @@ end
 let passes () = DList.to_list passes
 let find_pass = Pass.find
 
-module Registry(T : T) = struct
+module Registry(T : T)(I : T) = struct
   open Bap_knowledge
   type info = {
     name : Knowledge.Name.t;
     desc : string option;
+    extra : I.t;
   }
 
-  let registry : (Knowledge.name, string option * T.t) Hashtbl.t =
+  let registry : (Knowledge.name, string option * T.t * I.t) Hashtbl.t =
     Hashtbl.create (module Knowledge.Name)
 
-  let register ?desc ?package name entity =
+  let register ?desc ?package name extra entity =
     let name = Knowledge.Name.create ?package name in
     if Hashtbl.mem registry name then
       invalid_argf "An element with name %s is already registered \
                     please choose a unique name"
         (Knowledge.Name.show name) ();
-    Hashtbl.add_exn registry name (desc,entity)
+    Hashtbl.add_exn registry name (desc,entity,extra)
 
   let find ?package name =
     let name = Knowledge.Name.read ?package name in
     match Hashtbl.find registry name with
-    | Some (_,x) -> Some x
+    | Some (_,x,_) -> Some x
     | None -> None
 
   let registered () =
     Hashtbl.to_alist registry |>
-    List.map ~f:(fun (name,(desc,_)) -> {name; desc})
+    List.map ~f:(fun (name,(desc,_,extra)) -> {name; desc; extra})
 
   let name {name} = name
   let desc = function
     | {desc=None} -> "not provided"
     | {desc=Some txt} -> txt
+  let extra {extra} = extra
 end
 
 module Collator = struct
@@ -692,7 +692,7 @@ module Collator = struct
       summary : 's -> unit;
     } -> t
 
-  include Registry(struct type nonrec t = t end)
+  include Registry(struct type nonrec t = t end)(Unit)
 
   let apply (Collator {prepare; collate; summary}) projects =
     match Seq.split_n projects 1 with
@@ -702,7 +702,7 @@ module Collator = struct
     | _ -> ()
 
   let register ?desc ?package name ~prepare ~collate ~summary =
-    register ?desc ?package name @@ Collator {
+    register ?desc ?package name () @@ Collator {
       prepare;
       collate;
       summary;
@@ -725,6 +725,11 @@ module Analysis = struct
     parse : ctxt -> ('a * ctxt) knowledge;
     desc : string;
     rule : string;
+  }
+
+  type ('a,'r) args = {
+    run : 'a -> 'r arg;
+    grammar : string list;
   }
 
   type problem =
@@ -772,7 +777,7 @@ module Analysis = struct
   }
 
   let optional arg = {
-    rule = arg.rule ^ "?";
+    rule = sprintf "[%s]" arg.rule;
     desc = arg.desc;
     parse = fun ctxt -> match ctxt.inputs with
       | [] -> KB.return (None,ctxt)
@@ -796,7 +801,7 @@ module Analysis = struct
     loop [] inputs
 
   let keyword key arg = {
-    rule = sprintf ":%s %s" key arg.rule;
+    rule = sprintf "[:%s %s]" key arg.rule;
     desc = "an argument prefixed by the keyword";
     parse = fun ctxt ->
       match pull_keyword (":"^key) ctxt.inputs with
@@ -806,8 +811,8 @@ module Analysis = struct
   }
 
   let flag key = {
-    rule = sprintf ":%s" key;
-    desc = "an argument prefixed by the keyword";
+    rule = sprintf "[:%s]" key;
+    desc = "an optional flag";
     parse = fun ctxt ->
       match filter_flag (":"^key) ctxt.inputs with
       | None -> KB.return (false,ctxt)
@@ -822,13 +827,13 @@ module Analysis = struct
     loop [] ctxt
 
   let rest arg = {
-    rule = arg.rule ^ "*";
+    rule = sprintf "[%s] ..." arg.rule;
     desc = arg.desc;
     parse = fun ctxt -> apply_until_exhausted ctxt arg
   }
 
   let empty = {
-    rule = "empty";
+    rule = "";
     desc = "no arguments are expected";
     parse = fun ctxt -> match ctxt.inputs with
       | [] -> KB.return ((),ctxt)
@@ -845,9 +850,7 @@ module Analysis = struct
   let parse_object cls ~fail:_ x = KB.Object.read cls x
 
   let object_of cls =
-    let name = sprintf "<%s>" @@
-      KB.Name.to_string (KB.Class.name cls) in
-    argument name
+    argument "<label>"
       ~parse:(parse_object cls)
       ~desc:(sprintf "an object of the %s" name)
 
@@ -863,46 +866,52 @@ module Analysis = struct
       ~parse:parse_bitvec
       ~desc:"a bitvector of arbitrary length"
 
-  module Args = Variadic.Make(struct
-      type 'a t = 'a arg
-      let map arg ~f = {
-        arg with
-        parse = fun ctxt ->
-          arg.parse {ctxt with rule = arg.rule} >>| fun (x,ctxt) ->
-          f x,ctxt
-      }
+  module Arg = struct
+    type 'a t = 'a arg
+    let map arg ~f = {
+      arg with
+      parse = fun ctxt ->
+        arg.parse {ctxt with rule = arg.rule} >>| fun (x,ctxt) ->
+        f x,ctxt
+    }
 
-      let apply ({parse=f} as lhs) ({parse=x} as rhs) = {
-        rule = lhs.rule ^ " " ^ rhs.rule;
-        desc = "";
-        parse = fun ctxt ->
-          f {ctxt with rule = lhs.rule} >>= fun (f,ctxt) ->
-          x {ctxt with rule = rhs.rule} >>| fun (x,ctxt) ->
-          f x,ctxt
-      }
-    end)
+    let apply ({parse=f} as lhs) ({parse=x} as rhs) = {
+      rule = lhs.rule ^ " " ^ rhs.rule;
+      desc = "";
+      parse = fun ctxt ->
+        f {ctxt with rule = lhs.rule} >>= fun (f,ctxt) ->
+        x {ctxt with rule = rhs.rule} >>| fun (x,ctxt) ->
+        f x,ctxt
+    }
+  end
 
-  let ($) = Args.($)
-  let args = Args.args
-  type ('a,'r) args = ('a,'r) Args.t
+  let ($) t arg = {
+    grammar = arg.rule :: t.grammar;
+    run = fun f -> Arg.apply (t.run f) arg
+  }
+  let args a = {
+    grammar = [a.rule];
+    run = fun f -> Arg.map ~f a
+  }
+  let apply ~f args = args.run f
 
   let run inputs args code =
     let ctxt = {rule = ""; pos=0; parsed=[]; inputs} in
-    (Args.apply args ~f:code).parse ctxt >>= fun (f,_ctxt) ->
+    (apply args ~f:code).parse ctxt >>= fun (f,_ctxt) ->
     f
 
   type t = string list -> unit knowledge
-  include Registry(struct type nonrec t = t end)
-
-  let analyses = Hashtbl.create (module Knowledge.Name)
-  let infos = Hashtbl.create (module Knowledge.Name)
+  include Registry(struct type nonrec t = t end)(struct
+      type t = string list
+    end)
 
   let register ?desc ?package name args analysis =
     let code inputs = run inputs args analysis in
-    register ?desc ?package name code
+    register ?desc ?package name (List.rev args.grammar) code
 
   let apply f xs = f xs
 
+  let grammar = extra
 end
 
 module type S = sig

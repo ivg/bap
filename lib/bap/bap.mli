@@ -9539,6 +9539,9 @@ module Std : sig
       (** [subroutines state] returns the partition of the set of
           disassembled instructions into a set of subroutines.   *)
       val subroutines : t -> Disasm.Subroutines.t
+
+      (** the slot of a unit object that stores the state of disassembly  *)
+      val slot : (Theory.Unit.cls, state) KB.slot
     end
 
 
@@ -9783,6 +9786,8 @@ module Std : sig
 
       (** [desc info] is the short description of the analysis  *)
       val desc : info -> string
+
+      val grammar : info -> string list
 
       (** [register ?desc ?package name comp] registers the knowledge
           computation as an analysis. The [package:name] pair should

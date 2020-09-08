@@ -38,12 +38,24 @@ type ctxt = {
   package : string;
   history : string;
   quit : bool;
+  hints : string list Map.M(Knowledge.Name).t
 }
+
+
+let collect_hints () =
+  Project.Analysis.registered () |>
+  List.fold ~init:(Map.empty (module Knowledge.Name))
+    ~f:(fun hints info ->
+        let name = Project.Analysis.name info
+        and hint = Project.Analysis.grammar info in
+        Map.add_exn hints name hint)
+
 
 let initial_ctxt ~history path = {
   path;
   package = "user";
   quit = false;
+  hints = collect_hints ();
   history;
 }
 
@@ -160,9 +172,27 @@ let complete ctxt prefix completions =
       else if matches full || matches short
       then LNoise.add_completion completions full)
 
+
+let hint {package; hints} prefix =
+  match break_line prefix with
+  | [] -> None
+  | cmd :: args ->
+    let inputed = List.length args in
+    let cmd = Knowledge.Name.read ~package cmd in
+    match Map.find hints cmd with
+    | None -> None
+    | Some grammar ->
+      match List.drop grammar inputed with
+      | [] | [""] -> None
+      | xs ->
+        Option.return (" " ^ String.concat ~sep:" " xs,
+                       LNoise.Yellow,
+                       false)
+
 let rec interactive_loop ctxt =
   Format.printf "%!";
   LNoise.set_completion_callback (complete ctxt);
+  LNoise.set_hints_callback (hint ctxt);
   match LNoise.linenoise (ctxt.package ^ "> ") with
   | exception Sys.Break -> interactive_loop ctxt
   | None -> Ok ()
