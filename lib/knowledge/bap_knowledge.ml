@@ -2055,7 +2055,7 @@ module Record = struct
       then pp_text ppf s
       else Format.pp_print_string ppf s
     | Sexp.List xs ->
-      Format.fprintf ppf "(@[<hv1>";
+      Format.fprintf ppf "(@[<hv>";
       Format.pp_print_list pp_hum ppf xs
         ~pp_sep:Format.pp_print_space;
       Format.fprintf ppf "@])"
@@ -2074,13 +2074,19 @@ module Record = struct
     match (inspect x : Sexp.t) with
     | Atom _ -> assert false
     | List xs ->
+      let first = ref true in
+      Format.fprintf ppf "@[<v>";
       List.iter xs ~f:(function
           | Sexp.List (Atom slot :: payload ) as data
             when Set.mem slots slot ->
+            if not first.contents then Format.fprintf ppf "@,";
+            first := false;
             if no_name
-            then Format.fprintf ppf "%a@\n" pp_payload payload
-            else Format.fprintf ppf "%a@\n" pp_hum data
-          | _ -> ())
+            then Format.fprintf ppf "%a" pp_payload payload
+            else Format.fprintf ppf "%a" pp_hum data
+          | _ -> ());
+      Format.fprintf ppf "@]"
+
 end
 
 module Knowledge = struct
@@ -2957,18 +2963,18 @@ module Knowledge = struct
         if not (Map.is_empty vals) then begin
           Format.fprintf ppf "(in-class %a)@;"
             (pp_fullname ~package) (Name.full name);
-          Format.fprintf ppf "@[<hv1";
+          Format.fprintf ppf "@[<v>";
           Map.iteri vals ~f:(fun ~key:oid ~data ->
               if not (Dict.is_empty data) then
                 let () = match Map.find syms oid with
                   | None ->
-                    Format.fprintf ppf "(%a@ " Oid.pp oid
+                    Format.fprintf ppf "@[<hv2>(%a@ " Oid.pp oid
                   | Some name ->
-                    Format.fprintf ppf "(%a@ "
+                    Format.fprintf ppf "@[<hv2>(%a@ "
                       (pp_fullname ~package) name in
-                Format.fprintf ppf "%a)@;"
+                Format.fprintf ppf "%a)@]@;"
                   Record.pp_hum (Dict.sexp_of_t data));
-          Format.fprintf ppf "@]@;"
+          Format.fprintf ppf "@]"
         end);
     Format.fprintf ppf "@]";
 

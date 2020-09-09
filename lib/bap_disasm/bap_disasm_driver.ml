@@ -475,7 +475,8 @@ let execution_order stack =
 let always _ = KB.return true
 
 let with_disasm beg cfg f =
-  query_arch (Word.to_bitvec beg) >>= fun arch ->
+  Theory.Label.for_addr (Word.to_bitvec beg) >>=
+  KB.collect Arch.slot >>= fun arch ->
   match Dis.create (Arch.to_string arch) with
   | Error _ -> KB.return (cfg,None)
   | Ok dis -> f arch dis

@@ -787,6 +787,8 @@ module Analysis = struct
   let pull_keyword kw inputs =
     let rec loop searched = function
       | [] -> None
+      | [k] when String.equal k kw && List.is_empty searched ->
+        Some []
       | k :: x :: xs when String.equal k kw ->
         Some (x :: List.rev_append searched xs)
       | x :: xs -> loop (x::searched) xs in

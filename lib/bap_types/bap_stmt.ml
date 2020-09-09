@@ -11,9 +11,9 @@ let rec pp fmt s =
   | Move (var, exp) ->
     fprintf fmt "@[<2>%a :=@ %a@]" Bap_var.pp var Bap_exp.pp exp
   | Jmp (Exp.Var _ | Exp.Int _ as exp) ->
-    fprintf fmt "jmp %a" Bap_exp.pp exp
-  | Jmp exp -> fprintf fmt "jmp (%a)" Bap_exp.pp exp
-  | Special s -> fprintf fmt "special (%s)" s
+    fprintf fmt "@[<2>jmp@ %a@]" Bap_exp.pp exp
+  | Jmp exp -> fprintf fmt "@[<2>jmp@ (%a)@]" Bap_exp.pp exp
+  | Special s -> fprintf fmt "special@ @[<1>(%s)@]" s
   | While (cond, body) ->
     fprintf fmt "@[<v0>@[<v2>while (@[%a@]) {@;%a@]@;}@]"
       Bap_exp.pp cond pp_list body

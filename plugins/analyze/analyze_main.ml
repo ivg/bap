@@ -190,7 +190,7 @@ let hint {package; hints} prefix =
                        false)
 
 let rec interactive_loop ctxt =
-  Format.printf "@.";
+  Format.printf "%!";
   LNoise.set_completion_callback (complete ctxt);
   LNoise.set_hints_callback (hint ctxt);
   match LNoise.linenoise (ctxt.package ^ "> ") with
