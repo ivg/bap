@@ -65,11 +65,25 @@ let iter_subr entry subrs disasm ~f =
     ~node:(fun insns () -> KB.List.iter insns ~f)
     ~edge:(fun _ _ _ -> KB.return ())
 
-let list_objects cls () =
-  KB.objects cls >>=
+
+let make_triple unit =
+  KB.collect Theory.Unit.Target.arch   unit >>= fun arch ->
+  KB.collect Theory.Unit.Target.subarch unit >>= fun sub ->
+  KB.collect Theory.Unit.Target.vendor unit >>= fun vendor ->
+  KB.collect Theory.Unit.Target.system unit >>= fun system ->
+  KB.collect Theory.Unit.Target.abi unit >>| fun abi ->
+  let (=?) x default = Option.value x ~default in
+  sprintf "%s%s-%s-%s-%s"
+    (arch =? "unknown") (sub =? "") (vendor =? "none")
+    (system =? "unknown") (abi =? "unknown")
+
+
+let print_unit () =
+  KB.objects Theory.Unit.cls >>=
   KB.Seq.iter ~f:(fun obj ->
-      KB.Object.repr cls obj >>| fun str ->
-      Format.printf "%s@\n" str)
+      KB.Object.repr Theory.Unit.cls obj >>= fun str ->
+      make_triple obj >>| fun triple ->
+      Format.printf "%-40s %s@\n" str triple)
 
 let ensure x yes =
   x >>= function
@@ -80,7 +94,6 @@ let in_package package f = match package with
   | None -> f ()
   | Some package -> KB.Symbol.in_package package f
 
-
 let print_insn ?package slots obj =
   in_package package @@ fun () ->
   KB.Object.repr Theory.Program.cls obj >>= fun str ->
@@ -89,7 +102,7 @@ let print_insn ?package slots obj =
     Format.printf "%s@\n" str;
     KB.return ()
   | Some slots ->
-    Format.printf "%s@ " str;
+    Format.printf "%s@\n" str;
     print_semantics obj slots
 
 let list_insns unit slots =
@@ -97,7 +110,6 @@ let list_insns unit slots =
   KB.Seq.iter ~f:(fun obj ->
       ensure (belongs_to_unit unit obj) @@ fun () ->
       print_insn slots obj)
-
 
 let print_subr unit name slots =
   KB.collect Project.State.slot unit >>= fun state ->
@@ -157,7 +169,7 @@ let register () =
            only those that are specified will be printed.";
 
   register ~package "units"
-    (args empty) (list_objects Theory.Unit.cls)
+    (args empty) print_unit
     ~desc:"Prints all units. Prints all units stored in the knowledge \
            base." ;
 

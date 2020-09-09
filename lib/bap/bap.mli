@@ -9757,6 +9757,7 @@ module Std : sig
     module Analysis : sig
       type t
       type info
+      type grammar
       type 'a arg
       type ('a,'r) args
 
@@ -9787,7 +9788,7 @@ module Std : sig
       (** [desc info] is the short description of the analysis  *)
       val desc : info -> string
 
-      val grammar : info -> string list
+      val grammar : info -> grammar
 
       (** [register ?desc ?package name comp] registers the knowledge
           computation as an analysis. The [package:name] pair should
@@ -9802,6 +9803,12 @@ module Std : sig
         ?desc:string ->
         parse:(fail:(string -> _ knowledge) -> string -> 'a knowledge) ->
         string -> 'a arg
+
+      module Grammar : sig
+        type t = grammar
+        val to_string : grammar -> string
+      end
+
 
     end
 

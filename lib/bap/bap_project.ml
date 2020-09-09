@@ -914,6 +914,12 @@ module Analysis = struct
   let apply f xs = f xs
 
   let grammar = extra
+
+  module Grammar = struct
+    type t = string list
+    let to_string = String.concat ~sep:" "
+  end
+  type grammar = Grammar.t
 end
 
 module type S = sig

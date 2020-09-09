@@ -124,6 +124,7 @@ end
 module Analysis : sig
   type t
   type info
+  type grammar
   type 'a arg
   type ('a,'r) args
 
@@ -150,12 +151,17 @@ module Analysis : sig
   val find : ?package:string -> string -> t option
   val name : info -> Knowledge.Name.t
   val desc : info -> string
-  val grammar : info -> string list
+  val grammar : info -> grammar
 
   val argument :
     ?desc:string ->
     parse:(fail:(string -> _ knowledge) -> string -> 'a knowledge) ->
     string -> 'a arg
+
+  module Grammar : sig
+    type t = grammar
+    val to_string : grammar -> string
+  end
 
 end
 

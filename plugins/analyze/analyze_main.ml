@@ -38,24 +38,23 @@ type ctxt = {
   package : string;
   history : string;
   quit : bool;
-  hints : string list Map.M(Knowledge.Name).t
+  commands : Project.Analysis.info Map.M(Knowledge.Name).t
 }
 
 
-let collect_hints () =
+let collect_commands () =
   Project.Analysis.registered () |>
   List.fold ~init:(Map.empty (module Knowledge.Name))
     ~f:(fun hints info ->
-        let name = Project.Analysis.name info
-        and hint = Project.Analysis.grammar info in
-        Map.add_exn hints name hint)
+        let name = Project.Analysis.name info in
+        Map.add_exn hints name info)
 
 
 let initial_ctxt ~history path = {
   path;
   package = "user";
   quit = false;
-  hints = collect_hints ();
+  commands = collect_commands ();
   history;
 }
 
@@ -106,13 +105,60 @@ let clear = no_args "clear" @@ fun ctxt ->
   LNoise.clear_screen ();
   Ok ctxt
 
+let short str =
+  let len = min
+      (String.length str)
+      (Option.value (String.index str '.') ~default:40) in
+  String.lowercase @@ String.subo str ~len
+
 let list_commands = no_args "commands" @@ fun ctxt ->
   Project.Analysis.registered () |>
   List.iter ~f:(fun analysis ->
       let name = Project.Analysis.name analysis
-      and desc = Project.Analysis.desc analysis in
+      and desc = short @@ Project.Analysis.desc analysis in
       Format.printf "%-40s %s@\n%!" (Knowledge.Name.to_string name) desc);
   Ok ctxt
+
+let help_msg = "\
+Type `commands' for the list of available commands or `directives' \
+for the list of directives. Commands, unlike directives, are properly \
+namespaced (packaged), the name of the currently opened namesapce \
+(package) is displayed in the prompt. Most of the commands accept \
+required or optional arguments. Some arguments are keyworded, i.e., \
+them must be prefixed with the specified keyword, e.g.,
+
+instruction /bin/ls:0x8080 :semantics bil
+
+Type `help <command> ...` for the detailed description of the \
+<command>. If more than one command is specified, then the detailed \
+description will be printed for each.
+"
+
+let help args ctxt = match args with
+  | [] ->
+    Format.printf "@[%a@]" Format.pp_print_text help_msg;
+    Ok ctxt
+  | _ :: _ :: _ ->
+    fail (Bad_directive {
+        dir = "help";
+        msg = "expects zero or one argument";
+      })
+  | [cmd] ->
+    let name = Knowledge.Name.read ~package:ctxt.package cmd in
+    match Map.find ctxt.commands name with
+    | None -> fail (Bad_directive {
+        dir = "help";
+        msg = sprintf "no such command %s in package %s"
+            cmd ctxt.package;
+      })
+    | Some info ->
+      let grammar = Project.Analysis.grammar info
+      and desc = Project.Analysis.desc info  in
+      Format.printf "SYNOPSIS\n\n%s %s\n\nDESCRIPTION\n@[%a@]\n"
+        cmd (Project.Analysis.Grammar.to_string grammar)
+        Format.pp_print_text desc;
+      Ok ctxt
+
 
 let rec directives = [
   "in-package", set_package, "sets the default package";
@@ -120,6 +166,7 @@ let rec directives = [
   "quit", quit, "quits the interactive session";
   "clear", clear, "clears the screen";
   "commands", list_commands, "lists known commands";
+  "help", help, "prints the help message";
   "directives", (fun _args ctxt ->
       List.iter directives ~f:(fun (dir,_,desc) ->
           Format.printf "%-40s %s@\n%!" dir desc);
@@ -173,15 +220,18 @@ let complete ctxt prefix completions =
       then LNoise.add_completion completions full)
 
 
-let hint {package; hints} prefix =
+let hint {package; commands} prefix =
   match break_line prefix with
   | [] -> None
   | cmd :: args ->
     let inputed = List.length args in
     let cmd = Knowledge.Name.read ~package cmd in
-    match Map.find hints cmd with
+    match Map.find commands cmd with
     | None -> None
-    | Some grammar ->
+    | Some info ->
+      let grammar = break_line @@
+        Project.Analysis.Grammar.to_string @@
+        Project.Analysis.grammar info in
       match List.drop grammar inputed with
       | [] | [""] -> None
       | xs ->
