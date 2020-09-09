@@ -30,6 +30,7 @@ type problem =
   | Unknown_command of {package : string; name : string}
   | Conflict of Knowledge.Conflict.t * string * string list
   | Bad_directive of {dir : string; msg : string}
+  | Sys_error_on_load of exn
 
 type Extension.Error.t += Fail of problem
 
@@ -253,7 +254,23 @@ let rec interactive_loop ctxt =
     | Ok {quit=true} -> Ok ()
     | Ok ctxt -> interactive_loop ctxt
 
-let run_non_interactive _commands _script _ctxt = Ok ()
+let load_script = function
+  | None -> Ok []
+  | Some path ->
+    try Ok (In_channel.read_lines path)
+    with exn -> fail (Sys_error_on_load exn)
+
+
+let dispatch_commands commands ctxt =
+  let open Result.Monad_infix in
+  List.fold commands ~init:(Ok ctxt) ~f:(fun ctxt cmd ->
+      ctxt >>= dispatch cmd)
+
+let run_non_interactive commands script ctxt =
+  let open Result.Monad_infix in
+  dispatch_commands commands ctxt >>= fun ctxt ->
+  load_script script >>= fun commands ->
+  dispatch_commands commands ctxt
 
 let string_of_problem = function
   | Unknown_command {package; name} ->
@@ -262,6 +279,9 @@ let string_of_problem = function
     sprintf "Command %s failed with %s" cmd
       (Knowledge.Conflict.to_string err)
   | Bad_directive {msg} -> sprintf "Error: %s" msg
+  | Sys_error_on_load exn ->
+    sprintf "Failed to load a script: %s" (Exn.to_string exn)
+
 
 let () =
   let open Extension in
@@ -289,8 +309,9 @@ let () =
   | [], None ->
     load_history history;
     interactive_loop ctxt
-  | _ -> run_non_interactive commands script ctxt
-
+  | _ -> match run_non_interactive commands script ctxt with
+    | Ok _ -> Ok ()
+    | Error err -> Error err
 
 let () = Extension.Error.register_printer @@ function
   | Fail problem -> Some (string_of_problem problem)
