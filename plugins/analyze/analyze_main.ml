@@ -286,7 +286,9 @@ let string_of_problem = function
 let () =
   let open Extension in
   let open Extension.Command in
-  let knowledge = argument Type.("knowledge-base" %: file =? "a.bkb")
+  let knowledge = parameter
+      Type.("knowledge-base" %: string =? "a.project")
+      "project" ~aliases:["k"]
       ~doc:"The path to a knowledge base." in
   let commands = arguments Extension.Type.("command" %: string)
       ~doc:"The command to execute." in
@@ -303,7 +305,8 @@ let () =
   declare "analyze" (args $knowledge $commands $script $history) @@
   fun base commands script history _ctxt ->
   Analyze_core_commands.register ();
-  Toplevel.set @@ Knowledge.load base;
+  if Sys.file_exists base
+  then Toplevel.set @@ Knowledge.load base;
   let ctxt = in_package (initial_ctxt history base) "bap" in
   match commands,script with
   | [], None ->
