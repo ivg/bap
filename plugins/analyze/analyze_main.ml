@@ -39,7 +39,8 @@ type ctxt = {
   package : string;
   history : string;
   quit : bool;
-  commands : Project.Analysis.info Map.M(Knowledge.Name).t
+  commands : Project.Analysis.info Map.M(Knowledge.Name).t;
+  directives : string Map.M(String).t;
 }
 
 
@@ -51,12 +52,16 @@ let collect_commands () =
         Map.add_exn hints name info)
 
 
-let initial_ctxt ~history path = {
+let initial_ctxt ~history directives path = {
   path;
   package = "user";
   quit = false;
   commands = collect_commands ();
   history;
+  directives = List.fold directives
+      ~init:String.Map.empty
+      ~f:(fun dirs (name,_,desc) ->
+          Map.add_exn dirs name desc)
 }
 
 let fail problem = Error (Fail problem)
@@ -145,33 +150,37 @@ let help args ctxt = match args with
         msg = "expects zero or one argument";
       })
   | [cmd] ->
-    let name = Knowledge.Name.read ~package:ctxt.package cmd in
-    match Map.find ctxt.commands name with
-    | None -> fail (Bad_directive {
-        dir = "help";
-        msg = sprintf "no such command %s in package %s"
-            cmd ctxt.package;
-      })
-    | Some info ->
-      let grammar = Project.Analysis.grammar info
-      and desc = Project.Analysis.desc info  in
-      Format.printf "SYNOPSIS\n\n%s %s\n\nDESCRIPTION\n@[%a@]\n"
-        cmd (Project.Analysis.Grammar.to_string grammar)
-        Format.pp_print_text desc;
-      Ok ctxt
+    match Map.find ctxt.directives cmd with
+    | Some desc -> Format.printf "%s@\n" desc; Ok ctxt
+    | None ->
+      let name = Knowledge.Name.read ~package:ctxt.package cmd in
+      match Map.find ctxt.commands name with
+      | None -> fail (Bad_directive {
+          dir = "help";
+          msg = sprintf "no such command %s in package %s"
+              cmd ctxt.package;
+        })
+      | Some info ->
+        let grammar = Project.Analysis.grammar info
+        and desc = Project.Analysis.desc info  in
+        Format.printf "SYNOPSIS\n\n%s %s\n\nDESCRIPTION\n@[%a@]\n"
+          cmd (Project.Analysis.Grammar.to_string grammar)
+          Format.pp_print_text desc;
+        Ok ctxt
 
+let list_directives = no_args "directives" @@ fun ctxt ->
+  Map.iteri ctxt.directives ~f:(fun ~key:dir ~data:desc ->
+      Format.printf "%-40s %s@\n%!" dir desc);
+  Ok ctxt
 
-let rec directives = [
+let directives = [
   "in-package", set_package, "sets the default package";
   "save", save_base, "saves the knowledge base on disk";
   "quit", quit, "quits the interactive session";
   "clear", clear, "clears the screen";
   "commands", list_commands, "lists known commands";
-  "help", help, "prints the help message";
-  "directives", (fun _args ctxt ->
-      List.iter directives ~f:(fun (dir,_,desc) ->
-          Format.printf "%-40s %s@\n%!" dir desc);
-      Ok ctxt), "lists directives";
+  "help", help,  "prints the help message";
+  "directives", list_directives, "lists directives";
 ]
 
 let find_directive dir = List.find_map directives ~f:(fun (s,f,_) ->
@@ -287,14 +296,63 @@ let () =
   let open Extension in
   let open Extension.Command in
   let knowledge = parameter
-      Type.("knowledge-base" %: string =? "a.project")
+      Type.("knowledge-base" %: string =? "a.proj")
       "project" ~aliases:["k"]
       ~doc:"The path to a knowledge base." in
   let commands = arguments Extension.Type.("command" %: string)
       ~doc:"The command to execute." in
   let script = parameter Type.("path" %: some file) "script"
       ~aliases:["s"]
-      ~doc:"THe path to a script file with commands." in
+      ~doc:"The path to a script file with commands." in
+  let doc = {|
+    # DESCRIPTION
+
+    Analyses the knowledge base. Loads the knowledge base and executes
+    the specified commands or run the REPL if no commands or script
+    files were specified.
+
+    The knowledge base is not saved until the $(b,save) directive is
+    issued. The knowledge base itself is optional and can be specified
+    using the $(b,--project) parameter, which defaults to
+    $(b,a.proj).
+
+    The commands can be entered via the REPL, which features
+    completion (hit the $(b,<TAB>) key) and contextual
+    hints. Alternatively, commands could be specified via a script
+    file (see $(b,--script)), with one command per line, or using the
+    command-line itself, with each command delimited with quotes,
+    e.g.,
+
+```
+    bap analyze commands # prints all commands
+    bap analyze --project=test.proj 'subroutines :unit file:echo'
+```
+
+    All commands are stored in the history file that persists between
+    invocations of bap. The location of the file could be specified
+    with the $(b,--history) option, which could also be used to
+    interactively create the script files.
+
+    # GRAMMAR
+
+    The expected input is a list of commands or directives separated
+    with the newline characters. The directive $(b,directive) will
+    output the list of available directives and corresponding
+    descriptions. The $(b,commands) directive will list all available
+    commands, and $(b,help <command>) will provide detailed
+    information about $(b,<command>) its syntax and semantics.
+
+    The syntax rules for commands are described in the
+    $(b,Project.Analysis) API documentation but in general it follows
+    the common command line syntax, i.e., each command is a sequence
+    of words separated by whitespaces, with keyworded arguments
+    prefixed with $(b,:) instead of $(b,-) or $(b,--), e.g.,
+
+```
+     subroutines :unit file:echo :matches malloc
+```
+
+  |} in
   let history =
     let history_location =
       match Sys.getenv_opt "HOME" with
@@ -302,12 +360,12 @@ let () =
       | Some home -> Filename.concat home ".bap_history" in
     parameter Type.("path" %: file =? history_location) "history"
       ~aliases:["H"] in
-  declare "analyze" (args $knowledge $commands $script $history) @@
+  declare "analyze" ~doc (args $knowledge $commands $script $history) @@
   fun base commands script history _ctxt ->
   Analyze_core_commands.register ();
   if Sys.file_exists base
   then Toplevel.set @@ Knowledge.load base;
-  let ctxt = in_package (initial_ctxt history base) "bap" in
+  let ctxt = in_package (initial_ctxt history directives base) "bap" in
   match commands,script with
   | [], None ->
     load_history history;

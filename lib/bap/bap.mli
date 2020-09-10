@@ -9748,32 +9748,34 @@ module Std : sig
     end
 
 
-    (** A knowledge base analysis.
+    (** Knowledge base analyses.
 
         A registry of the knowledge base computations that could be
         used for exploring and refining the facts stored in the
         knowledge base.
 
         An analysis could be parameterized by an arbitrary number of
-        arguments, e.g.,
+        arguments, e.g., to register a function [print_subr] that has
+        type
+
+        {[
+          tid -> string -> Bitvec.t -> unit knowledge
+        ]}
+
+        use the following code
 
         {[
           let open Project.Analysis in
           register ~package "subroutine"
-            (args @@ unit $ string $ keyword "semantics" (rest string))
+            (args @@ unit $ string $ bitvec)
             print_subr
-        ]}
-
-        where the [print_subr] function has the type
-
-        {[
-          tid -> string -> string -> unit knowledge
         ]}
 
         The registered analyses could be invoked directly, using the
         [Analysis.apply] function or via the [analysis] plugin that
         provides a REPL as well as an ability to call analysis from
-        the command-line interface or from a script.
+        the command-line interface or from a script. To get the list
+        of available analyses, run `bap analyze commands`.
     *)
     module Analysis : sig
 
@@ -9886,8 +9888,6 @@ module Std : sig
 
       *)
       val ($) : ('a, 'b -> 'c) args -> 'b arg -> ('a,'c) args
-
-
 
       (** {2 Grammar Rules}  *)
 
