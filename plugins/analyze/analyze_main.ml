@@ -1,21 +1,48 @@
 let doc = {|
 # DESCRIPTION
 
-Reads the knowledge base $(b,KB) and applies the specified analyses
-to it. The knowledge base is left unmodified, unless the $(b,--update)
-flag is set.
+Analyses the knowledge base. Loads the knowledge base and executes the
+specified commands or run the REPL if no commands or script files were
+specified.
 
-To get the list of available analyses, use $(b,bap list
-analyses). Each analysis is represented by its name. If the name is
-not fully qualified (i.e., doesn't include the package name) then the
-bap package is assumed.
+The knowledge base is not saved until the $(b,save) directive is
+issued. The knowledge base itself is optional and can be specified
+using the $(b,--project) parameter, which defaults to $(b,a.proj).
 
-# EXAMPLE
+The commands can be entered via the REPL, which features completion
+(hit the $(b,<TAB>) key) and contextual hints. Alternatively, commands
+could be specified via a script file (see $(b,--script)), with one
+command per line, or using the command-line itself, with each command
+delimited with quotes, e.g.,
 
 ```
-  bap analyze knowledge.kb print-instructions
+    bap analyze commands # prints all commands
+    bap analyze --project=test.proj 'subroutines :unit file:echo'
 ```
 
+All commands are stored in the history file that persists between
+invocations of bap. The location of the file could be specified with
+the $(b,--history) option, which could also be used to interactively
+create the script files.
+
+# GRAMMAR
+
+The expected input is a list of commands or directives separated with
+the newline characters. The directive $(b,directive) will output the
+list of available directives and corresponding descriptions. The
+$(b,commands) directive will list all available commands, and $(b,help
+<command>) will provide detailed information about $(b,<command>) its
+syntax and semantics.
+
+The syntax rules for commands are described in the
+$(b,Project.Analysis) API documentation but in general it follows the
+common command line syntax, i.e., each command is a sequence of words
+separated by whitespaces, with keyworded arguments prefixed with
+$(b,:) instead of $(b,-) or $(b,--), e.g.,
+
+```
+     subroutines :unit file:echo :matches malloc
+```
 |}
 
 
@@ -304,55 +331,6 @@ let () =
   let script = parameter Type.("path" %: some file) "script"
       ~aliases:["s"]
       ~doc:"The path to a script file with commands." in
-  let doc = {|
-    # DESCRIPTION
-
-    Analyses the knowledge base. Loads the knowledge base and executes
-    the specified commands or run the REPL if no commands or script
-    files were specified.
-
-    The knowledge base is not saved until the $(b,save) directive is
-    issued. The knowledge base itself is optional and can be specified
-    using the $(b,--project) parameter, which defaults to
-    $(b,a.proj).
-
-    The commands can be entered via the REPL, which features
-    completion (hit the $(b,<TAB>) key) and contextual
-    hints. Alternatively, commands could be specified via a script
-    file (see $(b,--script)), with one command per line, or using the
-    command-line itself, with each command delimited with quotes,
-    e.g.,
-
-```
-    bap analyze commands # prints all commands
-    bap analyze --project=test.proj 'subroutines :unit file:echo'
-```
-
-    All commands are stored in the history file that persists between
-    invocations of bap. The location of the file could be specified
-    with the $(b,--history) option, which could also be used to
-    interactively create the script files.
-
-    # GRAMMAR
-
-    The expected input is a list of commands or directives separated
-    with the newline characters. The directive $(b,directive) will
-    output the list of available directives and corresponding
-    descriptions. The $(b,commands) directive will list all available
-    commands, and $(b,help <command>) will provide detailed
-    information about $(b,<command>) its syntax and semantics.
-
-    The syntax rules for commands are described in the
-    $(b,Project.Analysis) API documentation but in general it follows
-    the common command line syntax, i.e., each command is a sequence
-    of words separated by whitespaces, with keyworded arguments
-    prefixed with $(b,:) instead of $(b,-) or $(b,--), e.g.,
-
-```
-     subroutines :unit file:echo :matches malloc
-```
-
-  |} in
   let history =
     let history_location =
       match Sys.getenv_opt "HOME" with
