@@ -91,9 +91,7 @@ class substitution x y = object(self)
   method! map_let z ~exp ~body =
     if Bap_var.(z = x)
     then Let (z,self#map_exp exp,body)
-    else super#map_let z
-        ~exp:(self#map_exp exp)
-        ~body:(self#map_exp body)
+    else super#map_let z ~exp ~body
   method! map_var z =
     match super#map_var z with
     | Exp.Var z when Bap_var.(z = x) -> y
@@ -502,7 +500,7 @@ module Simpl = struct
       | x -> Extract (hi,lo,x)
     and unop op x = match exp x with
       | Int x -> Int (Apply.unop op x)
-      | UnOp(op',x) when [%compare.equal : unop] op op' -> exp x
+      | UnOp(op',x) when op = op' -> exp x
       | x -> UnOp(op, x)
     and binop op x y =
       let width = match Type.infer_exn x with
