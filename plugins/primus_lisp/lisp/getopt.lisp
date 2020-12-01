@@ -1,8 +1,6 @@
-(require type)
-(require array)
-(require strstr)
+(require types)
 
-(declare (global (optind opterr optopt optarg)))
+(declare (global opterr optopt optarg))
 
 (defun getopt-arg (argv)
   (array-get ptr_t argv optind))
@@ -23,8 +21,8 @@
 
 (defun getopt-nearly-finished (argv)
   (let ((p (getopt-arg argv)))
-    (and (points-to-dash (ptr+ p 1))
-         (points-to-null (ptr+ p 2)))))
+    (and (points-to-dash (ptr+ ptr_t p 1))
+         (points-to-null (ptr+ ptr_t p 2)))))
 
 (defun getopt-update-optopt (argv last-ofs)
   (set optopt (getopt-arg-char argv (+1 last-ofs))))
@@ -33,7 +31,7 @@
   (set optarg (array-get ptr_t argv (+1 optind))))
 
 (defun getopt-found (argv p last-ofs)
-  (or (points-to-colon (ptr+ 2 p))
+  (or (points-to-colon (ptr+ ptr_t 2 p))
       (getopt-arg-char argv (+ 2 last-ofs))))
 
 (defun getopt-reset-optarg-if-needed (argv last-ofs)
@@ -41,7 +39,7 @@
     (set optarg 0)))
 
 (defun getopt-expects-argument (p)
-  (points-to-colon (ptr+ 1 p)))
+  (points-to-colon (ptr+ ptr_t 1 p)))
 
 (defun getopt-missing-argument ())
 
@@ -53,12 +51,12 @@
 
 (defun getopt-with-argument (argv opts p last-ofs)
   (if (getopt-found argv p last-ofs)
-    (getopt-reset-optarg-if-needed argv last-ofs))
-  (prog
-   (getopt-update-optarg argv)
-   (when (is-zero optarg)
-     (getopt-no-argument argv opts))
-   (incr optind)))
+      (getopt-reset-optarg-if-needed argv last-ofs)
+    (prog
+     (getopt-update-optarg argv)
+     (when (is-zero optarg)
+       (getopt-no-argument argv opts))
+     (incr optind))))
 
 
 (defun getopt (argc argv opts)
