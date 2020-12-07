@@ -2127,6 +2127,8 @@ module Std : sig
     (** [special msg -> Special msg]  *)
     val special : string -> stmt
 
+
+
     (** [while_ cond stmts -> While (cond,stmts)]  *)
     val while_ : exp -> stmt list -> stmt
 
@@ -2331,6 +2333,44 @@ module Std : sig
         or which depends on it. The analysis doesn't track memory locations.
         @since 1.5 *)
     val prune_dead_virtuals : stmt list -> stmt list
+
+
+    (** {3 BIL Special values}
+
+        The [Special] statement enables encoding of arbitrary
+        semantics using [encode attr values] and [decode attr]
+        to get the values back. The meaning of the [attr] and
+        [values] is specific to the user domain.
+
+        Example, [encode call ["malloc"; "external"]], where
+        [call] is the BIL attribute that denotes a call to a
+        function. See {!call} for more information.
+    *)
+
+
+    (** [encode attr vals] encodes [vals] as a special statement.
+
+        @since 2.2.0    *)
+    val encode : KB.Name.t -> string list -> stmt
+
+
+    (** [decode attr s] is [Some vals] if [s] is [encode attr vals].
+
+        @since 2.2.0
+    *)
+    val decode : KB.Name.t -> stmt -> string list option
+
+    (** [call] is the attribute name for encoding calls.
+
+        Format:
+        - [encode call name] - represents a call to a function with
+          the given [name];
+        - [encode call name ":external"] - represent a call that is
+          external to the current unit
+
+        @since 2.2.0
+    *)
+    val call : KB.Name.t
 
     (** Maps BIL operators to bitvectors.
         @since 1.3

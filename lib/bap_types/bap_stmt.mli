@@ -17,6 +17,9 @@ module Stmt : sig
   val while_ : exp -> stmt list -> stmt
   val if_ : exp -> stmt list -> stmt list -> stmt
   val cpuexn : int -> stmt
+  val call : KB.Name.t
+  val encode : KB.Name.t -> string list -> stmt
+  val decode : KB.Name.t -> stmt -> string list option
 end
 
 module Infix : sig

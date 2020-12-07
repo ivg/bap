@@ -171,18 +171,17 @@ let plt_size label =
   List.find_map plt_sizes ~f:(fun (p,s) ->
       Option.some_if (Theory.Target.belongs p t) s)
 
-let extract_external s =
-  Option.map
-    (String.chop_prefix s ~prefix:"external:")
-    (fun s -> match String.chop_suffix s ~suffix:"@external" with
-       | None -> Name s
-       | Some s -> Name s)
+
+let extract_external stmt = match Bil.(decode call stmt) with
+  | Some (dst::_) -> Some (Name dst)
+  | _ -> None
+
 
 let find_references = List.filter_map ~f:(function
     | Bil.Jmp (Load (_,Int dst,_,_))
     | Bil.Jmp (Int dst)
     | Bil.Move (_, Load (_,Int dst,_,_)) -> Some (Addr (Word.to_bitvec dst))
-    | Bil.Special dst -> extract_external dst
+    | Bil.Special _ as stmt -> extract_external stmt
     | _ -> None)
 
 let addresses mem =

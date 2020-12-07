@@ -6,6 +6,47 @@ open Bap_common
 open Format
 open Bap_bil
 
+
+module Special = struct
+  let call = KB.Name.create ~package:"bap" "call"
+  let prefix = "@attribute:"
+  let encode attr vals =
+    prefix ^
+    Sexp.to_string @@
+    Sexp.List (Sexp.Atom (KB.Name.show attr) ::
+               List.map vals ~f:(fun v -> Sexp.Atom v))
+
+  let decode_payload attr name vals =
+    let name = KB.Name.read name in
+    if KB.Name.equal name attr then
+      Option.all @@
+      List.map vals ~f:(function
+          | Sexp.Atom x -> Some x
+          | _ -> None)
+    else None
+
+
+  let decode attr s = match String.chop_prefix ~prefix s with
+    | None -> None
+    | Some payload -> match Sexp.of_string payload with
+      | exception _ -> None
+      | Sexp.List (Atom name :: vals) -> decode_payload attr name vals
+      | _ -> None
+
+  let pp_default ppf s = fprintf ppf "special@ @[<1>(%s)@]" s
+
+  let pp ppf s = match String.chop_prefix ~prefix s with
+    | None -> pp_default ppf s
+    | Some data -> match Sexp.of_string data with
+      | exception _ -> pp_default ppf s
+      | Sexp.List (Atom cons::vals) ->
+        let pp_vals ppf xs = pp_print_list
+            ~pp_sep:(fun ppf () -> pp_print_string ppf ", ")
+            Sexp.pp_hum ppf xs in
+        fprintf ppf "%s(@[<hv2>%a@])" cons pp_vals vals
+      | _ -> pp_default ppf s
+end
+
 let rec pp fmt s =
   let open Stmt in match s with
   | Move (var, exp) ->
@@ -13,7 +54,7 @@ let rec pp fmt s =
   | Jmp (Exp.Var _ | Exp.Int _ as exp) ->
     fprintf fmt "@[<2>jmp@ %a@]" Bap_exp.pp exp
   | Jmp exp -> fprintf fmt "@[<2>jmp@ (%a)@]" Bap_exp.pp exp
-  | Special s -> fprintf fmt "special@ @[<1>(%s)@]" s
+  | Special s -> Special.pp fmt s
   | While (cond, body) ->
     fprintf fmt "@[<v0>@[<v2>while (@[%a@]) {@;%a@]@;}@]"
       Bap_exp.pp cond pp_list body
@@ -43,6 +84,12 @@ module Stmt = struct
   let while_ x s1  = While (x,s1)
   let if_ x s1 s2 = If (x,s1,s2)
   let cpuexn n = CpuExn n
+  let encode s xs = special @@ Special.encode s xs
+  let decode n = function
+    | Special s -> Special.decode n s
+    | _ -> None
+  let call = Special.call
+
 end
 
 module Infix = struct

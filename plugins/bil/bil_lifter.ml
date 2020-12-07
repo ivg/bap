@@ -10,8 +10,9 @@ open Knowledge.Syntax
 open Theory.Parser
 include Self()
 
-module Call = Bil_semantics.Call
 let package = "bap"
+
+let intrinsic = KB.Name.create "intrinsic"
 
 module BilParser = struct
   type context = [`Bitv | `Bool | `Mem ] [@@deriving sexp]
@@ -166,16 +167,18 @@ module BilParser = struct
       | Imm m -> S.set_reg n m x
       | Mem (ks,vs) ->
         S.set_mem n (Size.in_bits ks) (Size.in_bits vs) x in
-    fun s -> match Call.dst s with
-      | Some dst -> S.call dst
-      | None -> match s with
-        | Move (v,x) -> set v x
-        | Jmp (Int x) -> S.goto (Word.to_bitvec x)
-        | Jmp x -> S.jmp x
-        | Special s -> S.special s
-        | While (c,xs) -> S.while_ c xs
-        | If (c,xs,ys) -> S.if_ c xs ys
-        | CpuExn n -> S.cpuexn n
+    fun s -> match Bil.(decode call s) with
+      | Some dsts -> S.call (String.concat dsts)
+      | None -> match Bil.(decode intrinsic s) with
+        | Some data -> S.call (String.concat ~sep:":" data)
+        | None -> match s with
+          | Move (v,x) -> set v x
+          | Jmp (Int x) -> S.goto (Word.to_bitvec x)
+          | Jmp x -> S.jmp x
+          | Special s -> S.special s
+          | While (c,xs) -> S.while_ c xs
+          | If (c,xs,ys) -> S.if_ c xs ys
+          | CpuExn n -> S.cpuexn n
 
   let t = {bitv; mem; stmt; bool; float; rmode}
 end
@@ -292,9 +295,9 @@ module Relocations = struct
     end)
 
   let override_external is_stub name =
-    let name = if is_stub then name ^ "@external" else name in
+    let name = if is_stub then [name; ":external"] else [name] in
     Stmt.map (object inherit Stmt.mapper
-      method! map_jmp _ = [Call.create name]
+      method! map_jmp _ = [Bil.(encode call name)]
     end)
 
   let relocations_slot =
@@ -386,9 +389,10 @@ let create_intrinsic arch mem insn =
   pre @ Bil.[
       Var.create ("insn:next_address") (Imm width) :=
         int (Addr.succ (Memory.max_addr mem));
-      Call.create (sprintf "%s:%s"
-                     (Insn.encoding insn)
-                     (Insn.name insn));
+      encode intrinsic [
+        Insn.encoding insn;
+        Insn.name insn
+      ]
     ]
 
 type predicate = [
