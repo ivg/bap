@@ -2392,15 +2392,35 @@ module Std : sig
 
     (** [call] is the attribute name for encoding calls.
 
-        Format:
-        - [encode call name] - represents a call to a function with
-          the given [name];
-        - [encode call name ":external"] - represent a call that is
-          external to the current unit
-
         @since 2.3.0
     *)
     val call : string Attribute.t
+
+
+    (** [intrinsic] is the attribute for intrinsic calls.
+
+        An intrinsic is a low-level, usually microarchitectural
+        operation.
+
+        @since 2.3.0
+    *)
+    val intrinsic: string Attribute.t
+
+
+    (** Core Theory specification of BIL.  *)
+    module Theory : sig
+
+
+      (** [parser] the parser enables reflection of the bil statements
+          into core theory terms. To reflect a bil program [prog] into
+          the theory [Theory], use
+          {[
+            let module Parser = Theory.Parser.Make(Theory) in
+            Parser.run Bil.Theory.parser bil
+          ]}
+      *)
+      val parser : (exp,_,stmt) Theory.Parser.t
+    end
 
     (** Maps BIL operators to bitvectors.
         @since 1.3

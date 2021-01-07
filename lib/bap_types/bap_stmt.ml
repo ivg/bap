@@ -31,6 +31,12 @@ module Special = struct
       ~decode:ident
       ~package:"bap"
 
+  let intrinsic = Attribute.declare "intrinsic"
+      ~encode:ident
+      ~decode:ident
+      ~package:"bap"
+
+
   let prefix = "@attribute:"
   let encode {Attribute.constr; encode} data =
     prefix ^
@@ -110,7 +116,7 @@ module Stmt = struct
     | Special s -> Special.decode n s
     | _ -> None
   let call = Special.call
-
+  let intrinsic = Special.intrinsic
 end
 
 module Infix = struct
