@@ -319,8 +319,6 @@ let provide_lifter ~enable_intrinsics ~with_fp () =
       info "BIL: the BIL lifter failed with %a" Error.pp err;
       !!Insn.empty
     | Ok bil ->
-      Bil_semantics.context >>= fun ctxt ->
-      Knowledge.provide Bil_semantics.arch ctxt arch >>= fun () ->
       let module Lifter = Theory.Parser.Make(Core) in
       Optimizer.run Bil.Theory.parser bil >>= fun sema ->
       let bil = Insn.bil sema in
