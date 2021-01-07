@@ -2342,23 +2342,53 @@ module Std : sig
         to get the values back. The meaning of the [attr] and
         [values] is specific to the user domain.
 
-        Example, [encode call ["malloc"; "external"]], where
+        Example, [encode call "malloc"], where
         [call] is the BIL attribute that denotes a call to a
         function. See {!call} for more information.
+
     *)
 
 
-    (** [encode attr vals] encodes [vals] as a special statement.
+    (** BIL attributes.
 
-        @since 2.2.0    *)
-    val encode : KB.Name.t -> string list -> stmt
+        BIL attributes serve the role of constructor for encoding
+        values as special statements. The attribute defines methods
+        for encoding and decoding values as a string as well as a
+        unique attribute name.
 
-
-    (** [decode attr s] is [Some vals] if [s] is [encode attr vals].
-
-        @since 2.2.0
+        @since 2.3.0
     *)
-    val decode : KB.Name.t -> stmt -> string list option
+    module Attribute : sig
+
+      (** the type of attributes  *)
+      type 'a t
+
+
+      (** [declare ?package name ~encode ~decode] declares a new attribute.
+
+          The attribute [package], [name] pair should be unique. If an
+          attribute with the given name is already registered the
+          registration will fail. *)
+      val declare :
+        ?package:string ->
+        encode:('a -> string) ->
+        decode:(string -> 'a) ->
+        string ->
+        'a t
+    end
+
+
+    (** [encode attr value] encodes [value] as a special statement.
+
+        @since 2.3.0    *)
+    val encode : 'a Attribute.t -> 'a -> stmt
+
+
+    (** [decode attr s] is [Some v] if [s] is [encode attr v].
+
+        @since 2.3.0
+    *)
+    val decode : 'a Attribute.t -> stmt -> 'a option
 
     (** [call] is the attribute name for encoding calls.
 
@@ -2368,9 +2398,9 @@ module Std : sig
         - [encode call name ":external"] - represent a call that is
           external to the current unit
 
-        @since 2.2.0
+        @since 2.3.0
     *)
-    val call : KB.Name.t
+    val call : string Attribute.t
 
     (** Maps BIL operators to bitvectors.
         @since 1.3

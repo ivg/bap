@@ -502,7 +502,7 @@ module Basic : Theory.Basic = struct
       | Some ivec -> ctrl Bil.[CpuExn ivec]
       | None -> KB.collect Theory.Label.name lbl >>= fun name ->
         ctrl @@ match name with
-        | Some name -> [Bil.(encode call [name])]
+        | Some name -> [Bil.(encode call name)]
         | None -> [Bil.special (Format.asprintf "(goto %a)" Tid.pp lbl)]
 end
 

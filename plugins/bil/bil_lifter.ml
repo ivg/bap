@@ -12,7 +12,11 @@ include Self()
 
 let package = "bap"
 
-let intrinsic = KB.Name.create "intrinsic"
+let intrinsic = Bil.Attribute.declare
+    ~encode:ident
+    ~decode:ident
+    ~package
+    "intrinsic"
 
 module BilParser = struct
   type context = [`Bitv | `Bool | `Mem ] [@@deriving sexp]
@@ -168,9 +172,9 @@ module BilParser = struct
       | Mem (ks,vs) ->
         S.set_mem n (Size.in_bits ks) (Size.in_bits vs) x in
     fun s -> match Bil.(decode call s) with
-      | Some dsts -> S.call (String.concat dsts)
+      | Some dst -> S.call dst
       | None -> match Bil.(decode intrinsic s) with
-        | Some data -> S.call (String.concat ~sep:":" data)
+        | Some data -> S.call data
         | None -> match s with
           | Move (v,x) -> set v x
           | Jmp (Int x) -> S.goto (Word.to_bitvec x)
@@ -295,7 +299,7 @@ module Relocations = struct
     end)
 
   let override_external is_stub name =
-    let name = if is_stub then [name; ":external"] else [name] in
+    let name = if is_stub then name^":external" else name in
     Stmt.map (object inherit Stmt.mapper
       method! map_jmp _ = [Bil.(encode call name)]
     end)
@@ -389,10 +393,9 @@ let create_intrinsic arch mem insn =
   pre @ Bil.[
       Var.create ("insn:next_address") (Imm width) :=
         int (Addr.succ (Memory.max_addr mem));
-      encode intrinsic [
-        Insn.encoding insn;
-        Insn.name insn
-      ]
+      encode intrinsic @@ sprintf "%s:%s"
+        (Insn.encoding insn)
+        (Insn.name insn)
     ]
 
 type predicate = [

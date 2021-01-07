@@ -176,8 +176,7 @@ let demangle s = match String.chop_suffix ~suffix:":external" s with
   | Some s -> s
 
 let extract_external stmt = match Bil.(decode call stmt) with
-  | Some (dst::_) ->
-    Some (Name (demangle dst))
+  | Some dst -> Some (Name (demangle dst))
   | _ -> None
 
 

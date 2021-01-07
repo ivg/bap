@@ -7,22 +7,43 @@ open Format
 open Bap_bil
 
 
+module Attribute = struct
+  type 'a t = {
+    constr : KB.Name.t;
+    encode : 'a -> string;
+    decode : string -> 'a;
+  }
+
+  let known = Hash_set.create (module KB.Name)
+
+  let declare ?package ~encode ~decode name =
+    let constr = KB.Name.create ?package name in
+    if Hash_set.mem known constr
+    then failwithf "The BIL attribute %s is already \
+                    registered. Please choose another name."
+        (KB.Name.show constr) ();
+    {encode; decode; constr}
+end
+
 module Special = struct
-  let call = KB.Name.create ~package:"bap" "call"
+  let call = Attribute.declare "call"
+      ~encode:ident
+      ~decode:ident
+      ~package:"bap"
+
   let prefix = "@attribute:"
-  let encode attr vals =
+  let encode {Attribute.constr; encode} data =
     prefix ^
     Sexp.to_string @@
-    Sexp.List (Sexp.Atom (KB.Name.show attr) ::
-               List.map vals ~f:(fun v -> Sexp.Atom v))
+    Sexp.List [
+      Atom (KB.Name.show constr);
+      Atom (encode data);
+    ]
 
-  let decode_payload attr name vals =
+  let decode_payload {Attribute.constr; decode} name data =
     let name = KB.Name.read name in
-    if KB.Name.equal name attr then
-      Option.all @@
-      List.map vals ~f:(function
-          | Sexp.Atom x -> Some x
-          | _ -> None)
+    if KB.Name.equal name constr
+    then Some (decode data)
     else None
 
 
@@ -30,7 +51,7 @@ module Special = struct
     | None -> None
     | Some payload -> match Sexp.of_string payload with
       | exception _ -> None
-      | Sexp.List (Atom name :: vals) -> decode_payload attr name vals
+      | Sexp.List [Atom name; Atom data] -> decode_payload attr name data
       | _ -> None
 
   let pp_default ppf s = fprintf ppf "special@ @[<1>(%s)@]" s
