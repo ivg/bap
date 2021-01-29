@@ -1,6 +1,7 @@
 open Core_kernel
 open Bap.Std
 open Bap_core_theory
+open Monads.Std
 
 open Bap_primus_lisp_types
 
@@ -10,11 +11,19 @@ module Def = Bap_primus_lisp_def
 module Check = Bap_primus_lisp_type.Check
 module Key = Bap_primus_lisp_program.Items
 
-open KB.Syntax
-open KB.Let
+module Meta = struct
+  type state = {
+    bound : Set.M(Theory.Var.Top).t;
+    stack : (unit Theory.Var.t * Bitvec.t) list;
+    arith : (module Bitvec.S);
+  }
+  module State = struct type t = state end
+  include Monad.State.T1(State)(KB)
+  include Monad.State.Make(State)(KB)
+end
 
-
-type words
+open Meta.Syntax
+open Meta.Let
 
 type value = unit Theory.Value.t
 type effect = unit Theory.Effect.t
@@ -32,14 +41,16 @@ let program = KB.Class.property Theory.Source.cls "primus-lisp-program" @@
         let r = Format.asprintf "%a" Program.pp p in
         Sexp.Atom r)
 
+let fail s = Meta.lift (KB.fail s)
 
 let lookup prog item name = match Resolve.semantics prog item name () with
   | None -> !!None
   | Some (Error problem) ->
-    KB.fail (Unresolved_definition problem)
+    fail (Unresolved_definition problem)
   | Some (Ok (fn,_)) -> !!(Some fn)
 
 module Primitive = struct
+  open KB.Syntax
   type t = {
     name : string;
     args : Theory.Value.Top.t list;
@@ -85,33 +96,36 @@ let static =
     ~equal:Bitvec.equal
     ~inspect:(fun x -> Sexp.Atom (Bitvec.to_string x))
 
+let (!) = KB.(!!)
+
 module Prelude(CT : Theory.Core) = struct
   let bits = Theory.Bitv.define
-  let label = KB.Object.create Theory.Program.cls
+  let label = Meta.lift (KB.Object.create Theory.Program.cls)
 
   let rec seq = function
-    | [] -> CT.perform Theory.Effect.Sort.bot
+    | [] -> Meta.lift@@CT.perform Theory.Effect.Sort.bot
     | [x] -> x
-    | x :: xs -> CT.seq x @@ seq xs
+    | x :: xs ->
+      let* xs = seq xs in
+      let* x = x in
+      Meta.lift@@CT.seq (KB.return x) (KB.return xs)
 
-  let skip = seq []
-  let pass = seq []
+  let skip = CT.perform Theory.Effect.Sort.bot
+  let pass = CT.perform Theory.Effect.Sort.bot
 
   let pure res =
-    label >>= fun lbl ->
-    res >>= fun res ->
-    CT.blk lbl (seq []) (seq []) >>| fun eff ->
-    create eff res
+    res >>| fun res ->
+    create (Theory.Effect.empty Theory.Effect.Sort.bot) res
 
   let bigint x m =
     let s = bits m in
     let m = Bitvec.modulus m in
     let x = Bitvec.(bigint x mod m) in
-    CT.int s x
+    Meta.lift (CT.int s x)
 
   let zero = bigint Z.zero 1
 
-  let (:=) = CT.set
+  let (:=) v x = Meta.lift@@CT.set v x
 
   let full eff res =
     seq eff >>= fun eff ->
@@ -120,20 +134,23 @@ module Prelude(CT : Theory.Core) = struct
 
   let data xs =
     label >>= fun lbl ->
-    CT.blk lbl (seq xs) (seq [])
+    let* data = seq xs in
+    Meta.lift@@CT.blk lbl !data skip
 
   let ctrl xs =
     label >>= fun lbl ->
-    CT.blk lbl (seq []) (seq xs)
+    let* ctrl = seq xs in
+    Meta.lift@@CT.blk lbl pass !ctrl
 
-  let blk lbl xs =
-    seq [CT.blk lbl pass skip; seq xs]
+  let blk lbl xs = seq [
+      Meta.lift@@CT.blk lbl pass skip;
+      seq xs;
+    ]
 
   let cast s x =
-    CT.cast (bits s) CT.b0 !!x
+    Meta.lift@@CT.cast (bits s) CT.b0 !x
 
-  let undefined =
-    full [CT.perform lisp_machine] zero
+  let undefined = full [] zero
 
   let unified x y f =
     Theory.Value.Match.(begin
@@ -151,25 +168,22 @@ module Prelude(CT : Theory.Core) = struct
   let nil = pure @@ zero
 
   let var n m =
-    CT.var@@Theory.Var.define (bits m) n
-
+    Meta.lift@@CT.var@@Theory.Var.define (bits m) n
 
   let symsort = Bap_primus_value.Index.key_width
 
 
   let sym name =
-    KB.return @@
+    Meta.return @@
     KB.Value.put symbol (Theory.Value.empty (bits symsort)) (Some name)
 
-  let undefined =
-    full [CT.perform lisp_machine] zero
 
   let coerce_bits s x f =
     let open Theory.Value.Match in
     let| () = can Theory.Bitv.refine x @@ fun x ->
-      CT.cast s CT.b0 !!x >>= f in
+      Meta.lift@@CT.cast s CT.b0 !x >>= f in
     let| () = can Theory.Bool.refine x @@ fun cnd ->
-      CT.ite !!cnd
+      Meta.lift@@CT.ite !cnd
         (CT.int s Bitvec.one)
         (CT.int s Bitvec.zero) >>= fun x ->
       f x in
@@ -179,12 +193,12 @@ module Prelude(CT : Theory.Core) = struct
     let open Theory.Value.Match in
     let| () = can Theory.Bool.refine x f in
     let| () = can Theory.Bitv.refine x @@ fun x ->
-      CT.non_zero !!x >>= fun x -> f x in
+      Meta.lift@@CT.non_zero !x >>= fun x -> f x in
     undefined
 
   let reify prog target name =
     let word = Theory.Target.bits target in
-    let rec eval : ast -> unit Theory.eff = function
+    let rec eval : ast -> unit Theory.Effect.t Meta.t = function
       | {data=Int {data={exp=x; typ=Type m}}} -> pure@@bigint x m
       | {data=Int {data={exp=x; typ=Any}}} -> pure@@bigint x word
       | {data=Var {data={exp=n; typ=Type m}}} -> pure@@var n m
@@ -204,56 +218,57 @@ module Prelude(CT : Theory.Core) = struct
       let* yes = eval yes in
       let* nay = eval nay in
       coerce_bool (res cnd) @@ fun cres ->
-      Theory.Var.fresh Theory.Bool.t >>= fun c ->
+      Meta.lift@@Theory.Var.fresh Theory.Bool.t >>= fun c ->
       full [
         !!cnd;
-        data [c := !!cres];
-        CT.branch (CT.var c) !!yes !!nay;
+        data [c := !cres];
+        Meta.lift@@CT.branch (CT.var c) !yes !nay;
       ] @@
-      CT.ite (CT.var c) !!(res yes) !!(res nay)
+      Meta.lift@@CT.ite (CT.var c) !(res yes) !(res nay)
     and rep cnd body =
       let* cnd = eval cnd in
       let* body = eval body in
       let* head = label and* loop = label and* tail = label in
       coerce_bool (res cnd) @@ fun cres ->
       full [
-        blk head [ctrl [CT.goto tail]];
+        blk head [ctrl [Meta.lift@@CT.goto tail]];
         blk loop [!!body];
         blk tail [!!cnd; ctrl [
-            CT.branch !!cres (CT.goto head) skip
+            Meta.lift@@CT.branch !cres (CT.goto head) skip
           ]]
       ] !!cres
     and app name xs =
       map xs >>= fun (aeff,xs) ->
-      Primitive.eval name (List.map ~f:forget xs) >>= fun peff ->
+      let xs = List.map ~f:forget xs in
+      Meta.lift@@Primitive.eval name xs >>= fun peff ->
       if KB.Domain.is_empty Theory.Semantics.domain peff
       then
-        let* dst = Theory.Label.for_name name in
+        let* dst = Meta.lift@@Theory.Label.for_name name in
         let* eff = args name xs in
         full [
           !!aeff;
           !!eff;
-          ctrl [CT.goto dst]
+          ctrl [Meta.lift@@CT.goto dst]
         ] !!(res eff)
       else
         full [!!aeff; !!peff] !!(res peff)
     and map args =
       seq [] >>= fun eff ->
-      KB.List.fold args ~init:(eff,[]) ~f:(fun (eff,args) arg ->
+      Meta.List.fold args ~init:(eff,[]) ~f:(fun (eff,args) arg ->
           let* eff' = eval arg in
           let+ eff = seq [!!eff; !!eff'] in
           (eff,forget (res eff')::args)) >>| fun (eff,args) ->
       eff, List.rev args
     and seq_ xs =
       nil >>= fun init ->
-      KB.List.fold ~init xs ~f:(fun eff x  ->
+      Meta.List.fold ~init xs ~f:(fun eff x  ->
           let* eff' = eval x in
           full [!!eff; !!eff'] !!(res eff'))
     and set_ n t x =
       let* eff = eval x in
       let v = Theory.Var.define (bits t) n in
       coerce_bits (bits t) (res eff) @@ fun reff ->
-      full [!!eff; data [v := !!reff]] !!reff
+      full [!!eff; data [v := !reff]] !!reff
     and let_ v t x b =
       let* x = eval x in
       let* b = eval b in
@@ -262,18 +277,21 @@ module Prelude(CT : Theory.Core) = struct
       cast t rx >>= fun rx ->
       full [
         !!x;
-        data [v := !!rx];
+        data [v := !rx];
         !!b;
       ] !!(res b)
     and args name xs =
       sym name >>= fun x ->
-      Primitive.eval "invoke-subroutine" (forget x::xs) in
+      Meta.lift@@Primitive.eval "invoke-subroutine" (forget x::xs) in
     lookup prog Key.func name >>= function
     | Some fn -> eval (Def.Func.body fn)
     | None -> !!Insn.empty
 end
 
 module Unit = struct
+  open KB.Syntax
+  open KB.Let
+
   let slot = KB.Class.property Theory.Unit.cls "lisp-unit"
       ~package:"bap"
       ~public:true @@ KB.Domain.optional "unit-name"
@@ -297,6 +315,7 @@ end
 
 
 let provide () =
+  let open KB.Syntax in
   KB.Rule.(begin
       declare "primus-lisp-semantics" |>
       require Theory.Label.name |>
@@ -320,8 +339,18 @@ let provide () =
         KB.collect Theory.Unit.source unit >>= fun src ->
         KB.collect Theory.Unit.target unit >>= fun target ->
         let prog = KB.Value.get program src in
+        let bits = Theory.Target.bits target in
+        let module Arith = Bitvec.Make(struct
+            let modulus = Bitvec.modulus bits
+          end) in
+        let meta = Meta.{
+            stack = [];
+            bound = Set.empty (module Theory.Var.Top);
+            arith = (module Arith);
+          } in
         Theory.instance () >>= Theory.require >>= fun (module Core) ->
         let open Prelude(Core) in
-        reify prog target name
+        Meta.run (reify prog target name) meta >>| fun (res,_) ->
+        res
 
 let enable () = provide ()
