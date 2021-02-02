@@ -33,7 +33,6 @@ module Primitives(CT : Theory.Core) = struct
   let negone s =
     CT.int s @@ Bitvec.(ones mod modulus (size s))
 
-  let one s = CT.int s @@ Bitvec.one
   let int s x = CT.int s @@ Bitvec.(int x mod modulus (size s))
 
 
@@ -46,18 +45,31 @@ module Primitives(CT : Theory.Core) = struct
     | _ -> illformed "requires exactly two arguments"
 
   let require_bitv x = match to_bitv x with
-    | Some x -> !!x
     | None -> illformed "requires a bitvector"
+    | Some x -> !!x
 
   let all_bitv = KB.List.map ~f:require_bitv
 
-  let monoid s f init xs =
+  let const x = KB.Value.get Primus.Lisp.Semantics.static x
+  let static s x =
+    CT.int s x >>| fun v ->
+    KB.Value.put Primus.Lisp.Semantics.static
+      v
+      (Some x)
+
+  type 'a bitv = 'a Theory.Bitv.t Theory.Value.sort
+
+  let monoid s sf df init xs =
     all_bitv xs >>= function
-    | [] -> forget@@init s
+    | [] -> forget@@static s init
     | x :: xs ->
       KB.List.fold ~init:x xs ~f:(fun res x ->
-          CT.cast s CT.b0 !!x >>= fun x ->
-          f !!res !!x) |>
+          match const res, const x with
+          | Some res, Some x ->
+            static s@@sf res x
+          | _ ->
+            CT.cast s CT.b0 !!x >>= fun x ->
+            df !!res !!x) |>
       forget
 
   let is_one x = CT.(inv@@is_zero x)
@@ -145,21 +157,25 @@ module Primitives(CT : Theory.Core) = struct
 
   let dispatch lbl name args =
     Theory.Label.target lbl >>= fun t ->
-    let s = Theory.Bitv.define (Theory.Target.bits t) in
+    let bits = Theory.Target.bits t in
+    let module Z = Bitvec.Make(struct
+        let modulus = Bitvec.modulus bits
+      end) in
+    let s = Theory.Bitv.define bits in
     match name with
-    | "+" -> pure@@monoid s CT.add CT.zero args
-    | "-" -> pure@@monoid s CT.sub CT.zero args
-    | "*" -> pure@@monoid s CT.mul one args
-    | "/" -> pure@@monoid s CT.div one args
-    | "s/" -> pure@@monoid s CT.sdiv one args
-    | "mod" -> pure@@monoid s CT.modulo one args
-    | "signed-mod" -> pure@@monoid s CT.smodulo one args
-    | "lshift" -> pure@@monoid s CT.lshift one args
-    | "rshift" -> pure@@monoid s CT.rshift one args
-    | "arshift" -> pure@@monoid s CT.arshift one args
-    | "logand" -> pure@@monoid s CT.logand negone args
-    | "logor" -> pure@@monoid s CT.logor CT.zero args
-    | "logxor" -> pure@@monoid s CT.logxor CT.zero args
+    | "+" -> pure@@monoid s Z.add CT.add Z.zero args
+    | "-" -> pure@@monoid s Z.sub CT.sub Z.zero args
+    | "*" -> pure@@monoid s Z.mul CT.mul Z.one args
+    | "/" -> pure@@monoid s Z.div CT.div Z.one args
+    | "s/" -> pure@@monoid s Z.sdiv CT.sdiv Z.one args
+    | "mod" -> pure@@monoid s Z.rem CT.modulo Z.one args
+    | "signed-mod" -> pure@@monoid s Z.srem CT.smodulo Z.one args
+    | "lshift" -> pure@@monoid s Z.lshift CT.lshift Z.one args
+    | "rshift" -> pure@@monoid s Z.rshift CT.rshift Z.one args
+    | "arshift" -> pure@@monoid s Z.arshift CT.arshift Z.one args
+    | "logand" -> pure@@monoid s Z.logand CT.logand Z.ones args
+    | "logor" -> pure@@monoid s Z.logor CT.logor Z.zero args
+    | "logxor" -> pure@@monoid s Z.logxor CT.logxor Z.zero args
     | "=" -> pure@@order CT.eq args
     | "/=" -> pure@@order CT.neq args
     | "<" -> pure@@order CT.ult args
