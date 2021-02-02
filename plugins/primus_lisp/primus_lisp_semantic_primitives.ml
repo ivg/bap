@@ -176,6 +176,31 @@ module Primitives(CT : Theory.Core) = struct
     let (:=) = CT.set in
     CT.(mem := store (var mem) !!dst !!data)
 
+
+  let rec prefix p = function
+    | [] -> []
+    | x::xs -> (p,x) :: prefix p xs
+
+  let rec combinations = function
+    | [] -> []
+    | x :: xs -> prefix x xs @ combinations xs
+
+
+  let distinct_pair (x,y) =
+    bitv x >>= fun x ->
+    bitv y >>= fun y ->
+    match const x, const y with
+    | Some x, Some y -> const_bool Bitvec.(x <> y)
+    | _ -> CT.neq !!x !!y
+
+  let distinct = function
+    | [] | [_] -> true_
+    | xs ->
+      true_ >>= fun init ->
+      KB.List.fold (combinations xs) ~init ~f:(fun t p ->
+          distinct_pair p >>= fun t' ->
+          t &&& t')
+
   let dispatch lbl name args =
     Theory.Label.target lbl >>= fun t ->
     let bits = Theory.Target.bits t in
@@ -204,11 +229,11 @@ module Primitives(CT : Theory.Core) = struct
     | "logor" -> pure@@monoid s Z.logor CT.logor Z.zero args
     | "logxor" -> pure@@monoid s Z.logxor CT.logxor Z.zero args
     | "=" -> pure@@order Bitvec.(=) CT.eq args
-    | "/=" -> pure@@order Bitvec.(<>) CT.neq args
     | "<" -> pure@@order Bitvec.(<) CT.ult args
     | ">" -> pure@@order Bitvec.(>) CT.ugt args
     | "<=" -> pure@@order Bitvec.(<=) CT.ule args
     | ">=" -> pure@@order Bitvec.(>=) CT.uge args
+    | "/=" | "distinct" -> pure@@forget@@distinct args
     | "is-zero" | "not" -> pure@@all Bitvec.(equal zero) CT.is_zero args
     | "is-positive" -> pure@@all Z.is_positive is_positive args
     | "is-negative" -> pure@@all Z.is_negative is_negative args
