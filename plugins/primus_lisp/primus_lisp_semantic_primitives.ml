@@ -33,8 +33,6 @@ module Primitives(CT : Theory.Core) = struct
   let negone s =
     CT.int s @@ Bitvec.(ones mod modulus (size s))
 
-  let int s x = CT.int s @@ Bitvec.(int x mod modulus (size s))
-
 
   let unary = function
     | [x] -> !!x
@@ -48,6 +46,7 @@ module Primitives(CT : Theory.Core) = struct
   let set_const v x =
     KB.Value.put Primus.Lisp.Semantics.static v (Some x)
   let const_int s x = CT.int s x >>| fun v -> set_const v x
+  let int s x = const_int s @@ Bitvec.(int x mod modulus (size s))
   let true_ = CT.b1 >>| fun v -> set_const v Bitvec.one
   let false_ = CT.b0 >>| fun v -> set_const v Bitvec.zero
   let const_bool x = if x then true_ else false_
@@ -112,11 +111,15 @@ module Primitives(CT : Theory.Core) = struct
 
   let order sf df xs = forget@@is_ordered sf df xs
 
-  let all f xs =
-    CT.b1 >>= fun init ->
+  let all sf df xs =
+    true_ >>= fun init ->
     KB.List.fold ~init xs ~f:(fun r x ->
         bitv x >>= fun x ->
-        CT.and_ !!r (f !!x)) |>
+        let r' = match const x with
+          | Some x -> const_bool (sf x)
+          | None -> df !!x in
+        r' >>= fun r' ->
+        r &&& r') |>
     forget
 
 
@@ -127,10 +130,10 @@ module Primitives(CT : Theory.Core) = struct
 
   let pure res = full (seq []) res
 
-  let static = pure
   let ctrl eff =
     let* lbl = fresh in
     CT.blk lbl (seq []) eff
+
   let data eff =
     let* lbl = fresh in
     CT.blk lbl eff (seq [])
@@ -176,9 +179,15 @@ module Primitives(CT : Theory.Core) = struct
   let dispatch lbl name args =
     Theory.Label.target lbl >>= fun t ->
     let bits = Theory.Target.bits t in
-    let module Z = Bitvec.Make(struct
-        let modulus = Bitvec.modulus bits
-      end) in
+    let module Z = struct
+      include Bitvec.Make(struct
+          let modulus = Bitvec.modulus bits
+        end)
+      let is_zero = Bitvec.equal zero
+      let is_negative = msb
+      let is_positive x =
+        not (is_negative x) && not (is_zero x)
+    end in
     let s = Theory.Bitv.define bits in
     match name with
     | "+" -> pure@@monoid s Z.add CT.add Z.zero args
@@ -200,10 +209,10 @@ module Primitives(CT : Theory.Core) = struct
     | ">" -> pure@@order Bitvec.(>) CT.ugt args
     | "<=" -> pure@@order Bitvec.(<=) CT.ule args
     | ">=" -> pure@@order Bitvec.(>=) CT.uge args
-    | "is-zero" | "not" -> pure@@all CT.is_zero args
-    | "is-positive" -> pure@@all is_positive args
-    | "is-negative" -> pure@@all is_negative args
-    | "word-width" -> static@@word_width s args
+    | "is-zero" | "not" -> pure@@all Bitvec.(equal zero) CT.is_zero args
+    | "is-positive" -> pure@@all Z.is_positive is_positive args
+    | "is-negative" -> pure@@all Z.is_negative is_negative args
+    | "word-width" -> pure@@word_width s args
     | "exec-addr" -> ctrl@@exec_addr args
     | "memory-read" -> pure@@memory_read t args
     | "memory-write" -> data@@memory_write t args
