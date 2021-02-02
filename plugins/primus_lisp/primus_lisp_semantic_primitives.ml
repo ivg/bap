@@ -15,9 +15,9 @@ let nothing = KB.Value.empty Theory.Semantics.cls
 
 let size = Theory.Bitv.size
 let forget x = x >>| Theory.Value.forget
-let to_bitv x = Theory.Value.resort Theory.Bitv.refine x
 let empty s = Theory.Value.(forget @@ empty s)
 let fresh = KB.Object.create Theory.Program.cls
+let bits x = size @@ Theory.Value.sort x
 
 module Primitives(CT : Theory.Core) = struct
 
@@ -36,37 +36,51 @@ module Primitives(CT : Theory.Core) = struct
   let int s x = CT.int s @@ Bitvec.(int x mod modulus (size s))
 
 
-  let require_one = function
+  let unary = function
     | [x] -> !!x
     | _ -> illformed "requires exactly one argument"
 
-  let require_two xs f = match xs with
+  let binary xs f = match xs with
     | [x; y] -> f x y
     | _ -> illformed "requires exactly two arguments"
 
-  let require_bitv x = match to_bitv x with
-    | None -> illformed "requires a bitvector"
-    | Some x -> !!x
-
-  let all_bitv = KB.List.map ~f:require_bitv
-
   let const x = KB.Value.get Primus.Lisp.Semantics.static x
-  let static s x =
-    CT.int s x >>| fun v ->
-    KB.Value.put Primus.Lisp.Semantics.static
-      v
-      (Some x)
+  let set_const v x =
+    KB.Value.put Primus.Lisp.Semantics.static v (Some x)
+  let const_int s x = CT.int s x >>| fun v -> set_const v x
+  let true_ = CT.b1 >>| fun v -> set_const v Bitvec.one
+  let false_ = CT.b0 >>| fun v -> set_const v Bitvec.zero
+  let const_bool x = if x then true_ else false_
+
+  let bitv x =
+    match Theory.Value.resort Theory.Bitv.refine x with
+    | Some x -> !!x
+    | None -> match Theory.Value.resort Theory.Bool.refine x with
+      | None -> illformed "defined for bits or bools"
+      | Some b ->
+        let s = Theory.Bitv.define 1 in
+        let b1 = const_int s Bitvec.M1.one
+        and b0 = const_int s Bitvec.M1.zero in
+        match const b with
+        | Some r ->
+          if Bitvec.(equal r zero)
+          then b0
+          else b1
+        | None -> CT.ite !!b b1 b0
+
+
+  let nbitv = KB.List.map ~f:bitv
 
   type 'a bitv = 'a Theory.Bitv.t Theory.Value.sort
 
   let monoid s sf df init xs =
-    all_bitv xs >>= function
-    | [] -> forget@@static s init
+    nbitv xs >>= function
+    | [] -> forget@@const_int s init
     | x :: xs ->
       KB.List.fold ~init:x xs ~f:(fun res x ->
           match const res, const x with
           | Some res, Some x ->
-            static s@@sf res x
+            const_int s@@sf res x
           | _ ->
             CT.cast s CT.b0 !!x >>= fun x ->
             df !!res !!x) |>
@@ -74,30 +88,37 @@ module Primitives(CT : Theory.Core) = struct
 
   let is_one x = CT.(inv@@is_zero x)
 
-  let rec is_ordered f = function
-    | [] | [_] -> CT.b1
-    | x :: (y :: _ as rest) ->
-      match to_bitv x, to_bitv y with
-      | Some x, Some y ->
-        f !!x !!y >>= fun r ->
-        is_ordered f rest >>= fun r' ->
-        CT.and_ !!r !!r'
-      | _ -> CT.unk Theory.Bool.t
+  let (&&&) x y = match const x, const y with
+    | Some x, Some y ->
+      if Bitvec.(equal x zero || equal y zero)
+      then false_
+      else true_
+    | _ -> CT.and_ !!x !!y
 
-  let order f xs = forget@@is_ordered f xs
+  let rec is_ordered sf df = function
+    | [] | [_] -> true_
+    | x :: (y :: _ as rest) ->
+      bitv x >>= fun x ->
+      bitv y >>= fun y ->
+      match const x, const y with
+      | Some x, Some y ->
+        const_bool@@sf x y >>= fun r ->
+        is_ordered sf df rest >>= fun r' ->
+        r &&& r'
+      | _ ->
+        df !!x !!y >>= fun r ->
+        is_ordered sf df rest >>= fun r' ->
+        CT.and_ !!r !!r'
+
+  let order sf df xs = forget@@is_ordered sf df xs
 
   let all f xs =
     CT.b1 >>= fun init ->
     KB.List.fold ~init xs ~f:(fun r x ->
-        match to_bitv x with
-        | None -> illformed "requires bitvec"
-        | Some x ->
-          CT.and_ !!r (f !!x)) |>
+        bitv x >>= fun x ->
+        CT.and_ !!r (f !!x)) |>
     forget
 
-  let unary f xs =
-    require_one xs >>= require_bitv >>= fun x ->
-    forget@@f !!x
 
   let full eff res =
     res >>= fun res ->
@@ -127,8 +148,7 @@ module Primitives(CT : Theory.Core) = struct
     CT.(and_ (non_zero x) (inv (is_negative x)))
 
   let word_width s xs =
-    let bits x = size @@ Theory.Value.sort x in
-    all_bitv xs >>= fun xs ->
+    nbitv xs >>= fun xs ->
     List.max_elt xs ~compare:(fun x y ->
         Int.compare (bits x) (bits y)) |>
     Option.value_map ~f:(fun x ->
@@ -137,20 +157,18 @@ module Primitives(CT : Theory.Core) = struct
     forget
 
   let exec_addr xs =
-    require_one xs >>=
-    require_bitv >>= fun dst ->
+    unary xs >>= bitv >>= fun dst ->
     CT.jmp !!dst
 
   let memory_read t xs =
-    require_one xs >>=
-    require_bitv >>= fun src ->
+    unary xs >>= bitv >>= fun src ->
     CT.(load (var (Theory.Target.data t)) !!src) |>
     forget
 
   let memory_write t xs =
-    require_two xs @@ fun dst data ->
-    require_bitv dst >>= fun dst ->
-    require_bitv data >>= fun data ->
+    binary xs @@ fun dst data ->
+    bitv dst >>= fun dst ->
+    bitv data >>= fun data ->
     let mem = Theory.Target.data t in
     let (:=) = CT.set in
     CT.(mem := store (var mem) !!dst !!data)
@@ -176,12 +194,12 @@ module Primitives(CT : Theory.Core) = struct
     | "logand" -> pure@@monoid s Z.logand CT.logand Z.ones args
     | "logor" -> pure@@monoid s Z.logor CT.logor Z.zero args
     | "logxor" -> pure@@monoid s Z.logxor CT.logxor Z.zero args
-    | "=" -> pure@@order CT.eq args
-    | "/=" -> pure@@order CT.neq args
-    | "<" -> pure@@order CT.ult args
-    | ">" -> pure@@order CT.ugt args
-    | "<=" -> pure@@order CT.ule args
-    | ">=" -> pure@@order CT.uge args
+    | "=" -> pure@@order Bitvec.(=) CT.eq args
+    | "/=" -> pure@@order Bitvec.(<>) CT.neq args
+    | "<" -> pure@@order Bitvec.(<) CT.ult args
+    | ">" -> pure@@order Bitvec.(>) CT.ugt args
+    | "<=" -> pure@@order Bitvec.(<=) CT.ule args
+    | ">=" -> pure@@order Bitvec.(>=) CT.uge args
     | "is-zero" | "not" -> pure@@all CT.is_zero args
     | "is-positive" -> pure@@all is_positive args
     | "is-negative" -> pure@@all is_negative args
