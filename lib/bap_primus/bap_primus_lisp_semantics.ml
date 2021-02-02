@@ -93,8 +93,14 @@ let symbol =
     ~equal:String.equal
     ~inspect:(fun x -> Sexp.Atom x)
 
+
 let static_slot =
-  KB.Class.property Theory.Value.cls "static-value" @@
+  KB.Class.property Theory.Value.cls "static-value"
+    ~package:"bap"
+    ~public:true
+    ~persistent:(KB.Persistent.of_binable (module struct
+                   type t = Bitvec_binprot.t option [@@deriving bin_io]
+                 end)) @@
   KB.Domain.optional "bitvec"
     ~equal:Bitvec.equal
     ~inspect:(fun x -> Sexp.Atom (Bitvec.to_string x))
@@ -238,6 +244,8 @@ module Prelude(CT : Theory.Core) = struct
 
   let nil = !!(Theory.Value.empty Theory.Bool.t)
   let undefined = full [] nil
+  let purify eff =
+    full [] !!(res eff)
 
   let unified x y f =
     Theory.Value.Match.(begin
@@ -373,29 +381,26 @@ module Prelude(CT : Theory.Core) = struct
       let v = Theory.Var.define (bits t) n in
       Stack.is_bound v >>= function
       | true ->
-        Format.eprintf "the variable %s is bound@\n" n;
         Stack.set v (res eff) >>= fun () ->
-        undefined
+        purify eff
       | false -> match static eff with
         | Some _ ->
-          Format.eprintf "the rhs of %s is static@\n" n;
           Stack.push v (res eff) >>= fun () ->
-          undefined
+          purify eff
         | None ->
-          Format.eprintf "A regular machine assignment of %s@\n" n;
           coerce_bits (bits t) (res eff) @@ fun reff ->
           full [!!eff; data [v := !reff]] !!reff
     and let_ v t x b =
       let* x = eval x in
-      let* b = eval b in
       let v = Theory.Var.define (bits t) v in
       match static x with
       | Some _ ->
         Stack.push v (res x) >>= fun () ->
-        undefined
+        eval b
       | None ->
         coerce_bits (bits t) (res x) @@ fun rx ->
         cast t rx >>= fun rx ->
+        let* b = eval b in
         full [
           !!x;
           data [v := !rx];
