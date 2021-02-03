@@ -120,6 +120,42 @@ let static x =
 
 let (!) = KB.(!!)
 
+let empty = Theory.Effect.empty Theory.Effect.Sort.bot
+
+let sym str =
+  let v = update_value empty @@ fun v ->
+    KB.Value.put symbol v (Some str) in
+  match str with
+  | "nil" -> Meta.return@@set_static v Bitvec.zero
+  | name ->
+    Meta.lift @@
+    KB.Symbol.intern name Theory.Value.cls >>|
+    KB.Object.id >>| Int63.to_int64 >>|
+    Bitvec.M64.int64 >>|
+    set_static v
+
+let is_machine_var t v =
+  Set.mem (Theory.Target.vars t) (Theory.Var.forget v)
+
+let machine_var_by_name t name =
+  Set.find (Theory.Target.vars t) ~f:(fun v ->
+      String.equal (Theory.Var.name v) name)
+
+let make_var ?t:constr target name  =
+  let word = Theory.Target.bits target in
+  match machine_var_by_name target name with
+  | Some v -> v
+  | None ->
+    let t = Option.value constr ~default:word in
+    Theory.Var.forget@@Theory.Var.define (bits t) name
+
+let lookup_parameter prog v =
+  let name = Theory.Var.name v in
+  Program.get prog Key.para |>
+  List.find ~f:(fun p ->
+      String.equal (Def.name p) name) |> function
+  | None -> None
+  | Some p -> Some (Def.Para.default p)
 
 module Stack = struct
   open Meta.State
@@ -204,7 +240,6 @@ module Prelude(CT : Theory.Core) = struct
 
   let skip = CT.perform Theory.Effect.Sort.bot
   let pass = CT.perform Theory.Effect.Sort.bot
-  let empty = Theory.Effect.empty Theory.Effect.Sort.bot
 
   let pure res =
     res >>| fun res ->
@@ -259,16 +294,6 @@ module Prelude(CT : Theory.Core) = struct
         undefined
       end)
 
-
-  let sym = function
-    | "nil" -> Meta.return@@set_static empty Bitvec.zero
-    | name ->
-      Meta.lift @@
-      KB.Symbol.intern name Theory.Program.cls >>|
-      KB.Object.id >>| Int63.to_int64 >>|
-      Bitvec.M64.int64 >>|
-      set_static empty
-
   let coerce_bits s x f =
     let open Theory.Value.Match in
     let| () = can Theory.Bitv.refine x @@ fun x ->
@@ -287,31 +312,34 @@ module Prelude(CT : Theory.Core) = struct
       Meta.lift@@CT.non_zero !x >>= fun x -> f x in
     undefined
 
+  let is_static eff = Option.is_some (static eff)
 
-
+  let assign target v eff =
+    let v = Theory.Var.forget v in
+    match static eff with
+    | Some _ when not (is_machine_var target v) ->
+      Stack.push v (res eff) >>= fun () ->
+      purify eff
+    | _ ->
+      full [!!eff; data [v := !(res eff)]] !!(res eff)
 
   let reify prog target name =
     let word = Theory.Target.bits target in
     let rec eval : ast -> unit Theory.Effect.t Meta.t = function
       | {data=Int {data={exp=x; typ=Type m}}} -> bigint x m
       | {data=Int {data={exp=x; typ=Any}}} -> bigint x word
-      | {data=Var {data={exp=n; typ=Type m}}} -> var n m
-      | {data=Var {data={exp=n; typ=Any}}} -> var n word
+      | {data=Var {data={exp=n; typ=Type t}}} -> var ~t n
+      | {data=Var {data={exp=n; typ=Any}}} -> var n
       | {data=Sym {data=s}} -> sym s
       | {data=Ite (cnd,yes,nay)} -> ite cnd yes nay
-      | {data=Let ({data={exp=n; typ=Type t}},x,y)} -> let_ n t x y
-      | {data=Let ({data={exp=n; typ=Any}},x,y)} -> let_ n word x y
+      | {data=Let ({data={exp=n; typ=Type t}},x,y)} -> let_ ~t n x y
+      | {data=Let ({data={exp=n; typ=Any}},x,y)} -> let_ n x y
       | {data=App (Dynamic name,args)} -> app name args
       | {data=Seq xs} -> seq_ xs
-      | {data=Set ({data={exp=n; typ=Type t}},x)} -> set_ n t x
-      | {data=Set ({data={exp=n; typ=Any}},x)} -> set_ n word x
+      | {data=Set ({data={exp=n; typ=Type t}},x)} -> set_ ~t n x
+      | {data=Set ({data={exp=n; typ=Any}},x)} -> set_ n x
       | {data=Rep (cnd,body)} -> rep cnd body
       | _ -> undefined
-    and var n t =
-      let v = Theory.Var.define (bits t) n in
-      Stack.lookup v >>= function
-      | None -> pure@@Meta.lift@@CT.var v
-      | Some v -> pure (!!v)
     and ite cnd yes nay =
       let* cnd = eval cnd in
       match static cnd with
@@ -376,36 +404,34 @@ module Prelude(CT : Theory.Core) = struct
       Meta.List.fold ~init xs ~f:(fun eff x  ->
           let* eff' = eval x in
           full [!!eff; !!eff'] !!(res eff'))
-    and set_ n t x =
+    and var ?t n =
+      let v = make_var ?t target n in
+      if is_machine_var target v
+      then pure@@Meta.lift@@CT.var v
+      else Stack.lookup v >>= function
+        | Some v -> pure !!v
+        | None -> match lookup_parameter prog v with
+          | None -> pure@@Meta.lift@@CT.var v
+          | Some def ->
+            let* eff = eval def in
+            assign target v eff
+    and set_ ?t n x =
       let* eff = eval x in
-      let v = Theory.Var.define (bits t) n in
+      let v = make_var ?t target n in
       Stack.is_bound v >>= function
       | true ->
         Stack.set v (res eff) >>= fun () ->
         purify eff
-      | false -> match static eff with
-        | Some _ ->
-          Stack.push v (res eff) >>= fun () ->
-          purify eff
-        | None ->
-          coerce_bits (bits t) (res eff) @@ fun reff ->
-          full [!!eff; data [v := !reff]] !!reff
-    and let_ v t x b =
-      let* x = eval x in
-      let v = Theory.Var.define (bits t) v in
-      match static x with
-      | Some _ ->
-        Stack.push v (res x) >>= fun () ->
-        eval b
-      | None ->
-        coerce_bits (bits t) (res x) @@ fun rx ->
-        cast t rx >>= fun rx ->
-        let* b = eval b in
-        full [
-          !!x;
-          data [v := !rx];
-          !!b;
-        ] !!(res b) in
+      | false -> assign target v eff
+    and let_ ?t v x b =
+      let v = make_var ?t target v in
+      let* xeff = eval x in
+      assign target v xeff >>= fun aeff ->
+      let* beff = eval b in
+      full [
+        !!aeff;
+        !!beff;
+      ] !!(res beff) in
     lookup prog Key.func name >>= function
     | Some fn -> eval (Def.Func.body fn)
     | None -> !!Insn.empty
