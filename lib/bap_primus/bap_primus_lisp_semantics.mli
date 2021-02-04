@@ -10,7 +10,10 @@ module Primitive : sig
   type t = primitive
   val name : t -> string
   val args : t -> unit Theory.Value.t list
+  val eval : string -> unit Theory.Value.t list -> unit Theory.Effect.t KB.t
 end
+
+
 
 val program : (Theory.Source.cls, program) KB.slot
 val primitive : (Theory.program, primitive option) KB.slot

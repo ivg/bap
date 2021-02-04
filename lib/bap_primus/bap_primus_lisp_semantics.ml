@@ -14,9 +14,9 @@ module Key = Bap_primus_lisp_program.Items
 module Meta = struct
   module State = struct
     type t = {
-      bound : int Map.M(Theory.Var.Top).t;
-      stack : (unit Theory.Var.t * unit Theory.Value.t) list;
+      binds : unit Theory.Value.t Map.M(Theory.Var.Top).t;
       arith : (module Bitvec.S);
+      scope : unit Theory.var list Map.M(Theory.Var.Top).t;
     }
   end
   include Monad.State.T1(State)(KB)
@@ -44,7 +44,7 @@ let program = KB.Class.property Theory.Source.cls "primus-lisp-program" @@
 
 let fail s = Meta.lift (KB.fail s)
 
-let lookup prog item name =
+let find_def prog item name =
   match Resolve.semantics prog item name () with
   | None -> !!None
   | Some (Error problem) ->
@@ -157,74 +157,84 @@ let lookup_parameter prog v =
   | None -> None
   | Some p -> Some (Def.Para.default p)
 
-module Stack = struct
+module Env = struct
   open Meta.State
-
-  let is_bound v =
-    Meta.get () >>| fun {bound} ->
-    Map.mem bound (Theory.Var.forget v)
 
   let lookup v =
     let v = Theory.Var.forget v in
-    Meta.get () >>| fun {bound; stack} ->
-    if Map.mem bound (Theory.Var.forget v)
-    then List.Assoc.find stack v
-        ~equal:Theory.Var.Top.equal
-    else None
+    Meta.get () >>| fun {binds} ->
+    Map.find binds v
 
-
-  let push_var v x = function {bound; stack} as s -> {
-      s with
-      stack = (v,x) :: stack;
-      bound = Map.update bound v ~f:(function
-          | None -> 1
-          | Some n -> n+1)
-    }
-
-  let push v x =
-    let v = Theory.Var.forget v in
-    Meta.update @@ push_var v x
-
-  let rec update xs x z = match xs with
-    | [] -> []
-    | (x',_) :: xs when Theory.Var.Top.(x' = x) -> (x,z) :: xs
-    | xw :: xs -> xw :: update xs x z
 
   let set v x =
-    let v = Theory.Var.forget v
-    and x = forget x in
-    Meta.update @@ function {stack} as s -> {
-        s with stack = update stack v x
-      }
+    Meta.update @@ fun s -> {
+      s with binds = Map.set s.binds
+                 (Theory.Var.forget v) x
+    }
 
-  let make_var word {data={exp=n; typ=t}} =
+  let del v =
+    Meta.update @@ fun s -> {
+      s with binds = Map.remove s.binds (Theory.Var.forget v)
+    }
+
+  let is_bound v = lookup v >>| Option.is_some
+
+  let var word {data={exp=n; typ=t}} =
     let s = match t with
       | Any | Name _ -> word
       | Symbol -> symsort
       | Type m -> m in
     Theory.Var.forget@@Theory.Var.define (bits s) n
 
-  let push_frame ws bs =
-    Meta.get () >>= fun s ->
-    let s,n = List.fold ~init:(s,0) bs ~f:(fun (s,n) (v,x) ->
-        push_var (make_var ws v) x s,n+1) in
-    Meta.put s >>| fun () ->
-    n
+  let set_args ws bs = Meta.update @@ fun s -> {
+      s with binds = List.fold bs ~init:s.binds ~f:(fun s (v,x) ->
+      Map.set s (var ws v) x)
+    }
 
-  let rec pop_vars n s =
-    if n = 0 then s else match s.stack with
-      | [] -> failwith "bug: broken stack"
-      | (v,_) :: vs -> pop_vars (n-1) {
-          s with
-          stack = vs;
-          bound = Map.change s.bound v ~f:(function
-              | Some 1 | None -> None
-              | Some n -> Some (n-1))
-        }
+  let del_args ws bs = Meta.update @@ fun s -> {
+      s with binds = List.fold bs ~init:s.binds ~f:(fun s (v,_) ->
+      Map.remove s (var ws v))
+    }
+end
+
+module Scope = struct
+  let forget = Theory.Var.forget
+
+  let push orig =
+    let orig = forget orig in
+    Meta.lift@@Theory.Var.fresh (Theory.Var.sort orig) >>= fun v ->
+    Meta.update  (fun s -> {
+          s with scope = Map.update s.scope orig ~f:(function
+        | None -> [v]
+        | Some vs -> v::vs)
+        }) >>| fun () ->
+    v
+
+  let lookup orig =
+    let+ {scope} = Meta.get () in
+    match Map.find scope orig with
+    | None | Some [] -> None
+    | Some (x :: _) -> Some x
+
+  let pop orig =
+    Meta.update @@ fun s -> {
+      s with scope = Map.change s.scope (forget orig) ~f:(function
+        | None | Some [] | Some [_] -> None
+        | Some (_::xs) -> Some xs)
+    }
+
+  let clear =
+    let* s = Meta.get () in
+    let+ () = Meta.put {
+        s with scope = Map.empty (module Theory.Var.Top)
+      } in
+    s.scope
+
+  let restore scope = Meta.update @@ fun s -> {
+      s with scope
+    }
 
 
-  let tear_frame size = Meta.update @@ fun s ->
-    pop_vars size s
 end
 
 module Prelude(CT : Theory.Core) = struct
@@ -314,30 +324,32 @@ module Prelude(CT : Theory.Core) = struct
 
   let is_static eff = Option.is_some (static eff)
 
-  let assign target v eff =
+  let assign ?(local=false) target v eff =
     let v = Theory.Var.forget v in
     match static eff with
-    | Some _ when not (is_machine_var target v) ->
-      Stack.push v (res eff) >>= fun () ->
+    | Some _ when local || not (is_machine_var target v) ->
+      Env.set v (res eff) >>= fun () ->
       purify eff
     | _ ->
+      Env.del v >>= fun () ->
       full [!!eff; data [v := !(res eff)]] !!(res eff)
 
   let reify prog target name =
     let word = Theory.Target.bits target in
+    let var ?t n = make_var ?t target n in
     let rec eval : ast -> unit Theory.Effect.t Meta.t = function
       | {data=Int {data={exp=x; typ=Type m}}} -> bigint x m
-      | {data=Int {data={exp=x; typ=Any}}} -> bigint x word
-      | {data=Var {data={exp=n; typ=Type t}}} -> var ~t n
-      | {data=Var {data={exp=n; typ=Any}}} -> var n
+      | {data=Int {data={exp=x}}} -> bigint x word
+      | {data=Var {data={exp=n; typ=Type t}}} -> lookup@@var ~t n
+      | {data=Var {data={exp=n}}} -> lookup@@var n
       | {data=Sym {data=s}} -> sym s
       | {data=Ite (cnd,yes,nay)} -> ite cnd yes nay
       | {data=Let ({data={exp=n; typ=Type t}},x,y)} -> let_ ~t n x y
-      | {data=Let ({data={exp=n; typ=Any}},x,y)} -> let_ n x y
+      | {data=Let ({data={exp=n}},x,y)} -> let_ n x y
       | {data=App (Dynamic name,args)} -> app name args
       | {data=Seq xs} -> seq_ xs
-      | {data=Set ({data={exp=n; typ=Type t}},x)} -> set_ ~t n x
-      | {data=Set ({data={exp=n; typ=Any}},x)} -> set_ n x
+      | {data=Set ({data={exp=n; typ=Type t}},x)} -> set_ (var ~t n) x
+      | {data=Set ({data={exp=n}},x)} -> set_ (var n) x
       | {data=Rep (cnd,body)} -> rep cnd body
       | _ -> undefined
     and ite cnd yes nay =
@@ -385,9 +397,11 @@ module Prelude(CT : Theory.Core) = struct
         Meta.lift@@Primitive.eval name xs >>= fun peff ->
         full [!!aeff; !!peff] !!(res peff)
       | Some (Ok (fn,bs)) ->
-        Stack.push_frame word bs >>= fun size ->
+        Env.set_args word bs >>= fun () ->
+        Scope.clear >>= fun scope ->
         eval (Def.Func.body fn) >>= fun eff ->
-        Stack.tear_frame size >>= fun () ->
+        Scope.restore scope >>= fun () ->
+        Env.del_args word bs >>= fun () ->
         !!eff
       | Some (Error _) ->
         assert false
@@ -404,35 +418,36 @@ module Prelude(CT : Theory.Core) = struct
       Meta.List.fold ~init xs ~f:(fun eff x  ->
           let* eff' = eval x in
           full [!!eff; !!eff'] !!(res eff'))
-    and var ?t n =
-      let v = make_var ?t target n in
-      if is_machine_var target v
-      then pure@@Meta.lift@@CT.var v
-      else Stack.lookup v >>= function
+    and lookup v =
+      Scope.lookup v >>= function
+      | Some v -> lookup v
+      | None ->
+        Env.lookup v >>= function
         | Some v -> pure !!v
         | None -> match lookup_parameter prog v with
           | None -> pure@@Meta.lift@@CT.var v
           | Some def ->
             let* eff = eval def in
             assign target v eff
-    and set_ ?t n x =
+    and set_ v x =
       let* eff = eval x in
-      let v = make_var ?t target n in
-      Stack.is_bound v >>= function
-      | true ->
-        Stack.set v (res eff) >>= fun () ->
-        purify eff
-      | false -> assign target v eff
-    and let_ ?t v x b =
-      let v = make_var ?t target v in
+      Scope.lookup v >>= function
+      | Some v ->
+        assign target ~local:true v eff
+      | None ->
+        assign target v eff
+    and let_ ?(t=word) v x b =
       let* xeff = eval x in
-      assign target v xeff >>= fun aeff ->
+      let orig = Theory.Var.define (bits t) v in
+      Scope.push orig >>= fun v ->
+      let* aeff = assign ~local:true target v xeff in
       let* beff = eval b in
+      Scope.pop orig >>= fun () ->
       full [
         !!aeff;
         !!beff;
       ] !!(res beff) in
-    lookup prog Key.func name >>= function
+    find_def prog Key.func name >>= function
     | Some fn -> eval (Def.Func.body fn)
     | None -> !!Insn.empty
 end
@@ -493,8 +508,8 @@ let provide () =
             let modulus = Bitvec.modulus bits
           end) in
         let meta = Meta.State.{
-            stack = [];
-            bound = Map.empty (module Theory.Var.Top);
+            binds = Map.empty (module Theory.Var.Top);
+            scope = Map.empty (module Theory.Var.Top);
             arith = (module Arith);
           } in
         Theory.instance () >>= Theory.require >>= fun (module Core) ->
