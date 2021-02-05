@@ -30,11 +30,14 @@ open Meta.Let
 type value = unit Theory.Value.t
 type effect = unit Theory.Effect.t
 
-type KB.Conflict.t += Unresolved_definition of Resolve.resolution
+type KB.Conflict.t += Unresolved_definition of string
 
 let language = Theory.Language.declare ~package:"bap" "primus-lisp"
 
-let program = KB.Class.property Theory.Source.cls "primus-lisp-program" @@
+let program =
+  KB.Class.property Theory.Source.cls "primus-lisp-program"
+    ~public:true
+    ~package:"bap" @@
   KB.Domain.flat "lisp-program"
     ~empty:Program.empty
     ~equal:Program.equal
@@ -43,13 +46,23 @@ let program = KB.Class.property Theory.Source.cls "primus-lisp-program" @@
         let r = Format.asprintf "%a" Program.pp p in
         Sexp.Atom r)
 
+let typed = KB.Class.property Theory.Source.cls "typed-program"
+    ~package:"bap" @@
+  KB.Domain.flat "typed-lisp-program"
+    ~empty:Program.Type.empty
+    ~equal:Program.Type.equal
+    ~join:(fun x y -> Ok (Program.Type.merge x y))
+
 let fail s = Meta.lift (KB.fail s)
+
+let unresolved problem =
+  let msg = Format.asprintf "%a" Resolve.pp_resolution problem in
+  fail (Unresolved_definition msg)
 
 let find_def prog item name =
   match Resolve.semantics prog item name () with
   | None -> !!None
-  | Some (Error problem) ->
-    fail (Unresolved_definition problem)
+  | Some (Error problem) -> unresolved problem
   | Some (Ok (fn,_)) -> !!(Some fn)
 
 let check_arg _ _ = true
@@ -58,11 +71,20 @@ let is_external def =
   Option.is_some (Attribute.Set.get (Def.attributes def) External.t)
 
 module Primitive = struct
+  module Type = Bap_primus_lisp_type
   open KB.Syntax
   type t = {
     name : string;
     args : Theory.Value.Top.t list;
   } [@@deriving compare, equal, sexp]
+
+  type info = {
+    types : (Theory.Target.t -> Type.signature);
+    docs : string;
+  }
+
+  let library = Hashtbl.create (module String)
+
   let name p = p.name
   let args p = p.args
 
@@ -75,6 +97,22 @@ module Primitive = struct
     KB.Object.scoped Theory.Program.cls @@ fun obj ->
     KB.provide slot obj (Some {name;args}) >>= fun () ->
     KB.collect Theory.Semantics.slot obj
+
+
+  let declare
+      ?(types=fun _ -> Type.{
+          args = [];
+          rest = Some any;
+          ret = any;
+        })
+      ?(docs="undocumented") name =
+    if Hashtbl.mem library name
+    then invalid_argf "A primitive `%s' already exists, please \
+                       choose a different name for your primitive" name ();
+    Hashtbl.add_exn library name {
+      docs;
+      types
+    }
 end
 
 let primitive = Primitive.slot
@@ -414,8 +452,7 @@ module Prelude(CT : Theory.Core) = struct
         Scope.restore scope >>= fun () ->
         Env.del_args word bs >>= fun () ->
         !!eff
-      | Some (Error err) ->
-        Meta.lift@@KB.fail (Unresolved_definition err)
+      | Some (Error problem) -> unresolved problem
     and map args =
       seq [] >>= fun eff ->
       Meta.List.fold args ~init:(eff,[]) ~f:(fun (eff,args) arg ->
@@ -494,6 +531,30 @@ module Unit = struct
   let language = language
 end
 
+type KB.conflict += Illtyped_program of Program.Type.error list
+
+let obtain_typed_program unit =
+  let open KB.Syntax in
+  KB.collect Theory.Unit.source unit >>= fun src ->
+  KB.collect Theory.Unit.target unit >>= fun target ->
+  let prog = KB.Value.get typed src in
+  match Program.Type.(equal empty prog) with
+  | false -> !!prog
+  | true ->
+    let prog = KB.Value.get program src in
+    let vars = Theory.Target.vars target |>
+               Set.to_sequence |>
+               Seq.map ~f:Var.reify in
+    let externals = Hashtbl.to_alist Primitive.library |>
+                    List.Assoc.map ~f:(fun {Primitive.types} ->
+                        types target) in
+    let tprog = Program.Type.infer ~externals vars prog in
+    match Program.Type.errors tprog with
+    | [] ->
+      let src = KB.Value.put typed src tprog in
+      KB.provide Theory.Unit.source unit src >>| fun () ->
+      tprog
+    | errs -> KB.fail (Illtyped_program errs)
 
 let provide () =
   let open KB.Syntax in
@@ -517,9 +578,9 @@ let provide () =
       KB.collect Theory.Label.name obj >>= function
       | None -> !!Insn.empty
       | Some name ->
-        KB.collect Theory.Unit.source unit >>= fun src ->
+        obtain_typed_program unit >>= fun typed ->
         KB.collect Theory.Unit.target unit >>= fun target ->
-        let prog = KB.Value.get program src in
+        let prog = Program.Type.program typed in
         let bits = Theory.Target.bits target in
         let module Arith = Bitvec.Make(struct
             let modulus = Bitvec.modulus bits
@@ -537,3 +598,14 @@ let provide () =
 let enable () = provide ()
 
 let static = static_slot
+
+let () = KB.Conflict.register_printer @@ function
+  | Unresolved_definition s -> Some s
+  | Illtyped_program errs ->
+    let open Format in
+    let msg = asprintf "%a"
+        (pp_print_list
+           ~pp_sep:pp_print_newline
+           Program.Type.pp_error) errs in
+    Some msg
+  | _ -> None

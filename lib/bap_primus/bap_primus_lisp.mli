@@ -39,7 +39,7 @@ end
 module Type : sig
   type t
   type env
-  type signature
+  type signature = Theory.Target.t -> Bap_primus_lisp_type.signature
   type error
 
   type parameters = [
@@ -142,10 +142,15 @@ end
 module Semantics : sig
   type primitive
 
+  type KB.conflict += Unresolved_definition of string
+  type KB.conflict += Illtyped_program of Type.error list
+
+
   module Primitive : sig
     type t = primitive
     val name : t -> string
     val args : t -> unit Theory.Value.t list
+    val declare : ?types:Type.signature -> ?docs:string -> string -> unit
   end
 
   val program : (Theory.Source.cls, program) KB.slot

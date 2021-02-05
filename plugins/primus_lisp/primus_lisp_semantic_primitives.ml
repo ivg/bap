@@ -4,6 +4,136 @@ open Bap_primus.Std
 open KB.Syntax
 open KB.Let
 
+let export = Primus.Lisp.Type.Spec.[
+    "+", (all any @-> any),
+    "(+ X Y ... Z) returns X + Y + ... + Z, performing any necessary \
+     type conversions in the process. If no numbers are supplied, 0 is \
+     returned.";
+
+    "-", (all any @-> any),
+    "(- X Y ... Z) returns X - Y - ... - Z, performing any necessary \
+     type conversions in the process. If no numbers are supplied \
+     returns 0. If one number is supplied returns its negation.";
+
+    "neg", (one any @-> any),
+    "(neg X) returns the negation of X. Same as (- X).";
+
+    "*", (all any @-> any),
+    "(*  X Y ... Z) returns X * Y * ... * Z, performing any necessary \
+     type conversions in the process. If no numbers are supplied, 1 is \
+     returned.";
+
+    "/", (all any @-> any),
+    "(/  X Y ... Z) returns X / Y / ... / Z, performing any necessary \
+     type conversions in the process. If no numbers are supplied, 1 is \
+     returned. If one number is provided returns its reciprocal.";
+
+
+    "s/", (all any @-> any),
+    "(s/ X Y ... Z) returns signed X / Y / ... / Z, performing any \
+     necessary type conversions in the process. If no numbers are \
+     supplied, 1 is returned. If one number is provided returns its \
+     signed reciprocal.";
+
+    "mod", (all any @-> any),
+    "(/ X Y ... Z) returns mod(X,Y) Y mod ... mod Z, performing any \
+     necessary type conversions in the process. Where `X mod Y` is the \
+     remainder of [X / Y]. If no numbers are supplied, 1 is \
+     returned. If one number is provided returns that number.";
+
+    "signed-mod", (all any @-> any),
+    "(/ X Y ... Z) returns signed mod(X,Y) Y mod ... mod Z, performing \
+     any necessary type conversions in the process. Where `X mod Y` is \
+     the remainder of [X / Y]. If no numbers are supplied, 1 is \
+     returned. If one number is provided returns that number.";
+
+    "lshift", (all any @-> any),
+    "(lshift X Y ... Z) returns X << Y << ... << Z, performing \
+     any necessary type conversions in the process. Where `X << Y` is \
+     logical shift left of X by Y bits. If no numbers are supplied, 1 \
+     is returned. If one number is provided returns that number";
+
+    "rshift", (all any @-> any),
+    "(rshift X Y ... Z) returns X >> Y >> ... >> Z, performing \
+     any necessary type conversions in the process. Where `X >> Y` is \
+     logical shift right of X by Y bits. If no numbers are supplied, 1 \
+     is returned. If one number is provided returns that number";
+
+    "arshift", (all any @-> any),
+    "(arshift X Y ... Z) returns X ~>> Y ~>> ... ~>> Z, performing \
+     any necessary type conversions in the process. Where `X ~>> Y` is \
+     arithmetic shift right of X by Y bits. If no numbers are supplied, 1 \
+     is returned. If one number is provided returns that number";
+
+    "logand", (all any @-> any),
+    "(logand X Y ... Z) returns X land Y land ... land Z, performing \
+     any necessary type conversions in the process. Where `X land Y` is \
+     bitwise (logical) /\ (AND) of X and Y. If no numbers are supplied, 1 \
+     is returned. If one number is provided returns that number";
+
+    "logor", (all any @-> any),
+    "(logor X Y ... Z) returns X lor Y lor ... lor Z, performing \
+     any necessary type conversions in the process. Where `X lor Y` is \
+     bitwise (logical) \\/ (OR) of X and Y. If no numbers are supplied, 1 \
+     is returned. If one number is provided returns that number";
+
+    "logxor", (all any @-> any),
+    "(loxgor X Y ... Z) returns X lxor Y lxor ... lxor Z, performing \
+     any necessary type conversions in the process. Where `X lor Y` is \
+     bitwise (logical) exclusive \\/ (XOR) of X and Y. If no numbers \
+     are supplied, 1 is returned. If one number is provided returns \
+     that number";
+
+    "=", (all any @-> any),
+    "(= X Y ... Z) returns one if all numbers are equal in value.";
+
+    "/=", (all any @-> any),
+    "(/= X Y ... Z) returns one if all numbers are distinct.";
+
+    "<", (all any @-> any),
+    "(< X Y ... Z) returns one if all numbers are in monotonically \
+     increasing order.";
+
+    ">", (all any @-> any),
+    "(> X Y ... Z) returns one if all numbers are in monotonically \
+     decreasing order.";
+
+    "<=", (all any @-> any),
+    "(<= X Y ... Z) returns one if all numbers are in monotonically \
+     nondecreasing order.";
+
+    ">=", (all any @-> any),
+    "(> X Y ... Z) returns one if all numbers are in monotonically \
+     nonincreasing order.";
+
+    "is-zero", (all any @-> any),
+    "(is-zero X Y ... Z) returns one if all numbers are zero.";
+
+    "not", (all any @-> any),
+    "(not X Y ... Z) returns one if all numbers are not \
+     true. Equivalent to (is-zero X Y Z)";
+
+    "is-positive", (all any @-> any),
+    "(is-zero X Y ... Z) returns one if all numbers are positive.";
+
+    "is-negative", (all any @-> any),
+    "(is-zero X Y ... Z) returns one if all numbers are negative.";
+
+    "word-width", (all any @-> any),
+    "(word-width X Y ... Z) returns the maximum width of its \
+     arguments. If no arguments provided returns the size of the \
+     machine word.";
+
+    "exec-addr", (one int @-> any),
+    "(exec-addr ADDR) transfers control flow to ADDR.";
+
+    "memory-read", (one int @-> byte),
+    "(memory-read PTR) loads one byte from the address PTR";
+
+    "memory-write", (tuple [int; byte] @-> int),
+    "(memory-write PTR X) stores X at PTR."
+  ]
+
 type KB.conflict += Illformed of string
 
 let illformed fmt =
@@ -201,6 +331,17 @@ module Primitives(CT : Theory.Core) = struct
           distinct_pair p >>= fun t' ->
           t &&& t')
 
+  let neg x =
+    bitv x >>= fun x -> forget@@CT.neg !!x
+
+  let one_op_x op x =
+    bitv x >>= fun x ->
+    let s = Theory.Value.sort x in
+    forget@@CT.(op (int s Bitvec.one) !!x)
+
+  let reciprocal = one_op_x CT.div
+  let sreciprocal = one_op_x CT.sdiv
+
   let dispatch lbl name args =
     Theory.Label.target lbl >>= fun t ->
     let bits = Theory.Target.bits t in
@@ -214,33 +355,36 @@ module Primitives(CT : Theory.Core) = struct
         not (is_negative x) && not (is_zero x)
     end in
     let s = Theory.Bitv.define bits in
-    match name with
-    | "+" -> pure@@monoid s Z.add CT.add Z.zero args
-    | "-" -> pure@@monoid s Z.sub CT.sub Z.zero args
-    | "*" -> pure@@monoid s Z.mul CT.mul Z.one args
-    | "/" -> pure@@monoid s Z.div CT.div Z.one args
-    | "s/" -> pure@@monoid s Z.sdiv CT.sdiv Z.one args
-    | "mod" -> pure@@monoid s Z.rem CT.modulo Z.one args
-    | "signed-mod" -> pure@@monoid s Z.srem CT.smodulo Z.one args
-    | "lshift" -> pure@@monoid s Z.lshift CT.lshift Z.one args
-    | "rshift" -> pure@@monoid s Z.rshift CT.rshift Z.one args
-    | "arshift" -> pure@@monoid s Z.arshift CT.arshift Z.one args
-    | "logand" -> pure@@monoid s Z.logand CT.logand Z.ones args
-    | "logor" -> pure@@monoid s Z.logor CT.logor Z.zero args
-    | "logxor" -> pure@@monoid s Z.logxor CT.logxor Z.zero args
-    | "=" -> pure@@order Bitvec.(=) CT.eq args
-    | "<" -> pure@@order Bitvec.(<) CT.ult args
-    | ">" -> pure@@order Bitvec.(>) CT.ugt args
-    | "<=" -> pure@@order Bitvec.(<=) CT.ule args
-    | ">=" -> pure@@order Bitvec.(>=) CT.uge args
-    | "/=" | "distinct" -> pure@@forget@@distinct args
-    | "is-zero" | "not" -> pure@@all Bitvec.(equal zero) CT.is_zero args
-    | "is-positive" -> pure@@all Z.is_positive is_positive args
-    | "is-negative" -> pure@@all Z.is_negative is_negative args
-    | "word-width" -> pure@@word_width s args
-    | "exec-addr" -> ctrl@@exec_addr args
-    | "memory-read" -> pure@@memory_read t args
-    | "memory-write" -> data@@memory_write t args
+    match name,args with
+    | "+",_-> pure@@monoid s Z.add CT.add Z.zero args
+    | "-",[x]|"neg",[x] -> pure@@neg x
+    | "-",_-> pure@@monoid s Z.sub CT.sub Z.zero args
+    | "*",_-> pure@@monoid s Z.mul CT.mul Z.one args
+    | "/",[x]-> pure@@reciprocal x
+    | "/",_-> pure@@monoid s Z.div CT.div Z.one args
+    | "s/",[x]-> pure@@sreciprocal x
+    | "s/",_-> pure@@monoid s Z.sdiv CT.sdiv Z.one args
+    | "mod",_-> pure@@monoid s Z.rem CT.modulo Z.one args
+    | "signed-mod",_-> pure@@monoid s Z.srem CT.smodulo Z.one args
+    | "lshift",_-> pure@@monoid s Z.lshift CT.lshift Z.one args
+    | "rshift",_-> pure@@monoid s Z.rshift CT.rshift Z.one args
+    | "arshift",_-> pure@@monoid s Z.arshift CT.arshift Z.one args
+    | "logand",_-> pure@@monoid s Z.logand CT.logand Z.ones args
+    | "logor",_-> pure@@monoid s Z.logor CT.logor Z.zero args
+    | "logxor",_-> pure@@monoid s Z.logxor CT.logxor Z.zero args
+    | "=",_-> pure@@order Bitvec.(=) CT.eq args
+    | "<",_-> pure@@order Bitvec.(<) CT.ult args
+    | ">",_-> pure@@order Bitvec.(>) CT.ugt args
+    | "<=",_-> pure@@order Bitvec.(<=) CT.ule args
+    | ">=",_-> pure@@order Bitvec.(>=) CT.uge args
+    | "/=",_| "distinct",_-> pure@@forget@@distinct args
+    | "is-zero",_| "not",_-> pure@@all Bitvec.(equal zero) CT.is_zero args
+    | "is-positive",_-> pure@@all Z.is_positive is_positive args
+    | "is-negative",_-> pure@@all Z.is_negative is_negative args
+    | "word-width",_-> pure@@word_width s args
+    | "exec-addr",_-> ctrl@@exec_addr args
+    | "memory-read",_-> pure@@memory_read t args
+    | "memory-write",_-> data@@memory_write t args
     | _ -> !!nothing
 end
 
@@ -253,6 +397,8 @@ let provide () =
       provide Theory.Semantics.slot |>
       comment "implements semantics for the core primitives"
     end);
+  List.iter export ~f:(fun (name,types,docs) ->
+      Primus.Lisp.Semantics.Primitive.declare ~types ~docs name);
   KB.promise Theory.Semantics.slot @@ fun obj ->
   KB.collect Sema.primitive obj >>= function
   | None -> !!nothing

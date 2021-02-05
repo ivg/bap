@@ -4,6 +4,9 @@ open Bap_primus_lisp_types
 open Bap_primus_lisp_program
 
 
+type KB.conflict += Unresolved_definition of string
+type KB.conflict += Illtyped_program of Type.error list
+
 type primitive
 
 module Primitive : sig
@@ -11,6 +14,10 @@ module Primitive : sig
   val name : t -> string
   val args : t -> unit Theory.Value.t list
   val eval : string -> unit Theory.Value.t list -> unit Theory.Effect.t KB.t
+  val declare :
+    ?types:(Theory.Target.t -> Bap_primus_lisp_type.signature) ->
+    ?docs:string ->
+    string -> unit
 end
 
 

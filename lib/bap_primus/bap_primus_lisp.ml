@@ -1,4 +1,5 @@
 open Core_kernel
+open Bap_core_theory
 open Bap.Std
 open Format
 open Bap_c.Std
@@ -511,8 +512,8 @@ type program = Lisp.Program.t
 module Load = Lisp.Parse
 module Type = struct
   include Lisp.Program.Type
-  type t = arch -> Lisp.Type.t
-  type signature = arch -> Lisp.Type.signature
+  type t = Theory.Target.t -> Lisp.Type.t
+  type signature = Theory.Target.t -> Lisp.Type.signature
 
   type parameters = [
     | `All of t
@@ -531,8 +532,8 @@ module Type = struct
     let var s _ = Lisp.Type.var s
     let sym _ = Lisp.Type.sym
     let word n _ = Lisp.Type.word n
-    let int arch =
-      Lisp.Type.word (Size.in_bits (Arch.addr_size arch))
+    let int t =
+      Lisp.Type.word (Theory.Target.bits t)
     let bool = word 1
     let byte = word 8
     let a : t = var "a"
@@ -608,11 +609,11 @@ module Make(Machine : Machine) = struct
       Env.all >>= fun evars ->
       let pvars = vars_of_prog (Project.program proj) in
       let vars = Seq.append evars pvars in
-      let arch = Project.arch proj in
+      let t = Project.target proj in
       let externals =
         invoke_subroutine_signature ::
         signatures_of_subs (Project.program proj) |>
-        List.map ~f:(fun (n,s) -> n,s arch) in
+        List.map ~f:(fun (n,s) -> n,s t) in
       let typeenv =
         Lisp.Program.Type.infer ~externals vars s.program in
       Lisp.Program.Type.errors typeenv |>
@@ -761,13 +762,13 @@ module Make(Machine : Machine) = struct
         })
 
   let define ?types ?docs name body =
-    Machine.gets Project.arch >>= fun arch ->
+    Machine.gets Project.target >>= fun arch ->
     let types = Option.map types ~f:(fun t -> t arch) in
     Lisp.Def.Closure.create ?types ?docs name body |>
     link_primitive
 
   let signal ?params ?(doc="undocumented") obs proj =
-    Machine.gets Project.arch >>= fun arch ->
+    Machine.gets Project.target >>= fun arch ->
     let specialize = List.map ~f:(fun p -> p arch) in
     let name = Bap_primus_observation.name obs in
     let default_types = Lisp.Type.signature [] ~rest:Any Any in

@@ -1119,6 +1119,15 @@ module Typing = struct
       gamma = Gamma.empty;
     }
 
+    let program env = env.program
+
+    let equal x y = equal x.program y.program
+    let merge x y = {
+      program = merge x.program y.program;
+      gamma = Gamma.merge x.gamma y.gamma;
+    }
+
+
     let infer ?(externals=[]) vars program =
       let program = Reindex.program program in
       let gamma = infer externals vars program in
