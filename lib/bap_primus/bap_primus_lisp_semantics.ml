@@ -4,6 +4,7 @@ open Bap_core_theory
 open Monads.Std
 
 open Bap_primus_lisp_types
+open Bap_primus_lisp_attributes
 
 module Program = Bap_primus_lisp_program
 module Resolve = Bap_primus_lisp_resolve
@@ -52,6 +53,9 @@ let find_def prog item name =
   | Some (Ok (fn,_)) -> !!(Some fn)
 
 let check_arg _ _ = true
+
+let is_external def =
+  Option.is_some (Attribute.Set.get (Def.attributes def) External.t)
 
 module Primitive = struct
   open KB.Syntax
@@ -396,6 +400,11 @@ module Prelude(CT : Theory.Core) = struct
       | None ->
         Meta.lift@@Primitive.eval name xs >>= fun peff ->
         full [!!aeff; !!peff] !!(res peff)
+      | Some (Ok (fn,_)) when is_external fn ->
+        sym (Def.name fn) >>= fun dst ->
+        Meta.lift@@
+        Primitive.eval "invoke-subroutine" (res dst::xs) >>= fun peff ->
+        full [!!aeff; !!peff] !!(res peff)
       | Some (Ok (fn,bs)) ->
         Env.set_args word bs >>= fun () ->
         Scope.clear >>= fun scope ->
@@ -403,9 +412,8 @@ module Prelude(CT : Theory.Core) = struct
         Scope.restore scope >>= fun () ->
         Env.del_args word bs >>= fun () ->
         !!eff
-      | Some (Error _) ->
-        assert false
-
+      | Some (Error err) ->
+        Meta.lift@@KB.fail (Unresolved_definition err)
     and map args =
       seq [] >>= fun eff ->
       Meta.List.fold args ~init:(eff,[]) ~f:(fun (eff,args) arg ->
