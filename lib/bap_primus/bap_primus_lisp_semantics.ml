@@ -161,6 +161,8 @@ let lookup_parameter prog v =
   | None -> None
   | Some p -> Some (Def.Para.default p)
 
+let is_parameter prog v = Option.is_some (lookup_parameter prog v)
+
 module Env = struct
   open Meta.State
 
@@ -447,14 +449,21 @@ module Prelude(CT : Theory.Core) = struct
     and let_ ?(t=word) v x b =
       let* xeff = eval x in
       let orig = Theory.Var.define (bits t) v in
-      Scope.push orig >>= fun v ->
-      let* aeff = assign ~local:true target v xeff in
-      let* beff = eval b in
-      Scope.pop orig >>= fun () ->
-      full [
-        !!aeff;
-        !!beff;
-      ] !!(res beff) in
+      if is_parameter prog orig
+      then
+        Env.set orig (res xeff) >>= fun () ->
+        let* beff = eval b in
+        Env.del orig >>= fun () ->
+        full [!!beff] !!(res beff)
+      else
+        Scope.push orig >>= fun v ->
+        let* aeff = assign ~local:true target v xeff in
+        let* beff = eval b in
+        Scope.pop orig >>= fun () ->
+        full [
+          !!aeff;
+          !!beff;
+        ] !!(res beff) in
     find_def prog Key.func name >>= function
     | Some fn -> eval (Def.Func.body fn)
     | None -> !!Insn.empty
