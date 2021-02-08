@@ -59,7 +59,7 @@ let unresolved problem =
   let msg = Format.asprintf "%a" Resolve.pp_resolution problem in
   fail (Unresolved_definition msg)
 
-let find_def prog item name =
+let resolve prog item name =
   match Resolve.semantics prog item name () with
   | None -> !!None
   | Some (Error problem) -> unresolved problem
@@ -97,7 +97,6 @@ module Primitive = struct
     KB.Object.scoped Theory.Program.cls @@ fun obj ->
     KB.provide slot obj (Some {name;args}) >>= fun () ->
     KB.collect Theory.Semantics.slot obj
-
 
   let declare
       ?(types=fun _ -> Type.{
@@ -434,17 +433,12 @@ module Prelude(CT : Theory.Core) = struct
               Meta.lift@@CT.branch !cres (CT.goto head) skip
             ]]
         ] !!cres
-    and app name xs =
-      map xs >>= fun (aeff,xs) ->
+    and call name xs =
       match Resolve.defun check_arg prog Key.func name xs with
-      | None ->
-        Meta.lift@@Primitive.eval name xs >>= fun peff ->
-        full [!!aeff; !!peff] !!(res peff)
+      | None -> Meta.lift@@Primitive.eval name xs
       | Some (Ok (fn,_)) when is_external fn ->
         sym (Def.name fn) >>= fun dst ->
-        Meta.lift@@
-        Primitive.eval "invoke-subroutine" (res dst::xs) >>= fun peff ->
-        full [!!aeff; !!peff] !!(res peff)
+        Meta.lift@@ Primitive.eval "invoke-subroutine" (res dst::xs)
       | Some (Ok (fn,bs)) ->
         Env.set_args word bs >>= fun () ->
         Scope.clear >>= fun scope ->
@@ -453,6 +447,10 @@ module Prelude(CT : Theory.Core) = struct
         Env.del_args word bs >>= fun () ->
         !!eff
       | Some (Error problem) -> unresolved problem
+    and app name xs =
+      map xs >>= fun (aeff,xs) ->
+      call name xs >>= fun peff ->
+      full [!!aeff; !!peff] !!(res peff)
     and map args =
       seq [] >>= fun eff ->
       Meta.List.fold args ~init:(eff,[]) ~f:(fun (eff,args) arg ->
@@ -501,7 +499,7 @@ module Prelude(CT : Theory.Core) = struct
           !!aeff;
           !!beff;
         ] !!(res beff) in
-    find_def prog Key.func name >>= function
+    resolve prog Key.func name >>= function
     | Some fn -> eval (Def.Func.body fn)
     | None -> !!Insn.empty
 end
