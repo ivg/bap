@@ -9,7 +9,7 @@ open Bap_primus_lisp_attributes
 module Program = Bap_primus_lisp_program
 module Resolve = Bap_primus_lisp_resolve
 module Def = Bap_primus_lisp_def
-module Check = Bap_primus_lisp_type.Check
+module Type = Bap_primus_lisp_type
 module Key = Bap_primus_lisp_program.Items
 
 module Meta = struct
@@ -70,53 +70,57 @@ let check_arg _ _ = true
 let is_external def =
   Option.is_some (Attribute.Set.get (Def.attributes def) External.t)
 
-module Primitive = struct
-  module Type = Bap_primus_lisp_type
-  open KB.Syntax
-  type t = {
-    name : string;
-    args : Theory.Value.Top.t list;
-  } [@@deriving compare, equal, sexp]
+type info = {
+  types : (Theory.Target.t -> Type.signature);
+  docs : string;
+}
 
-  type info = {
-    types : (Theory.Target.t -> Type.signature);
-    docs : string;
-  }
+let library = Hashtbl.create (module String)
 
-  let library = Hashtbl.create (module String)
+module Property = struct
+  let name = KB.Class.property Theory.Program.cls "lisp-name" @@
+    KB.Domain.optional "lisp-name"
+      ~equal:String.equal
+      ~inspect:sexp_of_string
 
-  let name p = p.name
-  let args p = p.args
+  type args = Theory.Value.Top.t list [@@deriving equal, sexp]
 
-  let slot = KB.Class.property Theory.Program.cls "lisp-primitive" @@
-    KB.Domain.optional "lisp-primitive"
-      ~equal
-      ~inspect:sexp_of_t
 
-  let eval name args =
-    KB.Object.scoped Theory.Program.cls @@ fun obj ->
-    KB.provide slot obj (Some {name;args}) >>= fun () ->
-    KB.collect Theory.Semantics.slot obj
+  type KB.conflict += Unequal_arity
 
-  let declare
-      ?(types=fun _ -> Type.{
-          args = [];
-          rest = Some any;
-          ret = any;
-        })
-      ?(docs="undocumented") name =
-    if Hashtbl.mem library name
-    then invalid_argf "A primitive `%s' already exists, please \
-                       choose a different name for your primitive" name ();
-    Hashtbl.add_exn library name {
-      docs;
-      types
-    }
+  let args = KB.Class.property Theory.Program.cls "lisp-args" @@
+    KB.Domain.optional "lisp-args"
+      ~equal:equal_args
+      ~inspect:sexp_of_args
+      ~join:(fun xs ys ->
+          List.map2 xs ys ~f:(KB.Domain.join Theory.Value.Top.domain) |>
+          function
+          | Ok rs -> Result.all rs
+          | Unequal_lengths -> Error Unequal_arity)
 end
 
-let primitive = Primitive.slot
+let primitive name args =
+  let open KB.Syntax in
+  KB.Object.scoped Theory.Program.cls @@ fun obj ->
+  KB.provide Property.name obj (Some name) >>= fun () ->
+  KB.provide Property.args obj (Some args) >>= fun () ->
+  KB.collect Theory.Semantics.slot obj
 
-type primitive = Primitive.t
+let declare
+    ?(types=fun _ -> Type.{
+        args = [];
+        rest = Some any;
+        ret = any;
+      })
+    ?(docs="undocumented") name =
+  if Hashtbl.mem library name
+  then invalid_argf "A primitive `%s' already exists, please \
+                     choose a different name for your primitive" name ();
+  Hashtbl.add_exn library name {
+    docs;
+    types
+  }
+
 
 let sort = Theory.Value.sort
 let size x = Theory.Bitv.size (sort x)
@@ -377,7 +381,7 @@ module Prelude(CT : Theory.Core) = struct
       Env.del v >>= fun () ->
       full [!!eff; data [v := !(res eff)]] !!(res eff)
 
-  let reify prog target name =
+  let reify prog target name args =
     let word = Theory.Target.bits target in
     let var ?t n = make_var ?t target n in
     let rec eval : ast -> unit Theory.Effect.t Meta.t = function
@@ -435,10 +439,10 @@ module Prelude(CT : Theory.Core) = struct
         ] !!cres
     and call name xs =
       match Resolve.defun check_arg prog Key.func name xs with
-      | None -> Meta.lift@@Primitive.eval name xs
+      | None -> Meta.lift@@primitive name xs
       | Some (Ok (fn,_)) when is_external fn ->
         sym (Def.name fn) >>= fun dst ->
-        Meta.lift@@ Primitive.eval "invoke-subroutine" (res dst::xs)
+        Meta.lift@@primitive "invoke-subroutine" (res dst::xs)
       | Some (Ok (fn,bs)) ->
         Env.set_args word bs >>= fun () ->
         Scope.clear >>= fun scope ->
@@ -499,9 +503,11 @@ module Prelude(CT : Theory.Core) = struct
           !!aeff;
           !!beff;
         ] !!(res beff) in
-    resolve prog Key.func name >>= function
-    | Some fn -> eval (Def.Func.body fn)
-    | None -> !!Insn.empty
+    match args with
+    | Some args -> call name args
+    | None -> resolve prog Key.func name >>= function
+      | Some fn -> eval (Def.Func.body fn)
+      | None -> !!Insn.empty
 end
 
 module Unit = struct
@@ -543,8 +549,8 @@ let obtain_typed_program unit =
     let vars = Theory.Target.vars target |>
                Set.to_sequence |>
                Seq.map ~f:Var.reify in
-    let externals = Hashtbl.to_alist Primitive.library |>
-                    List.Assoc.map ~f:(fun {Primitive.types} ->
+    let externals = Hashtbl.to_alist library |>
+                    List.Assoc.map ~f:(fun {types} ->
                         types target) in
     let tprog = Program.Type.infer ~externals vars prog in
     match Program.Type.errors tprog with
@@ -553,6 +559,8 @@ let obtain_typed_program unit =
       KB.provide Theory.Unit.source unit src >>| fun () ->
       tprog
     | errs -> KB.fail (Illtyped_program errs)
+
+
 
 let provide () =
   let open KB.Syntax in
@@ -566,32 +574,29 @@ let provide () =
       provide Theory.Semantics.slot |>
       comment "reifies Primus Lisp definitions"
     end);
+  let (>>=?) x f = x >>= function
+    | None -> !!Insn.empty
+    | Some x -> f x in
   KB.promise Theory.Semantics.slot @@ fun obj ->
-  KB.collect Theory.Label.unit obj >>= function
-  | None -> !!Insn.empty
-  | Some unit ->
-    Unit.is_lisp unit >>= function
-    | false -> !!Insn.empty
-    | true ->
-      KB.collect Theory.Label.name obj >>= function
-      | None -> !!Insn.empty
-      | Some name ->
-        obtain_typed_program unit >>= fun typed ->
-        KB.collect Theory.Unit.target unit >>= fun target ->
-        let prog = Program.Type.program typed in
-        let bits = Theory.Target.bits target in
-        let module Arith = Bitvec.Make(struct
-            let modulus = Bitvec.modulus bits
-          end) in
-        let meta = Meta.State.{
-            binds = Map.empty (module Theory.Var.Top);
-            scope = Map.empty (module Theory.Var.Top);
-            arith = (module Arith);
-          } in
-        Theory.instance () >>= Theory.require >>= fun (module Core) ->
-        let open Prelude(Core) in
-        Meta.run (reify prog target name) meta >>| fun (res,_) ->
-        res
+  KB.collect Theory.Label.unit obj >>=? fun unit ->
+  KB.collect Property.name obj >>=? fun name ->
+  KB.collect Property.args obj >>= fun args ->
+  obtain_typed_program unit >>= fun typed ->
+  KB.collect Theory.Unit.target unit >>= fun target ->
+  let prog = Program.Type.program typed in
+  let bits = Theory.Target.bits target in
+  let module Arith = Bitvec.Make(struct
+      let modulus = Bitvec.modulus bits
+    end) in
+  let meta = Meta.State.{
+      binds = Map.empty (module Theory.Var.Top);
+      scope = Map.empty (module Theory.Var.Top);
+      arith = (module Arith);
+    } in
+  Theory.instance () >>= Theory.require >>= fun (module Core) ->
+  let open Prelude(Core) in
+  Meta.run (reify prog target name args) meta >>| fun (res,_) ->
+  res
 
 let enable () = provide ()
 
@@ -599,6 +604,8 @@ let static = static_slot
 
 let () = KB.Conflict.register_printer @@ function
   | Unresolved_definition s -> Some s
+  | Property.Unequal_arity ->
+    Some "The number of arguments is different"
   | Illtyped_program errs ->
     let open Format in
     let msg = asprintf "%a"
@@ -607,3 +614,5 @@ let () = KB.Conflict.register_printer @@ function
            Program.Type.pp_error) errs in
     Some msg
   | _ -> None
+
+include Property

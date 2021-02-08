@@ -3605,7 +3605,7 @@ ident ::= ?any atom that is not recognized as a <word>?
         val pp_error : Format.formatter -> error -> unit
       end
 
-      (** The static semantics of Primus Lisp.
+      (** The static semantics of Primus Lisp program.
 
           @warning this module is currently highly experimental and is
           subject to change. Use with caution.
@@ -3614,17 +3614,32 @@ ident ::= ?any atom that is not recognized as a <word>?
       *)
       module Semantics : sig
 
+
+        (** occurs when no matching definition is found
+
+            The reason why no match is selected is provided as the
+            payload.
+        *)
         type KB.conflict += Unresolved_definition of string
+
+
+        (** occurs when the Lisp program is ill-typed  *)
         type KB.conflict += Illtyped_program of Type.error list
 
-        (** A Primus Lisp primitive  *)
-        type primitive
 
-        (** a program is a property of the Unit source. *)
+        (** a property of the program source object in which
+            a Lisp program is stored.
+
+            This property is used by the Lisp semantics provider to
+            lookup for the definitions.
+        *)
         val program : (Theory.Source.cls, program) KB.slot
 
-        (** a primitive operation  *)
-        val primitive : (Theory.program, primitive option) KB.slot
+        (** the name of a lisp program *)
+        val name : (Theory.program, string option) KB.slot
+
+        (** the arguments of a lisp program   *)
+        val args : (Theory.program, unit Theory.Value.t list option) KB.slot
 
         (** a statically known symbolic value  *)
         val symbol : (Theory.Value.cls, String.t option) KB.slot
@@ -3700,20 +3715,9 @@ ident ::= ?any atom that is not recognized as a <word>?
             ]}
 
         *)
-        module Primitive : sig
-          type t = primitive
-
-
-          (** the primitive name  *)
-          val name : t -> string
-
-          (** the list of primitive arguments. *)
-          val args : t -> unit Theory.Value.t list
-
-          val declare :
-            ?types:Type.signature ->
-            ?docs:string -> string -> unit
-        end
+        val declare :
+          ?types:Type.signature ->
+          ?docs:string -> string -> unit
       end
 
 

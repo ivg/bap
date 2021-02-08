@@ -147,7 +147,8 @@ let size = Theory.Bitv.size
 let forget x = x >>| Theory.Value.forget
 let empty s = Theory.Value.(forget @@ empty s)
 let fresh = KB.Object.create Theory.Program.cls
-let bits x = size @@ Theory.Value.sort x
+let sort = Theory.Value.sort
+let bits x = size @@ sort x
 
 module Primitives(CT : Theory.Core) = struct
 
@@ -332,12 +333,14 @@ module Primitives(CT : Theory.Core) = struct
           t &&& t')
 
   let neg x =
-    bitv x >>= fun x -> forget@@CT.neg !!x
+    bitv x >>= fun x -> match const x with
+    | None -> forget@@CT.neg !!x
+    | Some v -> forget@@const_int (sort x) v
 
   let one_op_x op x =
-    bitv x >>= fun x ->
-    let s = Theory.Value.sort x in
-    forget@@CT.(op (int s Bitvec.one) !!x)
+    bitv x >>= fun x -> match const x with
+    | None -> forget@@CT.(op (int (sort x) Bitvec.one) !!x)
+    | Some v -> forget@@const_int (sort x) v
 
   let reciprocal = one_op_x CT.div
   let sreciprocal = one_op_x CT.sdiv
@@ -388,23 +391,24 @@ module Primitives(CT : Theory.Core) = struct
     | _ -> !!nothing
 end
 
-module Sema = Primus.Lisp.Semantics
+module Lisp = Primus.Lisp.Semantics
 
 let provide () =
   KB.Rule.(begin
       declare "primus-lisp-core-primitives" |>
-      require Sema.primitive   |>
+      require Lisp.name |>
+      require Lisp.args |>
       provide Theory.Semantics.slot |>
       comment "implements semantics for the core primitives"
     end);
   List.iter export ~f:(fun (name,types,docs) ->
-      Primus.Lisp.Semantics.Primitive.declare ~types ~docs name);
+      Primus.Lisp.Semantics.declare ~types ~docs name);
+  let (let*?) x f = x >>= function
+    | None -> !!nothing
+    | Some x -> f x in
   KB.promise Theory.Semantics.slot @@ fun obj ->
-  KB.collect Sema.primitive obj >>= function
-  | None -> !!nothing
-  | Some p ->
-    Theory.instance () >>= Theory.require >>= fun (module CT) ->
-    let module P = Primitives(CT) in
-    let name = Sema.Primitive.name p
-    and args = Sema.Primitive.args p in
-    P.dispatch obj name args
+  let*? name = KB.collect Lisp.name obj in
+  let*? args = KB.collect Lisp.args obj in
+  Theory.instance () >>= Theory.require >>= fun (module CT) ->
+  let module P = Primitives(CT) in
+  P.dispatch obj name args
