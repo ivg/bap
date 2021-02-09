@@ -48,7 +48,7 @@
   (let ((key k))
     (case/dispatch key x xs)))
 
-(defun non-zero (x)
+(defmacro non-zero (x)
   "(non-zero X) is true if X is not zero"
   (not (is-zero x)))
 
@@ -56,11 +56,11 @@
   "(+= X Y) assigns a sum of X and Y to variable X"
   (set x (+ x y)))
 
-(defun -1 (x)
+(defmacro -1 (x)
   "(-1 X) returns the predecessor of X"
   (- x 1))
 
-(defun +1 (x)
+(defmacro +1 (x)
   "(+1 x) returns the successor of X"
   (+ x 1))
 
