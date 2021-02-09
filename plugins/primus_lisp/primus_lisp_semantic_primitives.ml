@@ -391,6 +391,241 @@ module Primitives(CT : Theory.Core) = struct
     | _ -> !!nothing
 end
 
+
+
+
+
+module CST : Theory.Core = struct
+  type t = Sexp.t
+
+  let domain = KB.Domain.optional "cst"
+      ~equal:Sexp.equal
+      ~inspect:ident
+
+  let eslot = KB.Class.property Theory.Semantics.cls "lisp-stmt"
+      ~package:"bap"
+      ~public:true
+      domain
+
+  let pslot = KB.Class.property Theory.Value.cls "lisp-expr"
+      ~package:"bap"
+      ~public:true
+      domain
+
+  let pure s cst = KB.Value.put pslot (Theory.Value.empty s) (Some cst)
+  let eff s cst = KB.Value.put eslot (Theory.Effect.empty s) (Some cst)
+  let data = eff Theory.Effect.Sort.bot
+  let ctrl = eff Theory.Effect.Sort.bot
+  let ret = KB.return
+  let atom s = Sexp.Atom s
+  let list xs = Sexp.List xs
+  let app x xs = list (atom x :: xs)
+
+  let psort = Theory.Value.sort
+  let esort = Theory.Effect.sort
+
+  let (>>->) x f =
+    x >>= fun v ->
+    let s = psort v in
+    f s (KB.Value.get pslot v)
+
+  let (>>|>) x f = x >>-> fun s v -> ret (f s v)
+
+  let (>>->?) x f =
+    x >>= fun v ->
+    let s = psort v in
+    match KB.Value.get pslot v with
+    | None -> ret (Theory.Value.empty s)
+    | Some v -> f s v
+
+  let (>>|>?) x f = x >>->? fun s v -> ret (f s v)
+
+  let (>>=>) x f =
+    x >>= fun v ->
+    let s = esort v in
+    f s (KB.Value.get eslot v)
+
+  let (>>=>?) x f =
+    x >>= fun v ->
+    let s = esort v in
+    match KB.Value.get eslot v with
+    | None -> ret (Theory.Effect.empty s)
+    | Some x -> f s x
+
+
+  let empty = Theory.Value.empty
+
+  let unary_s s op x = x >>|> fun _ -> function
+    | None -> empty s
+    | Some v -> pure s @@ app op [v]
+
+  let unary op x = x >>|>? fun s v -> pure s @@ app op [v]
+
+  let monoid_s s op x y =
+    x >>-> fun _ x ->
+    y >>|> fun _ y ->
+    match x, y with
+    | Some x, Some y -> pure s @@ app op [x; y]
+    | _ -> empty s
+
+  let monoid op x y =
+    x >>->? fun s x ->
+    y >>|>? fun _ y ->
+    pure s @@ app op [x; y]
+
+  include Theory.Empty
+
+  let b0 = ret@@pure Theory.Bool.t (atom "0")
+  let b1 = ret@@pure Theory.Bool.t (atom "1")
+
+  let var v =
+    let s = Theory.Var.sort v in
+    ret@@pure s@@atom (Theory.Var.name v)
+
+  let let_ v x y =
+    x >>-> fun _ x ->
+    y >>|> fun s y ->
+    let name = Theory.Var.name v in
+    match x,y with
+    | Some x, Some y ->
+      pure s@@app "let" [atom name; x; y]
+    | _ -> empty s
+
+  let ite c x y =
+    c >>-> fun _ c ->
+    x >>->? fun s x ->
+    y >>|>? fun _ y -> match c with
+    | None -> empty s
+    | Some c -> pure s@@app "ite" [c; x; y]
+
+  let inv = unary "not"
+  let and_ = monoid "logand"
+  let or_ = monoid "logor"
+  let int s x = ret@@pure s@@atom (Bitvec.to_string x)
+  let msb x = unary_s Theory.Bool.t "msb" x
+  let lsb x = unary_s Theory.Bool.t "lsb" x
+  let neg x = unary "-" x
+  let not x = unary "not" x
+  let add x = monoid "+" x
+  let sub x = monoid "-" x
+  let mul x = monoid "*" x
+  let div x = monoid "/" x
+  let sdiv x = monoid "s/" x
+  let modulo x = monoid "mod" x
+  let smodulo x = monoid "signed-mod" x
+  let logand x = monoid "logand" x
+  let logor x = monoid "logor" x
+  let logxor x = monoid "logxor" x
+
+  let genshift name fill x off =
+    fill >>-> fun _ fill ->
+    x >>-> fun s x ->
+    off >>|> fun _ off ->
+    match fill, x, off with
+    | Some fill, Some x, Some off ->
+      pure s @@ app name [fill; x; off]
+    | _ -> empty s
+  let shiftr x = genshift "shiftr" x
+  let shiftl x = genshift "shiftl" x
+  let sle x = monoid_s Theory.Bool.t "s<=" x
+  let ule x = monoid_s Theory.Bool.t "<" x
+  let cast s fill x =
+    fill >>-> fun _ fill ->
+    x >>|> fun _ x ->
+    let ct = sprintf "%d" @@ Theory.Bitv.size s in
+    match fill, x  with
+    | Some fill, Some x -> pure s@@list [
+        atom "cast";
+        atom ct;
+        fill;
+        x
+      ]
+    | _ -> empty s
+
+  let concat s xs =
+    List.map xs ~f:(fun x -> x >>|> fun _ -> ident) |>
+    KB.List.all >>| Option.all >>| function
+    | None -> empty s
+    | Some xs -> pure s @@ app "concat" xs
+
+  let append s x y = monoid_s s "append" x y
+
+  let load m x =
+    m >>-> fun s m ->
+    x >>|> fun _ x ->
+    let s = Theory.Mem.vals s in
+    match m, x with
+    | Some m, Some x -> pure s @@ app "load" [m; x]
+    | _ -> empty s
+
+  let store m p x =
+    m >>-> fun s m ->
+    p >>-> fun _ p ->
+    x >>|> fun _ x ->
+    match m, p, x with
+    | Some m, Some p, Some x ->
+      pure s @@ app "store" [m; p; x]
+    | _ -> empty s
+
+  let nil = Theory.Effect.empty Theory.Effect.Sort.bot
+
+  let perform eff = ret (Theory.Effect.empty eff)
+
+  let set v x = x >>|> fun _ x ->
+    match x with
+    | None -> nil
+    | Some x -> data@@app "set" [
+        atom (Theory.Var.name v);
+        x
+      ]
+
+  let jmp x = x >>|> fun _ x -> match x with
+    | None -> nil
+    | Some x -> ctrl@@app "goto" [x]
+
+  let goto dst =
+    KB.collect Theory.Label.name dst >>= function
+    | Some dst -> ret@@ctrl@@app "goto" [atom dst]
+    | None ->
+      KB.Object.repr Theory.Program.cls dst >>= fun dst ->
+      ret@@ctrl@@app "goto" [atom dst]
+
+  let both s xs ys =
+    match xs,ys with
+    | None,None -> ret nil
+    | Some r,None
+    | None, Some r -> ret@@eff s r
+    | Some xs, Some ys ->
+      ret@@eff s@@app "prog" [xs; ys]
+
+  let seq xs ys =
+    xs >>=> fun s xs ->
+    ys >>=> fun _ ys ->
+    both s xs ys
+
+  let blk _ xs ys =
+    xs >>=> fun _ xs ->
+    ys >>=> fun _ ys ->
+    both Theory.Effect.Sort.top xs ys
+
+  let repeat cnd body =
+    cnd >>-> fun _ cnd ->
+    body >>=>? fun s body ->
+    match cnd with
+    | None -> ret@@nil
+    | Some cnd ->
+      ret@@eff s@@app "while" [cnd; body]
+
+  let branch cnd yes nay =
+    cnd >>-> fun _ cnd ->
+    yes >>=>? fun s yes ->
+    nay >>=>? fun _ nay ->
+    match cnd with
+    | None -> ret@@nil
+    | Some cnd ->
+      ret@@eff s@@app "if" [cnd; yes; nay]
+end
+
 module Lisp = Primus.Lisp.Semantics
 
 let provide () =
@@ -412,3 +647,8 @@ let provide () =
   Theory.instance () >>= Theory.require >>= fun (module CT) ->
   let module P = Primitives(CT) in
   P.dispatch obj name args
+
+let enable_extraction () =
+  Theory.declare ~provides:["extraction"; "primus-lisp"; "lisp"]
+    ~package:"bap"
+    ~name:"primus-lisp" (KB.return (module CST : Theory.Core))

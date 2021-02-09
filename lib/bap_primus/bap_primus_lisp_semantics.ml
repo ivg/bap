@@ -7,6 +7,7 @@ open Bap_primus_lisp_types
 open Bap_primus_lisp_attributes
 
 module Program = Bap_primus_lisp_program
+module Source = Bap_primus_lisp_source
 module Resolve = Bap_primus_lisp_resolve
 module Def = Bap_primus_lisp_def
 module Type = Bap_primus_lisp_type
@@ -97,7 +98,10 @@ module Property = struct
           function
           | Ok rs -> Result.all rs
           | Unequal_lengths -> Error Unequal_arity)
+
+
 end
+
 
 let primitive name args =
   let open KB.Syntax in
@@ -506,7 +510,8 @@ module Prelude(CT : Theory.Core) = struct
     match args with
     | Some args -> call name args
     | None -> resolve prog Key.func name >>= function
-      | Some fn -> eval (Def.Func.body fn)
+      | Some fn ->
+        eval (Def.Func.body fn)
       | None -> !!Insn.empty
 end
 

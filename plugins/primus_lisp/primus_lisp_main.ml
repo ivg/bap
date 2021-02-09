@@ -7,7 +7,14 @@ include Self()
 
 module Lisp_config = Primus_lisp_config
 module Primitives = Primus_lisp_primitives
+module Semantics_primitives = Primus_lisp_semantic_primitives
 module Channels = Primus_lisp_io
+
+let dump_program prog =
+  let margin = get_margin () in
+  set_margin 64;
+  printf "%a@\n%!" Primus.Lisp.Load.pp_program prog;
+  set_margin margin
 
 let load_program paths features project =
   match Primus.Lisp.Load.program ~paths project features with
@@ -15,12 +22,6 @@ let load_program paths features project =
   | Error err ->
     let err = asprintf "%a" Primus.Lisp.Load.pp_error err in
     invalid_arg err
-
-let dump_program prog =
-  let margin = get_margin () in
-  set_margin 64;
-  printf "%a@\n%!" Primus.Lisp.Load.pp_program prog;
-  set_margin margin
 
 module Documentation = struct
   let pp_index ppf index =
@@ -393,7 +394,8 @@ let () =
         ~desc:"Prints Primus Lisp type errors into the standard output.";
       Channels.init !!redirects;
       Primitives.init ();
-      Primus_lisp_semantic_primitives.provide ();
+      Semantics_primitives.provide ();
+      Semantics_primitives.enable_extraction ();
       Semantics.load_lisp_unit ~paths ~features;
       Primus.Lisp.Semantics.enable ();
       if Poly.(!!semantics <> ["disable"])
