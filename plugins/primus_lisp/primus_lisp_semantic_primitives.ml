@@ -452,6 +452,7 @@ module CST : Theory.Core = struct
     | None -> ret (Theory.Value.empty s)
     | Some v -> f s v
 
+
   let (>>|>?) x f = x >>->? fun s v -> ret (f s v)
 
   let (>>=>) x f =
@@ -715,6 +716,97 @@ module CST : Theory.Core = struct
   let ugt x = monoid_s Theory.Bool.t ">" x
   let sge x = monoid_s Theory.Bool.t "s>=" x
   let uge x = monoid_s Theory.Bool.t ">=" x
+
+  let asort s =
+    atom@@Format.asprintf "%a" Theory.Value.Sort.pp (Theory.Value.Sort.forget s)
+
+  let float s x =
+    x >>|> fun _ x -> match x with
+    | None -> empty s
+    | Some x -> pure s@@app "float" [asort s; x]
+
+  let fbits x =
+    x >>|> fun s x ->
+    let s = Theory.Float.bits s in
+    match x with
+    | None -> empty s
+    | Some x -> pure s@@app "fbits" [x]
+
+  let is_finite x = unary_s Theory.Bool.t "is-finite" x
+  let is_nan x = unary_s Theory.Bool.t "is-nan" x
+  let is_inf x = unary_s Theory.Bool.t "is-inf" x
+  let is_fzero x = unary_s Theory.Bool.t "is-fzero" x
+  let is_fpos x = unary_s Theory.Bool.t "is-fpos" x
+  let is_fneg x = unary_s Theory.Bool.t "is-fneg" x
+
+  let rmode s = ret@@pure Theory.Rmode.t @@ atom s
+  let rne = rmode ":rne"
+  let rna = rmode ":rna"
+  let rtp = rmode ":rtp"
+  let rtn = rmode ":rtn"
+  let rnz = rmode ":rtz"
+  let requal = eq
+
+  let mk_fcast name s m x =
+    m >>-> fun _ m ->
+    x >>|> fun _ x ->
+    match m,x with
+    | Some m, Some x -> pure s@@app name [m;x]
+    | _ -> empty s
+
+  let cast_float s = mk_fcast "cast-float" s
+  let cast_sfloat s = mk_fcast "cast-sfloat" s
+  let cast_int s = mk_fcast "cast-int" s
+  let cast_sint s = mk_fcast "cast-sint" s
+
+  let fneg x = unary "fneg" x
+  let fabs x = unary "fabs" x
+
+  let monoid_f name m x y =
+    x >>->? fun s x ->
+    y >>->? fun _ y ->
+    m >>|> fun _ m ->
+    match m with
+    | None -> empty s
+    | Some m -> pure s@@app name [m; x; y]
+
+  let unary_f name m x =
+    x >>->? fun s x ->
+    m >>|> fun _ m ->
+    match m with
+    | None -> empty s
+    | Some m -> pure s@@app name [m; x]
+
+  let ternary_f name m x y z =
+    x >>->? fun s x ->
+    y >>->? fun _ y ->
+    z >>->? fun _ z ->
+    m >>|> fun _ m ->
+    match m with
+    | None -> empty s
+    | Some m -> pure s@@app name [m; x; y; z]
+
+  let fadd m = monoid_f "+." m
+  let fsub m = monoid_f "-." m
+  let fmul m = monoid_f "*." m
+  let fdiv m = monoid_f "/." m
+  let fmodulo m = monoid_f "mod." m
+  let fsqrt m = unary_f "fsqrt" m
+  let fround m = unary_f "fround" m
+  let fmad m = ternary_f "fmad" m
+  let fsucc x = unary "fsucc" x
+  let fpred x = unary "fpred" x
+  let forder x = monoid_s Theory.Bool.t "forder" x
+
+  let fconvert s m x =
+    m >>-> fun _ m ->
+    x >>|> fun _ x ->
+    match m,x with
+    | Some m, Some x -> pure s@@app "fconvert" [
+        asort s; m; x
+      ]
+    | _ -> empty s
+
 end
 
 module Lisp = Primus.Lisp.Semantics
