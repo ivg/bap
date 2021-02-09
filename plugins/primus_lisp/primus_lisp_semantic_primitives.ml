@@ -418,7 +418,21 @@ module CST : Theory.Core = struct
   let ctrl = eff Theory.Effect.Sort.bot
   let ret = KB.return
   let atom s = Sexp.Atom s
-  let list xs = Sexp.List xs
+
+  let list = function
+    | [Sexp.Atom op;
+       List ((Atom opx) :: xs);
+       List ((Atom opy) :: ys)]
+      when String.(op = opx && op = opy) ->
+      Sexp.List (Atom op :: List.append xs ys)
+    | [Sexp.Atom op; List ((Atom opx) :: xs); y]
+      when String.(op = opx) ->
+      Sexp.List (Sexp.Atom op :: xs@[y])
+    | [Sexp.Atom op; x; List ((Atom opy) :: ys)]
+      when String.(op = opy) ->
+      Sexp.List (Sexp.Atom op :: x :: ys)
+    | xs -> Sexp.List xs
+
   let app x xs = list (atom x :: xs)
 
   let psort = Theory.Value.sort
@@ -529,17 +543,23 @@ module CST : Theory.Core = struct
   let shiftl x = genshift "shiftl" x
   let sle x = monoid_s Theory.Bool.t "s<=" x
   let ule x = monoid_s Theory.Bool.t "<" x
-  let cast s fill x =
+
+
+  let cast s fill exp =
     fill >>-> fun _ fill ->
-    x >>|> fun _ x ->
+    exp >>|> fun s' x ->
     let ct = sprintf "%d" @@ Theory.Bitv.size s in
     match fill, x  with
-    | Some fill, Some x -> pure s@@list [
-        atom "cast";
-        atom ct;
-        fill;
-        x
-      ]
+    | Some fill, Some x ->
+      if Theory.Value.Sort.same s s'
+      then pure s x
+      else
+        pure s@@list [
+          atom "cast";
+          atom ct;
+          fill;
+          x
+        ]
     | _ -> empty s
 
   let concat s xs =
