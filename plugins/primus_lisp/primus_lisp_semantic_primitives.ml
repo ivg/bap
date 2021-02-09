@@ -402,13 +402,13 @@ module CST : Theory.Core = struct
       ~equal:Sexp.equal
       ~inspect:ident
 
-  let eslot = KB.Class.property Theory.Semantics.cls "lisp-stmt"
-      ~package:"bap"
+  let eslot = KB.Class.property Theory.Semantics.cls "eff"
+      ~package:"core"
       ~public:true
       domain
 
-  let pslot = KB.Class.property Theory.Value.cls "lisp-expr"
-      ~package:"bap"
+  let pslot = KB.Class.property Theory.Value.cls "val"
+      ~package:"core"
       ~public:true
       domain
 
@@ -489,161 +489,232 @@ module CST : Theory.Core = struct
 
   include Theory.Empty
 
-  let b0 = ret@@pure Theory.Bool.t (atom "0")
-  let b1 = ret@@pure Theory.Bool.t (atom "1")
+  module Minimal = struct
+    let b0 = ret@@pure Theory.Bool.t (atom "0")
+    let b1 = ret@@pure Theory.Bool.t (atom "1")
 
-  let var v =
-    let s = Theory.Var.sort v in
-    ret@@pure s@@atom (Theory.Var.name v)
+    let unk s = ret@@empty s
 
-  let let_ v x y =
-    x >>-> fun _ x ->
-    y >>|> fun s y ->
-    let name = Theory.Var.name v in
-    match x,y with
-    | Some x, Some y ->
-      pure s@@app "let" [atom name; x; y]
-    | _ -> empty s
+    let var v =
+      let s = Theory.Var.sort v in
+      ret@@pure s@@atom (Theory.Var.name v)
 
-  let ite c x y =
-    c >>-> fun _ c ->
-    x >>->? fun s x ->
-    y >>|>? fun _ y -> match c with
-    | None -> empty s
-    | Some c -> pure s@@app "ite" [c; x; y]
+    let let_ v x y =
+      x >>-> fun _ x ->
+      y >>|> fun s y ->
+      let name = Theory.Var.name v in
+      match x,y with
+      | Some x, Some y ->
+        pure s@@app "let" [atom name; x; y]
+      | _ -> empty s
 
-  let inv = unary "not"
-  let and_ = monoid "logand"
-  let or_ = monoid "logor"
-  let int s x = ret@@pure s@@atom (Bitvec.to_string x)
-  let msb x = unary_s Theory.Bool.t "msb" x
-  let lsb x = unary_s Theory.Bool.t "lsb" x
-  let neg x = unary "-" x
-  let not x = unary "not" x
-  let add x = monoid "+" x
-  let sub x = monoid "-" x
-  let mul x = monoid "*" x
-  let div x = monoid "/" x
-  let sdiv x = monoid "s/" x
-  let modulo x = monoid "mod" x
-  let smodulo x = monoid "signed-mod" x
-  let logand x = monoid "logand" x
-  let logor x = monoid "logor" x
-  let logxor x = monoid "logxor" x
+    let ite c x y =
+      c >>-> fun _ c ->
+      x >>->? fun s x ->
+      y >>|>? fun _ y -> match c with
+      | None -> empty s
+      | Some c -> pure s@@app "ite" [c; x; y]
 
-  let genshift name fill x off =
-    fill >>-> fun _ fill ->
-    x >>-> fun s x ->
-    off >>|> fun _ off ->
-    match fill, x, off with
-    | Some fill, Some x, Some off ->
-      pure s @@ app name [fill; x; off]
-    | _ -> empty s
-  let shiftr x = genshift "shiftr" x
-  let shiftl x = genshift "shiftl" x
-  let sle x = monoid_s Theory.Bool.t "s<=" x
-  let ule x = monoid_s Theory.Bool.t "<" x
+    let inv = unary "not"
+    let and_ = monoid "logand"
+    let or_ = monoid "logor"
+    let int s x = ret@@pure s@@atom (Bitvec.to_string x)
+    let msb x = unary_s Theory.Bool.t "msb" x
+    let lsb x = unary_s Theory.Bool.t "lsb" x
+    let neg x = unary "-" x
+    let not x = unary "not" x
+    let add x = monoid "+" x
+    let sub x = monoid "-" x
+    let mul x = monoid "*" x
+    let div x = monoid "/" x
+    let sdiv x = monoid "s/" x
+    let modulo x = monoid "mod" x
+    let smodulo x = monoid "signed-mod" x
+    let logand x = monoid "logand" x
+    let logor x = monoid "logor" x
+    let logxor x = monoid "logxor" x
+
+    let genshift name fill x off =
+      fill >>-> fun _ fill ->
+      x >>-> fun s x ->
+      off >>|> fun _ off ->
+      match fill, x, off with
+      | Some fill, Some x, Some off ->
+        pure s @@ app name [fill; x; off]
+      | _ -> empty s
+    let shiftr x = genshift "shiftr" x
+    let shiftl x = genshift "shiftl" x
+    let sle x = monoid_s Theory.Bool.t "s<=" x
+    let ule x = monoid_s Theory.Bool.t "<" x
 
 
-  let cast s fill exp =
-    fill >>-> fun _ fill ->
-    exp >>|> fun s' x ->
-    let ct = sprintf "%d" @@ Theory.Bitv.size s in
-    match fill, x  with
-    | Some fill, Some x ->
-      if Theory.Value.Sort.same s s'
-      then pure s x
-      else
-        pure s@@list [
-          atom "cast";
-          atom ct;
-          fill;
+    let cast s fill exp =
+      fill >>-> fun _ fill ->
+      exp >>|> fun s' x ->
+      let ct = sprintf "%d" @@ Theory.Bitv.size s in
+      match fill, x  with
+      | Some fill, Some x ->
+        if Theory.Value.Sort.same s s'
+        then pure s x
+        else
+          pure s@@list [
+            atom "cast";
+            atom ct;
+            fill;
+            x
+          ]
+      | _ -> empty s
+
+    let concat s xs =
+      List.map xs ~f:(fun x -> x >>|> fun _ -> ident) |>
+      KB.List.all >>| Option.all >>| function
+      | None -> empty s
+      | Some xs -> pure s @@ app "concat" xs
+
+    let append s x y = monoid_s s "append" x y
+
+    let load m x =
+      m >>-> fun s m ->
+      x >>|> fun _ x ->
+      let s = Theory.Mem.vals s in
+      match m, x with
+      | Some m, Some x -> pure s @@ app "load" [m; x]
+      | _ -> empty s
+
+    let store m p x =
+      m >>-> fun s m ->
+      p >>-> fun _ p ->
+      x >>|> fun _ x ->
+      match m, p, x with
+      | Some m, Some p, Some x ->
+        pure s @@ app "store" [m; p; x]
+      | _ -> empty s
+
+    let nil = Theory.Effect.empty Theory.Effect.Sort.bot
+
+    let perform eff = ret (Theory.Effect.empty eff)
+
+    let set v x = x >>|> fun _ x ->
+      match x with
+      | None -> nil
+      | Some x -> data@@app "set" [
+          atom (Theory.Var.name v);
           x
         ]
-    | _ -> empty s
 
-  let concat s xs =
-    List.map xs ~f:(fun x -> x >>|> fun _ -> ident) |>
-    KB.List.all >>| Option.all >>| function
+    let jmp x = x >>|> fun _ x -> match x with
+      | None -> nil
+      | Some x -> ctrl@@app "goto" [x]
+
+    let goto dst =
+      KB.collect Theory.Label.name dst >>= function
+      | Some dst -> ret@@ctrl@@app "goto" [atom dst]
+      | None ->
+        KB.Object.repr Theory.Program.cls dst >>= fun dst ->
+        ret@@ctrl@@app "goto" [atom dst]
+
+    let both s xs ys =
+      match xs,ys with
+      | None,None -> ret nil
+      | Some r,None
+      | None, Some r -> ret@@eff s r
+      | Some xs, Some ys ->
+        ret@@eff s@@app "prog" [xs; ys]
+
+    let seq xs ys =
+      xs >>=> fun s xs ->
+      ys >>=> fun _ ys ->
+      both s xs ys
+
+    let blk _ xs ys =
+      xs >>=> fun _ xs ->
+      ys >>=> fun _ ys ->
+      both Theory.Effect.Sort.top xs ys
+
+    let repeat cnd body =
+      cnd >>-> fun _ cnd ->
+      body >>=>? fun s body ->
+      match cnd with
+      | None -> ret@@nil
+      | Some cnd ->
+        ret@@eff s@@app "while" [cnd; body]
+
+    let branch cnd yes nay =
+      cnd >>-> fun _ cnd ->
+      yes >>=>? fun s yes ->
+      nay >>=>? fun _ nay ->
+      match cnd with
+      | None -> ret@@nil
+      | Some cnd ->
+        ret@@eff s@@app "if" [cnd; yes; nay]
+  end
+  include Theory.Basic.Make(Minimal)
+
+  let mk_cast name s x =
+    x >>|> fun s' x -> match x with
     | None -> empty s
-    | Some xs -> pure s @@ app "concat" xs
+    | Some x ->
+      if Theory.Value.Sort.same s s'
+      then pure s x
+      else pure s@@app name [
+          atom@@sprintf "%d" (Theory.Bitv.size s);
+          x
+        ]
 
-  let append s x y = monoid_s s "append" x y
+  let high s = mk_cast "high" s
+  let low s = mk_cast "low" s
+  let signed s = mk_cast "signed" s
+  let unsigned s = mk_cast "unsigned" s
 
-  let load m x =
-    m >>-> fun s m ->
+  let extract s lo hi x =
+    lo >>-> fun _ lo ->
+    hi >>-> fun _ hi ->
     x >>|> fun _ x ->
-    let s = Theory.Mem.vals s in
-    match m, x with
-    | Some m, Some x -> pure s @@ app "load" [m; x]
+    match lo,hi,x with
+    | Some lo, Some hi, Some x ->
+      pure s@@app "extract" [lo; hi; x]
     | _ -> empty s
 
-  let store m p x =
-    m >>-> fun s m ->
-    p >>-> fun _ p ->
-    x >>|> fun _ x ->
-    match m, p, x with
-    | Some m, Some p, Some x ->
-      pure s @@ app "store" [m; p; x]
-    | _ -> empty s
-
-  let nil = Theory.Effect.empty Theory.Effect.Sort.bot
-
-  let perform eff = ret (Theory.Effect.empty eff)
-
-  let set v x = x >>|> fun _ x ->
-    match x with
-    | None -> nil
-    | Some x -> data@@app "set" [
-        atom (Theory.Var.name v);
-        x
+  let loadw s dir mem ptr =
+    dir >>-> fun _ dir ->
+    mem >>-> fun _ mem ->
+    ptr >>|> fun _ ptr ->
+    match dir,mem,ptr with
+    | Some dir, Some mem, Some ptr ->
+      pure s@@app "loadw" [
+        atom@@sprintf "%d" (Theory.Bitv.size s);
+        dir;
+        mem;
+        ptr
       ]
+    | _ -> empty s
 
-  let jmp x = x >>|> fun _ x -> match x with
-    | None -> nil
-    | Some x -> ctrl@@app "goto" [x]
+  let storew dir mem ptr exp =
+    dir >>-> fun _ dir ->
+    mem >>-> fun s mem ->
+    ptr >>-> fun _ ptr ->
+    exp >>|> fun _ exp ->
+    match Option.all [dir; mem; ptr; exp] with
+    | Some args -> pure s@@app "storew" args
+    | _ -> empty s
 
-  let goto dst =
-    KB.collect Theory.Label.name dst >>= function
-    | Some dst -> ret@@ctrl@@app "goto" [atom dst]
-    | None ->
-      KB.Object.repr Theory.Program.cls dst >>= fun dst ->
-      ret@@ctrl@@app "goto" [atom dst]
+  let mk_shift name x m =
+    x >>->? fun s x ->
+    m >>|> fun _ -> function
+    | None -> empty s
+    | Some m -> pure s@@app name [x; m]
 
-  let both s xs ys =
-    match xs,ys with
-    | None,None -> ret nil
-    | Some r,None
-    | None, Some r -> ret@@eff s r
-    | Some xs, Some ys ->
-      ret@@eff s@@app "prog" [xs; ys]
-
-  let seq xs ys =
-    xs >>=> fun s xs ->
-    ys >>=> fun _ ys ->
-    both s xs ys
-
-  let blk _ xs ys =
-    xs >>=> fun _ xs ->
-    ys >>=> fun _ ys ->
-    both Theory.Effect.Sort.top xs ys
-
-  let repeat cnd body =
-    cnd >>-> fun _ cnd ->
-    body >>=>? fun s body ->
-    match cnd with
-    | None -> ret@@nil
-    | Some cnd ->
-      ret@@eff s@@app "while" [cnd; body]
-
-  let branch cnd yes nay =
-    cnd >>-> fun _ cnd ->
-    yes >>=>? fun s yes ->
-    nay >>=>? fun _ nay ->
-    match cnd with
-    | None -> ret@@nil
-    | Some cnd ->
-      ret@@eff s@@app "if" [cnd; yes; nay]
+  let arshift x = mk_shift "arshift" x
+  let rshift x = mk_shift "rshift" x
+  let lshift x = mk_shift "lshift" x
+  let eq x = monoid_s Theory.Bool.t "=" x
+  let neq x = monoid_s Theory.Bool.t "/=" x
+  let slt x = monoid_s Theory.Bool.t "s<" x
+  let ult x = monoid_s Theory.Bool.t "<" x
+  let sgt x = monoid_s Theory.Bool.t "s>" x
+  let ugt x = monoid_s Theory.Bool.t ">" x
+  let sge x = monoid_s Theory.Bool.t "s>=" x
+  let uge x = monoid_s Theory.Bool.t ">=" x
 end
 
 module Lisp = Primus.Lisp.Semantics
