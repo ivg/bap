@@ -18,5 +18,6 @@ Library primus_lisp_library_plugin
                    Primus_lisp_io,
                    Primus_lisp_run
   XMETADescription: install and load Primus lisp libraries
-  DataFiles:        lisp/*.lisp ($primus_lisp_library_path)
+  DataFiles:        lisp/*.lisp ($primus_lisp_library_path),
+                    semantics/*.lisp ($primus_lisp_library_path/semantics)
   XMETAExtraLines:  tags="primus, lisp"
