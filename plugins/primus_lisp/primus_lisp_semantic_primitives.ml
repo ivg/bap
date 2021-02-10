@@ -488,8 +488,6 @@ module CST : Theory.Core = struct
     y >>|>? fun _ y ->
     pure s @@ app op [x; y]
 
-  include Theory.Empty
-
   module Minimal = struct
     let b0 = ret@@pure Theory.Bool.t (atom "0")
     let b1 = ret@@pure Theory.Bool.t (atom "1")
@@ -720,10 +718,37 @@ module CST : Theory.Core = struct
   let asort s =
     atom@@Format.asprintf "%a" Theory.Value.Sort.pp (Theory.Value.Sort.forget s)
 
+
+  let wellknown = Theory.IEEE754.[
+      binary16,  ":b16";
+      binary32,  ":b32";
+      binary64,  ":b64";
+      binary80,  ":b80";
+      binary128, ":b128";
+      decimal32, ":d32";
+      decimal64, ":d64";
+      decimal128, ":d128";
+    ]
+
+  let format s =
+    let s = Theory.Value.Sort.forget s in
+    match Theory.Float.(refine s) with
+    | None -> asort s
+    | Some s ->
+      List.find_map wellknown ~f:(fun (par,name) ->
+          let s' = Theory.IEEE754.Sort.define par in
+          if Theory.Value.Sort.same s s'
+          then Some (atom name)
+          else None) |> function
+      | Some s -> s
+      | None -> asort s
+
+
+
   let float s x =
     x >>|> fun _ x -> match x with
     | None -> empty s
-    | Some x -> pure s@@app "float" [asort s; x]
+    | Some x -> pure s@@app "float" [format s; x]
 
   let fbits x =
     x >>|> fun s x ->
@@ -744,7 +769,7 @@ module CST : Theory.Core = struct
   let rna = rmode ":rna"
   let rtp = rmode ":rtp"
   let rtn = rmode ":rtn"
-  let rnz = rmode ":rtz"
+  let rtz = rmode ":rtz"
   let requal = eq
 
   let mk_fcast name s m x =
@@ -786,6 +811,15 @@ module CST : Theory.Core = struct
     | None -> empty s
     | Some m -> pure s@@app name [m; x; y; z]
 
+  let binary_fi name m f x =
+    f >>->? fun s f ->
+    m >>-> fun _ m ->
+    x >>|> fun _ x ->
+    match m,x with
+    | Some m, Some x -> pure s@@app name [m; f; x]
+    | _ -> empty s
+
+
   let fadd m = monoid_f "+." m
   let fsub m = monoid_f "-." m
   let fmul m = monoid_f "*." m
@@ -803,10 +837,47 @@ module CST : Theory.Core = struct
     x >>|> fun _ x ->
     match m,x with
     | Some m, Some x -> pure s@@app "fconvert" [
-        asort s; m; x
+        format s; m; x
       ]
     | _ -> empty s
 
+  let pow m = monoid_f "pow" m
+  let hypot m = monoid_f "hypot" m
+
+  let rsqrt m = unary_f "rsqrt" m
+  let exp m = unary_f "exp" m
+  let expm1 m = unary_f "expm1" m
+  let exp2 m = unary_f "exp2" m
+  let exp2m1 m = unary_f "exp2m1" m
+  let exp10 m = unary_f "exp10" m
+  let exp10m1 m = unary_f "exp10m1" m
+  let log m = unary_f "log" m
+  let log2 m = unary_f "log2" m
+  let log10 m = unary_f "log10" m
+  let logp1 m = unary_f "logp1" m
+  let log2p1 m = unary_f "log2p1" m
+  let log10p1 m = unary_f "log10p1" m
+  let sin m = unary_f "sin" m
+  let cos m = unary_f "cos" m
+  let tan m = unary_f "tan" m
+  let sinpi m = unary_f "sinpi" m
+  let cospi m = unary_f "cospi" m
+  let atanpi m = unary_f "atanpi" m
+  let atan2pi m = monoid_f "atan2pi" m
+  let asin m = unary_f "asin" m
+  let acos m = unary_f "acos" m
+  let atan m = unary_f "atan" m
+  let atan2 m = monoid_f "atan2" m
+  let sinh m = unary_f "sinh" m
+  let cosh m = unary_f "cosh" m
+  let tanh m = unary_f "tanh" m
+  let asinh m = unary_f "asinh" m
+  let acosh m = unary_f "acosh" m
+  let atanh m = unary_f "atanh" m
+
+  let compound m = binary_fi "compound" m
+  let rootn m = binary_fi "rootn" m
+  let pown m = binary_fi "pown" m
 end
 
 module Lisp = Primus.Lisp.Semantics
