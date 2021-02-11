@@ -286,7 +286,8 @@ module Semantics = struct
   let translate_opcode_to_name () =
     KB.promise Lisp.Semantics.name @@ fun this ->
     KB.collect Insn.slot this >>|? fun insn ->
-    Some (sprintf "%s:%s" (Insn.encoding insn) (Insn.name insn))
+    let name = sprintf "%s:%s" (Insn.encoding insn) (Insn.name insn) in
+    Some name
 
   let strip_extension = String.chop_suffix ~suffix:".lisp"
 
@@ -297,6 +298,8 @@ module Semantics = struct
         | None -> features
         | Some name -> name::features)
 
+
+
   let collect_features sites =
     List.fold sites ~init:(sites,["init"]) ~f:(fun (paths,fs) site ->
         if Sys.file_exists site
@@ -305,6 +308,8 @@ module Semantics = struct
           else match strip_extension site with
             | None -> paths,site::fs
             | Some name -> paths,name::fs
+        else if Sys.file_exists (site^".lisp")
+        then paths,site::fs
         else paths,fs)
 
   let path = Filename.concat Lisp_config.library "semantics"
@@ -312,7 +317,9 @@ module Semantics = struct
   let load_lisp_sources sites =
     let sites = path :: sites in
     let paths, features = collect_features sites in
-    let paths = Lisp_config.library :: paths in
+    let paths = Filename.current_dir_name :: Lisp_config.library :: paths in
+    Format.eprintf "Loading the following semantics features: %s@\n%!"
+      (String.concat ~sep:", " features);
     let prog t =
       pack@@load_program paths features@@Project.empty t in
     KB.promise Theory.Unit.source @@ fun this ->

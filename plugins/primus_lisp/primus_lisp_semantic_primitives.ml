@@ -131,7 +131,13 @@ let export = Primus.Lisp.Type.Spec.[
     "(memory-read PTR) loads one byte from the address PTR";
 
     "memory-write", (tuple [int; byte] @-> int),
-    "(memory-write PTR X) stores X at PTR."
+    "(memory-write PTR X) stores X at PTR.";
+
+    "get-program-counter", (unit @-> int),
+    "(get-program-counter) returns the address of the current instruction";
+
+    "get-current-program-counter", (unit @-> int),
+    "(get-current-program-counter) is an alias to (get-program-counter)";
   ]
 
 type KB.conflict += Illformed of string
@@ -345,6 +351,11 @@ module Primitives(CT : Theory.Core) = struct
   let reciprocal = one_op_x CT.div
   let sreciprocal = one_op_x CT.sdiv
 
+  let get_pc s lbl =
+    KB.collect Theory.Label.addr lbl >>= function
+    | None -> forget@@int s 0
+    | Some addr -> forget@@const_int s addr
+
   let dispatch lbl name args =
     Theory.Label.target lbl >>= fun t ->
     let bits = Theory.Target.bits t in
@@ -388,6 +399,8 @@ module Primitives(CT : Theory.Core) = struct
     | "exec-addr",_-> ctrl@@exec_addr args
     | "memory-read",_-> pure@@memory_read t args
     | "memory-write",_-> data@@memory_write t args
+    | "get-program-counter",[]
+    | "get-current-program-counter",[] -> pure@@get_pc s lbl
     | _ -> !!nothing
 end
 
