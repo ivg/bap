@@ -1855,6 +1855,10 @@ module Theory : sig
       @since 2.2.0 *)
   module Fabi : Enum.S with type t = fabi
 
+  (** The file type that is used to pack the unit.
+      @since 2.3.0 *)
+  module Filetype : Enum.S with type t = filetype
+
   (** Information about the compiler.
 
       A compiler is a translator that was used to translate

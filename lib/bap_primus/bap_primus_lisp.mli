@@ -161,4 +161,35 @@ module Unit : sig
   val language : Theory.language
 end
 
+module Attribute : sig
+  type 'a t
+  type set
+
+  module Parse : sig
+    type tree
+    type error = ..
+    type error += Expect_atom | Expect_list
+    val atom : tree -> string option
+    val list : tree -> tree list option
+    val tree :
+      atom:(string -> 'a) ->
+      list:(tree list -> 'a) ->
+      tree -> 'a
+    val fail : error -> tree list -> _
+  end
+
+  val declare :
+    ?desc:string ->
+    ?package:string ->
+    domain:'a KB.domain ->
+    parse:(Parse.tree list -> 'a) ->
+    string -> 'a t
+
+  module Set : sig
+    include KB.Value.S with type t := set
+    val get : 'a t -> set -> 'a
+    val slot : (Theory.program, set) KB.slot
+  end
+end
+
 val init : ?log:formatter -> ?paths:string list -> string list -> unit

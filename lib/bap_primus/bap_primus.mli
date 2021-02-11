@@ -3223,8 +3223,8 @@ module Std : sig
         [memory-written], but also proclaims it as advice function to
         the [memory-write] function that should before it is called.
 
-        If an advisor is attached before the advised function, then
-        it the advisor will be called with the same arguments as the
+        If an advisor is attached before the advised function then
+        the advisor will be called with the same arguments as the
         advised function. The return value of the advisor is
         ignored. The advisor function will be called as a normal Lisp
         function, with all expected overloading and name resolving. So
@@ -3237,7 +3237,7 @@ module Std : sig
         the advised function. The value returned by the advisor will
         override the result of the advised function. If there are
         several advisors attached after the same function, then they
-        will be called in the unspecified order.
+        will be called in an unspecified order.
 
 
         {2 Signaling Mechanims}
@@ -3345,7 +3345,12 @@ var ::= <ident> | <ident>:<size>
 attribute ::=
   | (external <ident> ...)
   | (context (<ident> <ident> ...) ...)
+  | (global <ident> ...)
+  | (static <ident> ...)
+  | (advice <cmethod> <ident> ...)
   | (<ident> ?ident-specific-format?)
+
+cmethod ::= :before | :after
 
 docstring ::= <text>
 
@@ -3727,6 +3732,8 @@ ident ::= ?any atom that is not recognized as a <word>?
           base. The module has the {!Theory.Unit.source} field that
           contains the program and other relevant fields. The source
           language is set to {!Unit.language}.
+
+          @since 2.3.0
       *)
       module Unit : sig
 
@@ -3742,6 +3749,110 @@ ident ::= ?any atom that is not recognized as a <word>?
 
         (** The language identifier for Primus Lisp.  *)
         val language : Theory.language
+      end
+
+      (** Primus Lisp Attributes.
+
+          This module enables declaring new attributes as well as
+          accessing definition attributes via the knowledge base using
+          {!Attribute.Set.slot}.
+
+          @since 2.3.0
+      *)
+      module Attribute : sig
+
+        (** the abstract type the enables access to an attribute.  *)
+        type 'a t
+
+
+        (** the abstract type denoting a set of attributes  *)
+        type set
+
+
+        (** The interface to the abstract parse tree.
+
+            The parse tree is a functionally an s-expression.
+        *)
+        module Parse : sig
+          type tree
+
+
+          (** an extensible type for reporting ill-formed attributes.  *)
+          type error = ..
+          type error += Expect_atom | Expect_list
+
+
+          (** [atom tree] is [Some atom] if tree is an atom.  *)
+          val atom : tree -> string option
+
+          (** [list tree] is [Some list] if tree is an list.  *)
+          val list : tree -> tree list option
+
+
+          (** [tree ~atom:f ~list:g tree] parses tree.
+
+              Calls [f x] if [atom tree] is not [None],
+              otherwise calls [g x]. *)
+          val tree :
+            atom : (string -> 'a) ->
+            list : (tree list -> 'a) ->
+            tree -> 'a
+
+          (** [fail problem tree] reports an ill-formed attribute
+              declaration.
+
+              The passed [tree] is used to properly report error
+              that references the original source code and its
+              location.
+
+              It could be an empty if the problem is somewhat generic
+              and doesn't reference any particular tree or source. *)
+          val fail : error -> tree list -> _
+        end
+
+
+        (** [declare ~domain ~parse name] declares a new attribute.
+
+            The [domain] defines the domain structure of the attribute
+            carrier. When attributes are accumulated they should agree
+            with respect to the domain ordering. The [domain]'s [join]
+            function will be used to accumulate attributes of a
+            definition that are declared on different scopes.
+
+            The [parse] function denotes the concrete syntax of the
+            attribute, it is called for each declaration of the form
+            {v(<name> <payload>v} and applied to the
+            {v<payload>v}. The result is then merged with the existing
+            value of this attribute using the join function from the
+            provided domain.
+        *)
+        val declare :
+          ?desc:string ->
+          ?package:string ->
+          domain:'a KB.domain ->
+          parse:(Parse.tree list -> 'a) ->
+          string -> 'a t
+
+
+        (** The set of attributes.
+
+            We represent the set of attributes as an abstracted value.
+        *)
+        module Set : sig
+          include KB.Value.S with type t := set
+
+          (** [get attr set] extracts the value of the attribute from
+              the set.  *)
+          val get : 'a t -> set -> 'a
+
+
+          (** provides access to the definition's set of attributes.
+
+              This slot is provided when {!Semantics.enable} function
+              is called (it is called if the primus-lisp plugin is
+              enabled.  *)
+          val slot : (Theory.program, set) KB.slot
+        end
       end
 
 

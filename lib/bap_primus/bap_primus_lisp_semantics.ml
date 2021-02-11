@@ -6,6 +6,7 @@ open Monads.Std
 open Bap_primus_lisp_types
 open Bap_primus_lisp_attributes
 
+module Attribute = Bap_primus_lisp_attribute
 module Program = Bap_primus_lisp_program
 module Source = Bap_primus_lisp_source
 module Resolve = Bap_primus_lisp_resolve
@@ -69,7 +70,7 @@ let resolve prog item name =
 let check_arg _ _ = true
 
 let is_external def =
-  Option.is_some (Attribute.Set.get (Def.attributes def) External.t)
+  not @@ Set.is_empty (Attribute.Set.get External.t (Def.attributes def))
 
 type info = {
   types : (Theory.Target.t -> Type.signature);
@@ -567,7 +568,7 @@ let obtain_typed_program unit =
 
 
 
-let provide () =
+let provide_semantics () =
   let open KB.Syntax in
   KB.Rule.(begin
       declare "primus-lisp-semantics" |>
@@ -603,7 +604,28 @@ let provide () =
   Meta.run (reify prog target name args) meta >>| fun (res,_) ->
   res
 
-let enable () = provide ()
+let provide_attributes () =
+  let open KB.Syntax in
+  let empty = Attribute.Set.empty in
+  let (>>=?) x f = x >>= function
+    | None -> !!empty
+    | Some x -> f x in
+  KB.promise Attribute.Set.slot @@ fun this ->
+  KB.collect Theory.Label.unit this >>=? fun unit ->
+  KB.collect Property.name this >>=? fun name ->
+  obtain_typed_program unit >>|
+  Program.Type.program >>= fun prog ->
+  match Resolve.semantics prog Key.func name () with
+  | None -> !!empty
+  | Some (Error problem) ->
+    let msg = Format.asprintf "%a" Resolve.pp_resolution problem in
+    KB.fail (Unresolved_definition msg)
+  | Some (Ok (fn,_)) ->
+    !!(Def.attributes fn)
+
+let enable () =
+  provide_semantics ();
+  provide_attributes ()
 
 let static = static_slot
 

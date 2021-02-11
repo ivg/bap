@@ -1057,10 +1057,10 @@ module Typing = struct
 
   let applicable global =
     List.filter ~f:(fun def ->
-        match Lisp.Attribute.Set.get
-                (Def.attributes def) Lisp.Context.t with
-        | None -> true
-        | Some def_ctxt -> Lisp.Context.(global <= def_ctxt))
+        let def_ctxt =
+          Lisp.Attribute.Set.get Lisp.Context.t
+            (Def.attributes def) in
+        Lisp.Context.(def_ctxt <= global))
 
   let find_signal (sigs : Def.signal Def.t list) name =
     List.find sigs ~f:(fun s -> String.equal (Def.name s) name)

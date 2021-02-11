@@ -289,9 +289,9 @@ module Interpreter(Machine : Machine) = struct
 
 
   let is_external_call name def =
-    match Attribute.Set.get (Lisp.Def.attributes def) External.t with
-    | None -> false
-    | Some names -> List.mem ~equal:String.equal names name
+    let calls =
+      Attribute.Set.get External.t (Lisp.Def.attributes def) in
+    Set.mem calls name
 
   let notify_when ?rval cond obs name args =
     if cond then Machine.Observation.post obs ~f:(fun notify ->
@@ -351,14 +351,13 @@ module Interpreter(Machine : Machine) = struct
     Lisp.Program.get program func |>
     Machine.List.fold ~init ~f:(fun r def ->
         let name = Lisp.Def.name def in
-        match Attribute.Set.get (Lisp.Def.attributes def) Advice.t with
-        | None -> Machine.return r
-        | Some adv ->
-          if Set.mem (Advice.targets adv stage) primary
-          then match stage with
-            | After ->  eval_lisp name (args @ [r])
-            | Before -> eval_lisp name args
-          else Machine.return r)
+        let adv =
+          Attribute.Set.get Advice.t (Lisp.Def.attributes def) in
+        if Set.mem (Advice.targets adv stage) primary
+        then match stage with
+          | After  -> eval_lisp name (args @ [r])
+          | Before -> eval_lisp name args
+        else Machine.return r)
 
   and eval_primitive name args =
     Machine.Local.get state >>= fun {program} ->
@@ -629,11 +628,9 @@ module Make(Machine : Machine) = struct
   let collect_externals s =
     Lisp.Program.get s.program Lisp.Program.Items.func |>
     List.fold ~init:String.Map.empty  ~f:(fun toload def ->
-        match Attribute.Set.get (Lisp.Def.attributes def) External.t with
-        | Some names ->
-          List.fold names ~init:toload ~f:(fun toload name ->
-              Map.add_multi toload ~key:name ~data:def)
-        | _ -> toload) |>
+        let names = Attribute.Set.get External.t (Lisp.Def.attributes def) in
+        Set.fold names ~init:toload ~f:(fun toload name ->
+            Map.add_multi toload ~key:name ~data:def)) |>
     Map.to_sequence
 
 
@@ -641,11 +638,11 @@ module Make(Machine : Machine) = struct
     let open Lisp.Attributes in
     let default_width = Size.in_bits (Arch.addr_size arch) in
     let add attr def vars =
-      match Attribute.Set.get (Lisp.Def.attributes def) attr with
-      | None -> vars
-      | Some vars' -> Set.union vars @@
-        Var.Set.of_list @@
-        List.map ~f:(var_of_lisp_var default_width) vars' in
+      let vars' =
+        Set.to_list @@ Attribute.Set.get attr (Lisp.Def.attributes def) in
+      Set.union vars @@
+      Var.Set.of_list @@
+      List.map ~f:(var_of_lisp_var default_width) vars' in
     Lisp.Program.get s.program Lisp.Program.Items.func |>
     List.fold ~init:Var.Set.empty  ~f:(fun vars def ->
         add Variables.global def vars |>
@@ -890,3 +887,4 @@ end
 let primitive = lisp_primitive
 module Semantics = Bap_primus_lisp_semantics
 module Unit = Semantics.Unit
+module Attribute = Lisp.Attribute
