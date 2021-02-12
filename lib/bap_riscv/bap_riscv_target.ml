@@ -30,14 +30,14 @@ let regs = [
 ]
 
 let array t = List.map regs ~f:(reg t)
+let x t = List.init 32 ~f:(fun i -> reg t (sprintf "X%d" i))
 
 let parent = Theory.Target.declare ~package "riscv"
 
 let riscv t =
   let mems = Theory.Mem.define t r8 in
-  let gpr = array t  in
   let mem = reg mems "mem" in
-  let vars = gpr @< [mem] in
+  let vars = x t @< [mem] in
   let bits = Theory.Bitv.size t in
   let name = sprintf "riscv%d"  bits in
   Theory.Target.declare ~package name ~parent
