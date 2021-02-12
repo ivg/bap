@@ -5,139 +5,143 @@ open KB.Syntax
 open KB.Let
 
 let export = Primus.Lisp.Type.Spec.[
-    "+", (all any @-> any),
+    "+", all any @-> any,
     "(+ X Y ... Z) returns X + Y + ... + Z, performing any necessary \
      type conversions in the process. If no numbers are supplied, 0 is \
      returned.";
 
-    "-", (all any @-> any),
+    "-", all any @-> any,
     "(- X Y ... Z) returns X - Y - ... - Z, performing any necessary \
      type conversions in the process. If no numbers are supplied \
      returns 0. If one number is supplied returns its negation.";
 
-    "neg", (one any @-> any),
+    "neg", one any @-> any,
     "(neg X) returns the negation of X. Same as (- X).";
 
-    "*", (all any @-> any),
+    "*", all any @-> any,
     "(*  X Y ... Z) returns X * Y * ... * Z, performing any necessary \
      type conversions in the process. If no numbers are supplied, 1 is \
      returned.";
 
-    "/", (all any @-> any),
+    "/", all any @-> any,
     "(/  X Y ... Z) returns X / Y / ... / Z, performing any necessary \
      type conversions in the process. If no numbers are supplied, 1 is \
      returned. If one number is provided returns its reciprocal.";
 
 
-    "s/", (all any @-> any),
+    "s/", all any @-> any,
     "(s/ X Y ... Z) returns signed X / Y / ... / Z, performing any \
      necessary type conversions in the process. If no numbers are \
      supplied, 1 is returned. If one number is provided returns its \
      signed reciprocal.";
 
-    "mod", (all any @-> any),
+    "mod", all any @-> any,
     "(/ X Y ... Z) returns mod(X,Y) Y mod ... mod Z, performing any \
      necessary type conversions in the process. Where `X mod Y` is the \
      remainder of [X / Y]. If no numbers are supplied, 1 is \
      returned. If one number is provided returns that number.";
 
-    "signed-mod", (all any @-> any),
+    "signed-mod", all any @-> any,
     "(/ X Y ... Z) returns signed mod(X,Y) Y mod ... mod Z, performing \
      any necessary type conversions in the process. Where `X mod Y` is \
      the remainder of [X / Y]. If no numbers are supplied, 1 is \
      returned. If one number is provided returns that number.";
 
-    "lshift", (all any @-> any),
+    "lshift", all any @-> any,
     "(lshift X Y ... Z) returns X << Y << ... << Z, performing \
      any necessary type conversions in the process. Where `X << Y` is \
      logical shift left of X by Y bits. If no numbers are supplied, 1 \
      is returned. If one number is provided returns that number";
 
-    "rshift", (all any @-> any),
+    "rshift", all any @-> any,
     "(rshift X Y ... Z) returns X >> Y >> ... >> Z, performing \
      any necessary type conversions in the process. Where `X >> Y` is \
      logical shift right of X by Y bits. If no numbers are supplied, 1 \
      is returned. If one number is provided returns that number";
 
-    "arshift", (all any @-> any),
+    "arshift", all any @-> any,
     "(arshift X Y ... Z) returns X ~>> Y ~>> ... ~>> Z, performing \
      any necessary type conversions in the process. Where `X ~>> Y` is \
      arithmetic shift right of X by Y bits. If no numbers are supplied, 1 \
      is returned. If one number is provided returns that number";
 
-    "logand", (all any @-> any),
+    "logand", all any @-> any,
     "(logand X Y ... Z) returns X land Y land ... land Z, performing \
      any necessary type conversions in the process. Where `X land Y` is \
      bitwise (logical) /\ (AND) of X and Y. If no numbers are supplied, 1 \
      is returned. If one number is provided returns that number";
 
-    "logor", (all any @-> any),
+    "logor", all any @-> any,
     "(logor X Y ... Z) returns X lor Y lor ... lor Z, performing \
      any necessary type conversions in the process. Where `X lor Y` is \
      bitwise (logical) \\/ (OR) of X and Y. If no numbers are supplied, 1 \
      is returned. If one number is provided returns that number";
 
-    "logxor", (all any @-> any),
+    "logxor", all any @-> any,
     "(loxgor X Y ... Z) returns X lxor Y lxor ... lxor Z, performing \
      any necessary type conversions in the process. Where `X lor Y` is \
      bitwise (logical) exclusive \\/ (XOR) of X and Y. If no numbers \
      are supplied, 1 is returned. If one number is provided returns \
      that number";
 
-    "=", (all any @-> any),
+    "=", all any @-> any,
     "(= X Y ... Z) returns one if all numbers are equal in value.";
 
-    "/=", (all any @-> any),
+    "/=", all any @-> any,
     "(/= X Y ... Z) returns one if all numbers are distinct.";
 
-    "<", (all any @-> any),
+    "<", all any @-> any,
     "(< X Y ... Z) returns one if all numbers are in monotonically \
      increasing order.";
 
-    ">", (all any @-> any),
+    ">", all any @-> any,
     "(> X Y ... Z) returns one if all numbers are in monotonically \
      decreasing order.";
 
-    "<=", (all any @-> any),
+    "<=", all any @-> any,
     "(<= X Y ... Z) returns one if all numbers are in monotonically \
      nondecreasing order.";
 
-    ">=", (all any @-> any),
+    ">=", all any @-> any,
     "(> X Y ... Z) returns one if all numbers are in monotonically \
      nonincreasing order.";
 
-    "is-zero", (all any @-> any),
+    "is-zero", all any @-> any,
     "(is-zero X Y ... Z) returns one if all numbers are zero.";
 
-    "not", (all any @-> any),
+    "not", all any @-> any,
     "(not X Y ... Z) returns one if all numbers are not \
      true. Equivalent to (is-zero X Y Z)";
 
-    "is-positive", (all any @-> any),
+    "is-positive", all any @-> any,
     "(is-zero X Y ... Z) returns one if all numbers are positive.";
 
-    "is-negative", (all any @-> any),
+    "is-negative", all any @-> any,
     "(is-zero X Y ... Z) returns one if all numbers are negative.";
 
-    "word-width", (all any @-> any),
+    "word-width", all any @-> any,
     "(word-width X Y ... Z) returns the maximum width of its \
      arguments. If no arguments provided returns the size of the \
      machine word.";
 
-    "exec-addr", (one int @-> any),
+    "exec-addr", one int @-> any,
     "(exec-addr ADDR) transfers control flow to ADDR.";
 
-    "memory-read", (one int @-> byte),
+    "memory-read", one int @-> byte,
     "(memory-read PTR) loads one byte from the address PTR";
 
-    "memory-write", (tuple [int; byte] @-> int),
+    "memory-write", tuple [int; byte] @-> int,
     "(memory-write PTR X) stores X at PTR.";
 
-    "get-program-counter", (unit @-> int),
+    "get-program-counter", unit @-> int,
     "(get-program-counter) returns the address of the current instruction";
 
-    "get-current-program-counter", (unit @-> int),
+    "get-current-program-counter", unit @-> int,
     "(get-current-program-counter) is an alias to (get-program-counter)";
+
+    "set-symbol-value", tuple [sym; a] @-> a,
+    "(set-symbol-value S X) sets the value of the symbol S to X.
+         Returns X"
   ]
 
 type KB.conflict += Illformed of string
@@ -356,6 +360,17 @@ module Primitives(CT : Theory.Core) = struct
     | None -> forget@@int s 0
     | Some addr -> forget@@const_int s addr
 
+  let set_symbol sym x =
+    match KB.Value.get Primus.Lisp.Semantics.symbol sym with
+    | None -> illformed "not symbol!"
+    | Some sym ->
+      bitv x >>= fun x ->
+      let s = sort x in
+      let var = Theory.Var.define s sym in
+      CT.set var !!x
+
+
+
   let dispatch lbl name args =
     Theory.Label.target lbl >>= fun t ->
     let bits = Theory.Target.bits t in
@@ -401,12 +416,9 @@ module Primitives(CT : Theory.Core) = struct
     | "memory-write",_-> data@@memory_write t args
     | "get-program-counter",[]
     | "get-current-program-counter",[] -> pure@@get_pc s lbl
+    | "set-symbol-value",[sym;x] -> data@@set_symbol sym x
     | _ -> !!nothing
 end
-
-
-
-
 
 module CST : Theory.Core = struct
   type t = Sexp.t

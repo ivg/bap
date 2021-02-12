@@ -93,6 +93,11 @@
   (let ((r x)) (if r r (or xs))))
 (defmacro or (x) x)
 
+(defmacro set$ (s x)
+  "(set$ s x) set the value of the symbol s to x, returns x.
+   Like set but without implicit quotation."
+  (set-symbol-value s x))
+
 (defmacro sign (x)
   "returns 1 if X > 0, 0 if X = 0, and -1 if X < 0"
   (if (< x 0) -1 (if (> x 0) 1 0)))

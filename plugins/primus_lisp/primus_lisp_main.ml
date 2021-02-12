@@ -270,9 +270,15 @@ module Semantics = struct
     let bitv x = Bitvec.(int64 x mod modulus bits) in
     Insn.ops insn |> Array.to_list |>
     List.map ~f:(function
-        | Op.Imm x -> CT.int word (bitv (Imm.to_int64 x))
-        | Op.Reg v -> CT.var @@ Theory.Var.define word (Reg.name v)
-        | Op.Fmm _ -> CT.unk word) |>
+        | Op.Fmm _ -> CT.unk word
+        | Op.Imm x ->
+          let x = bitv (Imm.to_int64 x) in
+          CT.int word x >>| fun v ->
+          KB.Value.put Lisp.Semantics.static v (Some x)
+        | Op.Reg v ->
+          let name = Reg.name v in
+          CT.var @@ Theory.Var.define word name >>| fun v ->
+          KB.Value.put Lisp.Semantics.symbol v (Some name)) |>
     List.map ~f:(fun x -> x >>| Theory.Value.forget) |>
     KB.List.all
 
@@ -318,13 +324,13 @@ module Semantics = struct
     let sites = path :: sites in
     let paths, features = collect_features sites in
     let paths = Filename.current_dir_name :: Lisp_config.library :: paths in
-    Format.eprintf "Loading the following semantics features: %s@\n%!"
-      (String.concat ~sep:", " features);
     let prog t =
       pack@@load_program paths features@@Project.empty t in
     KB.promise Theory.Unit.source @@ fun this ->
-    KB.collect Theory.Unit.target this >>| prog
-
+    Primus.Lisp.Unit.is_lisp this >>= function
+    | true -> !!empty
+    | false ->
+      KB.collect Theory.Unit.target this >>| prog
 
   let enable_lifter sites =
     translate_ops_to_args ();

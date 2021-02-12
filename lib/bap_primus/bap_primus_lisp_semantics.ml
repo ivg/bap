@@ -99,16 +99,15 @@ module Property = struct
           function
           | Ok rs -> Result.all rs
           | Unequal_lengths -> Error Unequal_arity)
-
-
 end
 
-
-let primitive name args =
+let primitive unit addr name args =
   let open KB.Syntax in
   KB.Object.scoped Theory.Program.cls @@ fun obj ->
   KB.provide Property.name obj (Some name) >>= fun () ->
   KB.provide Property.args obj (Some args) >>= fun () ->
+  KB.provide Theory.Label.unit obj (Some unit) >>= fun () ->
+  KB.provide Theory.Label.addr obj addr >>= fun () ->
   KB.collect Theory.Semantics.slot obj
 
 let declare
@@ -386,7 +385,7 @@ module Prelude(CT : Theory.Core) = struct
       Env.del v >>= fun () ->
       full [!!eff; data [v := !(res eff)]] !!(res eff)
 
-  let reify prog target name args =
+  let reify prog unit addr target name args =
     let word = Theory.Target.bits target in
     let var ?t n = make_var ?t target n in
     let rec eval : ast -> unit Theory.Effect.t Meta.t = function
@@ -442,12 +441,14 @@ module Prelude(CT : Theory.Core) = struct
               Meta.lift@@CT.branch !cres (CT.goto head) skip
             ]]
         ] !!cres
-    and call name xs =
+    and call ?(toplevel=false) name xs =
       match Resolve.defun check_arg prog Key.func name xs with
-      | None -> Meta.lift@@primitive name xs
+      | None ->
+        if toplevel then !!Insn.empty
+        else Meta.lift@@primitive unit addr name xs
       | Some (Ok (fn,_)) when is_external fn ->
         sym (Def.name fn) >>= fun dst ->
-        Meta.lift@@primitive "invoke-subroutine" (res dst::xs)
+        Meta.lift@@primitive unit addr "invoke-subroutine" (res dst::xs)
       | Some (Ok (fn,bs)) ->
         Env.set_args word bs >>= fun () ->
         Scope.clear >>= fun scope ->
@@ -509,8 +510,9 @@ module Prelude(CT : Theory.Core) = struct
           !!beff;
         ] !!(res beff) in
     match args with
-    | Some args -> call name args
-    | None -> resolve prog Key.func name >>= function
+    | Some args -> call ~toplevel:true name args
+    | None ->
+      resolve prog Key.func name >>= function
       | Some fn ->
         eval (Def.Func.body fn)
       | None -> !!Insn.empty
@@ -586,6 +588,7 @@ let provide_semantics () =
   KB.promise Theory.Semantics.slot @@ fun obj ->
   KB.collect Theory.Label.unit obj >>=? fun unit ->
   KB.collect Property.name obj >>=? fun name ->
+  KB.collect Theory.Label.addr obj >>= fun addr ->
   KB.collect Property.args obj >>= fun args ->
   obtain_typed_program unit >>= fun typed ->
   KB.collect Theory.Unit.target unit >>= fun target ->
@@ -601,7 +604,7 @@ let provide_semantics () =
     } in
   Theory.instance () >>= Theory.require >>= fun (module Core) ->
   let open Prelude(Core) in
-  Meta.run (reify prog target name args) meta >>| fun (res,_) ->
+  Meta.run (reify prog unit addr target name args) meta >>| fun (res,_) ->
   res
 
 let provide_attributes () =
