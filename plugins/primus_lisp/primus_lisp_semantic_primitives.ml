@@ -127,8 +127,23 @@ let export = Primus.Lisp.Type.Spec.[
     "exec-addr", one int @-> any,
     "(exec-addr ADDR) transfers control flow to ADDR.";
 
-    "memory-read", one int @-> byte,
-    "(memory-read PTR) loads one byte from the address PTR";
+    "load-byte", one int @-> byte,
+    "(load-byte PTR) loads one byte from the address PTR";
+
+    "load-word", one int @-> int,
+    "(load-word PTR) loads one word from the address PTR";
+
+    "load-bits", tuple [any; int] @-> int,
+    "(load-word SIZE PTR) loads a SIZE-bit long word from the address PTR";
+
+    "load-half", one int @-> int,
+    "(load-half PTR) loads half-word from the address PTR";
+
+    "store-byte", tuple[int; any] @-> any,
+    "(store-byte POS VAL) stores byte VAL at the memory position POS";
+
+    "store-word", tuple[int; any] @-> any,
+    "(store-word POS VAL) stores VAL at the memory position POS";
 
     "memory-write", tuple [int; byte] @-> int,
     "(memory-write PTR X) stores X at PTR.";
@@ -141,7 +156,19 @@ let export = Primus.Lisp.Type.Spec.[
 
     "set-symbol-value", tuple [sym; a] @-> a,
     "(set-symbol-value S X) sets the value of the symbol S to X.
-         Returns X"
+         Returns X";
+
+    "cast-low", tuple [int; a] @-> b,
+    "(cast-low S X) extracts low S bits from X.";
+
+    "cast-high", tuple [int; a] @-> b,
+    "(cast-high S X) extracts high S bits from X.";
+
+    "cast-signed", tuple [int; a] @-> b,
+    "(cast-signed S X) performs signed extension of X to the size of S bits";
+
+    "cast-unsigned", tuple [int; a] @-> b,
+    "(cast-unsigned S X) performs unsigned extension of X to the size of S bits";
   ]
 
 type KB.conflict += Illformed of string
@@ -182,6 +209,10 @@ module Primitives(CT : Theory.Core) = struct
   let binary xs f = match xs with
     | [x; y] -> f x y
     | _ -> illformed "requires exactly two arguments"
+
+  let ternary xs f = match xs with
+    | [x; y; z] -> f x y z
+    | _ -> illformed "requires exactly three arguments"
 
   let const x = KB.Value.get Primus.Lisp.Semantics.static x
   let set_const v x =
@@ -304,12 +335,45 @@ module Primitives(CT : Theory.Core) = struct
     unary xs >>= bitv >>= fun dst ->
     CT.jmp !!dst
 
-  let memory_read t xs =
-    unary xs >>= bitv >>= fun src ->
-    CT.(load (var (Theory.Target.data t)) !!src) |>
-    forget
+  let load_byte t xs =
+    let mem = CT.var @@ Theory.Target.data t in
+    unary xs >>= bitv >>= fun addr -> forget@@CT.(load mem !!addr)
 
-  let memory_write t xs =
+
+  let is_big_endian t =
+    if Theory.Endianness.equal (Theory.Target.endianness t)
+        Theory.Endianness.eb then CT.b1 else CT.b0
+
+  let to_sort x =
+    bitv x >>| const >>= function
+    | None -> illformed "the sort specification must be static"
+    | Some sz ->
+      if Bitvec.fits_int sz then
+        !!(Theory.Bitv.define (Bitvec.to_int sz))
+      else illformed "cast size must fit into it"
+
+  let load_word t xs =
+    let mem = CT.var @@ Theory.Target.data t in
+    let s = Theory.Bitv.define (Theory.Target.bits t) in
+    let b = is_big_endian t in
+    unary xs >>= bitv >>= fun addr ->
+    forget@@CT.(loadw s b mem !!addr)
+
+  let loadn t xs =
+    let mem = CT.var @@ Theory.Target.data t in
+    binary xs @@ fun sz x ->
+    to_sort sz >>= fun s ->
+    bitv x >>= fun x ->
+    forget@@CT.(loadw s (is_big_endian t) mem !!x)
+
+  let load_bits t xs =
+    let mem = CT.var @@ Theory.Target.data t in
+    binary xs @@ fun sz x ->
+    to_sort sz >>= fun s ->
+    bitv x >>= fun x ->
+    forget@@CT.(loadw s (is_big_endian t) mem !!x)
+
+  let store_byte t xs =
     binary xs @@ fun dst data ->
     bitv dst >>= fun dst ->
     bitv data >>= fun data ->
@@ -317,6 +381,14 @@ module Primitives(CT : Theory.Core) = struct
     let (:=) = CT.set in
     CT.(mem := store (var mem) !!dst !!data)
 
+  let store_word t xs =
+    binary xs @@ fun dst data ->
+    bitv dst >>= fun dst ->
+    bitv data >>= fun data ->
+    let mem = Theory.Target.data t in
+    let (:=) = CT.set in
+    let b = is_big_endian t in
+    CT.(mem := storew b (var mem) !!dst !!data)
 
   let rec prefix p = function
     | [] -> []
@@ -371,6 +443,18 @@ module Primitives(CT : Theory.Core) = struct
 
 
 
+
+  let mk_cast cast xs =
+    binary xs @@ fun sz x ->
+    to_sort sz >>= fun s ->
+    bitv x >>= fun x ->
+    forget@@cast s !!x
+
+  let signed = mk_cast CT.signed
+  let unsigned = mk_cast CT.unsigned
+  let low = mk_cast CT.low
+  let high = mk_cast CT.high
+
   let dispatch lbl name args =
     Theory.Label.target lbl >>= fun t ->
     let bits = Theory.Target.bits t in
@@ -412,11 +496,18 @@ module Primitives(CT : Theory.Core) = struct
     | "is-negative",_-> pure@@all Z.is_negative is_negative args
     | "word-width",_-> pure@@word_width s args
     | "exec-addr",_-> ctrl@@exec_addr args
-    | "memory-read",_-> pure@@memory_read t args
-    | "memory-write",_-> data@@memory_write t args
+    | ("load-byte"|"memory-read"),_-> pure@@load_byte t args
+    | "load-word",_-> pure@@load_word t args
+    | "load-bits",_-> pure@@load_bits t args
+    | ("store-byte"|"memory-write"),_-> data@@store_byte t args
+    | "store-word",_-> data@@store_word t args
     | "get-program-counter",[]
     | "get-current-program-counter",[] -> pure@@get_pc s lbl
     | "set-symbol-value",[sym;x] -> data@@set_symbol sym x
+    | "cast-low",xs -> pure@@low xs
+    | "cast-high",xs -> pure@@high xs
+    | "cast-signed",xs -> pure@@signed xs
+    | "cast-unsigned",xs -> pure@@unsigned xs
     | _ -> !!nothing
 end
 
