@@ -402,6 +402,7 @@ module Prelude(CT : Theory.Core) = struct
       | {data=Set ({data={exp=n; typ=Type t}},x)} -> set_ (var ~t n) x
       | {data=Set ({data={exp=n}},x)} -> set_ (var n) x
       | {data=Rep (cnd,body)} -> rep cnd body
+      | {data=Msg (fmt,args)} -> msg fmt args
       | _ -> undefined
     and ite cnd yes nay =
       let* cnd = eval cnd in
@@ -473,6 +474,17 @@ module Prelude(CT : Theory.Core) = struct
       Meta.List.fold ~init xs ~f:(fun eff x  ->
           let* eff' = eval x in
           full [!!eff; !!eff'] !!(res eff'))
+    and msg fmt args =
+      map args >>= fun (aeff,args) ->
+      List.iter fmt ~f:(function
+          | Lit s -> Format.printf "%s" s
+          | Pos n -> match List.nth args n with
+            | None -> failwithf "bad positional %d" n ()
+            | Some v -> match KB.Value.get static_slot v with
+              | Some v -> Format.printf "%a" Bitvec.pp v
+              | None -> Format.printf "@[<hv>%a@]" KB.Value.pp v);
+      Format.printf "@\n";
+      !!aeff
     and lookup v =
       Scope.lookup v >>= function
       | Some v -> lookup v
