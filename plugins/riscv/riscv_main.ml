@@ -29,7 +29,7 @@ let provide_decoding () =
 
 let enable_llvm () =
   Dis.register Target.llvm_encoding @@ fun target ->
-  Dis.create ~backend:"llvm" @@
+  Dis.create ~attrs:"+a,+c,+d,+m" ~backend:"llvm" @@
   if Theory.Target.equal target Target.riscv64
   then "riscv64"
   else "riscv32"

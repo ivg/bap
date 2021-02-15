@@ -33,6 +33,7 @@ let array t = List.map regs ~f:(reg t)
 let x t = List.init 32 ~f:(fun i -> reg t (sprintf "X%d" i))
 
 let parent = Theory.Target.declare ~package "riscv"
+    ~endianness:Theory.Endianness.le
 
 let riscv t =
   let mems = Theory.Mem.define t r8 in
