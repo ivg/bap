@@ -23,16 +23,15 @@ let provide_decoding () =
   KB.promise CT.Label.encoding @@ fun label ->
   CT.Label.target label >>| fun t ->
   if CT.Target.belongs Target.parent t
-  then Target.llvm_encoding
+  then if Theory.Target.belongs Target.riscv64 t
+    then Target.llvm64
+    else Target.llvm32
   else CT.Language.unknown
 
 
-let enable_llvm () =
-  Dis.register Target.llvm_encoding @@ fun target ->
-  Dis.create ~attrs:"+a,+c,+d,+m" ~backend:"llvm" @@
-  if Theory.Target.equal target Target.riscv64
-  then "riscv64"
-  else "riscv32"
+let enable_llvm encoding triple =
+  Dis.register encoding @@ fun _ ->
+  Dis.create ~attrs:"+a,+c,+d,+m" ~backend:"llvm" triple
 
 let enable_loader () =
   let request_arch doc =
@@ -48,7 +47,8 @@ let enable_loader () =
 
 
 let main _ctxt =
-  enable_llvm ();
+  enable_llvm Target.llvm64 "riscv64";
+  enable_llvm Target.llvm32 "riscv32";
   enable_loader ();
   provide_decoding ();
   Ok ()
@@ -59,6 +59,8 @@ let main _ctxt =
 *)
 let provides = [
   "riscv";
+  "riscv64";
+  "riscv32";
 ]
 
 (* finally, let's register our extension and call the main function  *)

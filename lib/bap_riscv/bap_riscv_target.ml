@@ -50,4 +50,5 @@ let riscv t =
 let riscv64 = riscv r64
 let riscv32 = riscv r32
 
-let llvm_encoding = Theory.Language.declare ~package "llvm-riscv"
+let llvm64 = Theory.Language.declare ~package "llvm-riscv64"
+let llvm32 = Theory.Language.declare ~package "llvm-riscv32"
