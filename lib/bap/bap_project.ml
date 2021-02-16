@@ -268,9 +268,6 @@ module Input = struct
 
   let file ?loader ~filename = load ?loader filename
 
-  let null arch : addr =
-    Addr.of_int 0 ~width:(Arch.addr_size arch |> Size.in_bits)
-
   let raw ?(target=Theory.Target.unknown) ?(filename="") ?base arch big () =
     if Bigstring.length big = 0 then invalid_arg "file is empty";
     let addr_size = if Theory.Target.is_unknown target

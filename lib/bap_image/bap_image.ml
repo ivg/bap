@@ -423,17 +423,15 @@ module Derive = struct
     | Some x -> Fact.return x
 
   let arch =
-    Fact.collect Ogre.Query.(select (from arch)) >>= fun s ->
-    Fact.Seq.reduce ~f:(fun a1 a2 ->
-        if Arch.equal a1 a2 then Fact.return a1
-        else Fact.failf "arch is ambiguous: %a <> %a"
-            Arch.pp a1 Arch.pp a2 ())
-      (Seq.filter_map ~f:Arch.of_string s) >>= fun a ->
-    match a with
-    | Some a -> Fact.return a
-    | None -> Fact.return `unknown
+    Fact.collect Ogre.Query.(select (from arch)) >>|
+    Seq.hd >>| function
+    | None -> `unknown
+    | Some a ->  match Arch.of_string a with
+      | None -> `unknown
+      | Some a -> a
 
-  let addr_width = arch >>| Arch.addr_size >>| Size.in_bits
+  let addr_width = Fact.require bits >>| Int64.to_int_exn
+
   let endian = Fact.request is_little_endian >>| function
     | Some true -> LittleEndian
     | Some false -> BigEndian
