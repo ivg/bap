@@ -46,19 +46,8 @@ module Relocations = struct
       Seq.fold s ~init:Addr.Map.empty ~f:(fun m (key,data) ->
           Map.set m ~key ~data)
 
-    let arch =
-      Fact.collect Ogre.Query.(select (from arch)) >>= fun s ->
-      Fact.Seq.reduce ~f:(fun a1 a2 ->
-          if Arch.equal a1 a2 then Fact.return a1
-          else Fact.failf "arch is ambiguous: %a <> %a"
-              Arch.pp a1 Arch.pp a2 ())
-        (Seq.filter_map ~f:Arch.of_string s) >>= fun a ->
-      match a with
-      | Some a -> Fact.return a
-      | None -> Fact.return `unknown
-
     let arch_width =
-      arch >>| fun arch -> Arch.addr_size arch |> Size.in_bits
+      Fact.require Image.Scheme.bits >>| Int64.to_int_exn
 
     let relocations =
       arch_width >>= fun width ->
@@ -205,10 +194,9 @@ let base_context = [
   "bil-lifter";
 ]
 
-let create_intrinsic arch mem insn =
+let create_intrinsic target mem insn =
   let module Insn = Disasm_expert.Basic.Insn in
-  let width = Size.in_bits (Arch.addr_size arch) in
-  let module Target = (val target_of_arch arch) in
+  let width = Theory.Target.bits target in
   let pre = Insn.ops insn |> Array.to_list |> List.mapi ~f:(fun p op ->
       let name = sprintf "insn:op%d" (p+1) in
       let v = Var.create name (Imm width) in
@@ -283,19 +271,19 @@ let rec is_special = function
 and has_special = List.exists ~f:is_special
 
 let lift ~enable_intrinsics:{for_all; for_unk; for_special; predicates}
-    arch mem insn =
+    target arch mem insn =
   if for_all || matches_spec predicates insn
-  then Ok (create_intrinsic arch mem insn)
+  then Ok (create_intrinsic target mem insn)
   else
     let module Target = (val target_of_arch arch) in
     match Target.lift mem insn with
     | Error _ as err ->
       if for_unk
-      then Ok (create_intrinsic arch mem insn)
+      then Ok (create_intrinsic target mem insn)
       else err
     | Ok bil ->
       if for_special && has_special bil
-      then Ok (create_intrinsic arch mem insn)
+      then Ok (create_intrinsic target mem insn)
       else Ok bil
 
 let provide_bil ~enable_intrinsics () =
@@ -311,9 +299,10 @@ let provide_bil ~enable_intrinsics () =
   let enable_intrinsics = split_specs enable_intrinsics in
   KB.promise Bil.code @@ fun obj ->
   Knowledge.collect Arch.slot obj >>= fun arch ->
+  Theory.Label.target obj >>= fun target ->
   Knowledge.collect Memory.slot obj >>? fun mem ->
   Knowledge.collect Disasm_expert.Basic.Insn.slot obj >>? fun insn ->
-  match lift ~enable_intrinsics arch mem insn with
+  match lift ~enable_intrinsics target arch mem insn with
   | Error err ->
     info "BIL: the BIL lifter failed with %a" Error.pp err;
     !!unknown
@@ -337,15 +326,15 @@ let provide_basic () =
 
 let provide_lifter ~with_fp () =
   info "providing a lifter for all BIL lifters";
-  let context arch =
-    sprintf "arch-%a" Arch.str arch ::
+  let context target =
+    sprintf "arch-%s" (Theory.Target.to_string target) ::
     if with_fp
     then "floating-point" :: base_context
     else base_context in
   let is_empty = KB.Domain.is_empty Bil.domain in
   let lifter obj =
-    Knowledge.collect Arch.slot obj >>= fun arch ->
-    Theory.instance ~context:(context arch) () >>=
+    Theory.Label.target obj >>= fun target ->
+    Theory.instance ~context:(context target) () >>=
     Theory.require >>= fun (module Core) ->
     KB.collect Bil.code obj >>= fun bil ->
     if is_empty bil then !!Insn.empty
