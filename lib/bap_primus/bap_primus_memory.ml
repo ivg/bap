@@ -1,4 +1,5 @@
 open Core_kernel
+open Bap_core_theory
 open Bap.Std
 open Format
 
@@ -305,8 +306,7 @@ module Make(Machine : Machine) = struct
       ?init
       ?generator
       ~lower ~upper () =
-    Machine.gets Project.arch >>= fun arch ->
-    let width = Arch.addr_size arch |> Size.in_bits in
+    Machine.gets Project.target >>| Theory.Target.bits >>= fun width ->
     get_curr >>| add_layer {
       perms={readonly; executable};
       mem = Dynamic {lower;upper; value = match generator with

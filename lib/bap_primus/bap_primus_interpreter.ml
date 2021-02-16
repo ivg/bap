@@ -278,8 +278,7 @@ let sexp_of_state {curr} =
   Pos.sexp_of_t curr
 
 let null proj =
-  let size = Arch.addr_size (Project.arch proj) in
-  Addr.zero (Size.in_bits size)
+  Addr.code_addr (Project.target proj) Bitvec.zero
 
 let empty_scope = {
   stack = [];
