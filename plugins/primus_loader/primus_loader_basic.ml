@@ -140,15 +140,16 @@ module Make(Param : Param)(Machine : Primus.Machine.S)  = struct
 
   let setup_main_frame () =
     target >>= fun (module Target) ->
+    Machine.gets Project.target >>= fun target ->
     Machine.arch >>= fun arch ->
     Machine.args >>= fun argv ->
     Machine.envp >>= fun envp ->
     make_word stack_base >>= fun sp ->
     let endian = Arch.endian arch in
-    let addr_size = Arch.addr_size arch in
+    let width = Theory.Target.code_addr_size target in
     let argc = Array.length argv |>
-               Word.of_int ~width:(Size.in_bits addr_size) in
-    let bytes_in_addr = Size.in_bytes addr_size in
+               Word.of_int ~width in
+    let bytes_in_addr = width / 8 in
     let null = String.make bytes_in_addr '\x00' in
     let frame_size args = bytes_in_array args in
     let table_size args = bytes_in_addr * (Array.length args + 1) in
