@@ -333,7 +333,11 @@ module Primitives(CT : Theory.Core) = struct
 
   let exec_addr xs =
     unary xs >>= bitv >>= fun dst ->
-    CT.jmp !!dst
+    match const dst with
+    | None -> CT.jmp !!dst
+    | Some bitv ->
+      Theory.Label.for_addr bitv >>= fun dst ->
+      CT.goto dst
 
   let load_byte t xs =
     let mem = CT.var @@ Theory.Target.data t in
