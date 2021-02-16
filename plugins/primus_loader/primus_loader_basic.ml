@@ -1,4 +1,5 @@
 open Core_kernel
+open Bap_core_theory
 open Bap.Std
 open Bap_primus.Std
 open Format
@@ -21,8 +22,8 @@ module Make(Param : Param)(Machine : Primus.Machine.S)  = struct
   let target = Machine.arch >>| target_of_arch
 
   let make_word addr =
-    Machine.arch >>| Arch.addr_size >>| fun size ->
-    Addr.of_int64 ~width:(Size.in_bits size) addr
+    Machine.gets Project.target >>| Theory.Target.bits >>| fun width ->
+    Addr.of_int64 ~width addr
 
   let set_word name x =
     let t = Type.imm (Word.bitwidth x) in

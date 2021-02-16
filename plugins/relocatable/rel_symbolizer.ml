@@ -21,15 +21,8 @@ open Bap_core_theory
 
 include Loggers()
 
-let arch =
-  let open Ogre.Syntax in
-  Ogre.request Image.Scheme.arch >>| function
-  | None -> `unknown
-  | Some arch -> match Arch.of_string arch with
-    | None -> `unknown
-    | Some arch -> arch
-
-let width = Ogre.(arch >>| Arch.addr_size >>| Size.in_bits)
+let width =
+  Ogre.(require Image.Scheme.bits >>| Int64.to_int_exn)
 
 module Bitvec = struct
   include Bitvec
