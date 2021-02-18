@@ -520,14 +520,35 @@ module Theory : sig
         needed) and the result of the whole expression is [body x]
         and the nested below expressions are never
         evaluated. Otherwise, if there is no refinement, the
-        expression [can s1 x body] is evaluated to [x]
+        expression [can s1 x body] is evaluated to [()]
         and the next case is tried until the [default] case is hit.
+
+        @since 2.3.0
     *)
     module Match : sig
       type 'a t
       type 'a refiner = unit sort -> 'a sort option
       val (let|) : 'b t -> (unit -> 'b) -> 'b
+
+
+      (** [let| () = can s x f in can't] refines [x] to [s].
+
+          If the sort of [x] could be refined with [s] then [f]
+          is called with the refined value [x'] and the whole
+          expression is evaluated to [f x']. Otherwise, the control is
+          passed to [can't].
+      *)
       val can : 'a refiner -> unit value -> ('a value -> 'b) -> 'b t
+
+
+      (** [let| () = both sx x sy y f in no] applies two refiners in parallel.
+
+          If both [x] and [y] could be refined with [sx] and [sy]
+          respectively then [f x' y'] is called with the refined
+          values and becomes the value of the expression. Otherwise,
+          [no] is evaluated and becomes the value of the whole
+          expression.
+      *)
       val both :
         'a refiner -> unit value ->
         'b refiner -> unit value ->
@@ -1082,7 +1103,6 @@ module Theory : sig
 
     (** [resort v] changes the sort of the variable.  *)
     val resort : 'a t -> 'b Value.sort -> 'b t
-
 
     (** [versioned v n] creates the [n]th version of the variable [v].
 
