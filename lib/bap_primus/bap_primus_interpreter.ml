@@ -1,4 +1,5 @@
 open Core_kernel
+open Bap_core_theory
 open Bap.Std
 open Bap_c.Std
 
@@ -577,9 +578,8 @@ module Make (Machine : Machine) = struct
   let exp = eval_exp
 
   let mem =
-    Machine.get () >>| fun proj ->
-    let (module Target) = target_of_arch (Project.arch proj) in
-    Target.CPU.mem
+    Machine.gets Project.target >>| fun t ->
+    Var.reify (Theory.Target.data t)
 
   let succ x =
     Value.one (Value.bitwidth x) >>= fun one ->
