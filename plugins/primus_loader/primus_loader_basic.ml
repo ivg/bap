@@ -11,6 +11,8 @@ module type Param = sig
   val stack_base : int64
 end
 
+type Primus.exn += No_stack of Theory.Target.t
+
 module Make(Param : Param)(Machine : Primus.Machine.S)  = struct
   open Param
   open Machine.Syntax
@@ -18,8 +20,6 @@ module Make(Param : Param)(Machine : Primus.Machine.S)  = struct
   module Env = Primus.Env.Make(Machine)
   module Mem = Primus.Memory.Make(Machine)
   module Val = Primus.Value.Make(Machine)
-
-  let target = Machine.arch >>| target_of_arch
 
   let make_word addr =
     Machine.gets Project.target >>| Theory.Target.bits >>| fun width ->
@@ -31,6 +31,13 @@ module Make(Param : Param)(Machine : Primus.Machine.S)  = struct
     Val.of_word x >>=
     Env.set var
 
+  let stack_pointer =
+    Machine.gets Project.target >>= fun t ->
+    match Theory.Target.reg t Theory.Role.Register.stack_pointer with
+    | None -> Machine.raise (No_stack t)
+    | Some sp -> Machine.return (Var.reify sp)
+
+
   (* bottom points to the end of the stack, ala STL end pointer.
      Note: bottom is usually depicted at the top of the stack
      structure, and it is the highest address.
@@ -38,11 +45,11 @@ module Make(Param : Param)(Machine : Primus.Machine.S)  = struct
      where kernel should put argc, argv, and other info to a
      user process *)
   let setup_stack () =
-    target >>= fun (module Target) ->
     make_word stack_base >>= fun bottom ->
     let top = Addr.(bottom -- stack_size) in
     Val.of_word bottom >>= fun bottom ->
-    Env.set Target.CPU.sp bottom >>= fun () ->
+    stack_pointer >>= fun sp ->
+    Env.set sp bottom >>= fun () ->
     Mem.allocate
       ~readonly:false
       ~executable:false
@@ -50,9 +57,9 @@ module Make(Param : Param)(Machine : Primus.Machine.S)  = struct
 
   let setup_registers () =
     let zero = Generator.static 0 in
-    target >>= fun (module Target) ->
-    Set.to_sequence Target.CPU.gpr |>
-    Machine.Seq.iter ~f:(fun reg -> Env.add reg zero)
+    Machine.gets Project.target >>= fun t ->
+    Set.to_sequence (Theory.Target.vars t) |>
+    Machine.Seq.iter ~f:(fun reg -> Env.add (Var.reify reg) zero)
 
   let rec is set = function
     | Backend.Or (p1,p2) -> is set p1 || is set p2
@@ -139,13 +146,12 @@ module Make(Param : Param)(Machine : Primus.Machine.S)  = struct
         save_word endian addr ptr)
 
   let setup_main_frame () =
-    target >>= fun (module Target) ->
     Machine.gets Project.target >>= fun target ->
-    Machine.arch >>= fun arch ->
     Machine.args >>= fun argv ->
     Machine.envp >>= fun envp ->
     make_word stack_base >>= fun sp ->
-    let endian = Arch.endian arch in
+    let endian = if Theory.Endianness.(Theory.Target.endianness target = le)
+      then LittleEndian else BigEndian in
     let width = Theory.Target.code_addr_size target in
     let argc = Array.length argv |>
                Word.of_int ~width in
