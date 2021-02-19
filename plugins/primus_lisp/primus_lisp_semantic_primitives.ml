@@ -726,8 +726,9 @@ module CST : Theory.Core = struct
       | Some x -> ctrl@@app "goto" [x]
 
     let goto dst =
-      KB.collect Theory.Label.name dst >>= function
-      | Some dst -> ret@@ctrl@@app "goto" [atom dst]
+      KB.collect Theory.Label.addr dst >>= function
+      | Some dst ->
+        ret@@ctrl@@app "goto" [atom (Bitvec.to_string dst)]
       | None ->
         KB.Object.repr Theory.Program.cls dst >>= fun dst ->
         ret@@ctrl@@app "goto" [atom dst]
@@ -738,7 +739,7 @@ module CST : Theory.Core = struct
       | Some r,None
       | None, Some r -> ret@@eff s r
       | Some xs, Some ys ->
-        ret@@eff s@@app "prog" [xs; ys]
+        ret@@eff s@@list [xs; ys]
 
     let seq xs ys =
       xs >>=> fun s xs ->
