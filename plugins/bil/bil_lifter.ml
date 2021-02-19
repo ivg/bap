@@ -32,42 +32,33 @@ let provide_bir () =
 module Relocations = struct
 
   type t = {
-    rels : Addr.t Addr.Map.t;
-    exts : string Addr.Map.t;
+    rels : Int64.t Map.M(Int64).t;
+    exts : string Map.M(Int64).t;
   } [@@deriving equal]
 
-  module Fact = Ogre.Make(Monad.Ident)
+  module Fact = Ogre
 
   module Request = struct
     open Image.Scheme
     open Fact.Syntax
 
     let of_aseq s =
-      Seq.fold s ~init:Addr.Map.empty ~f:(fun m (key,data) ->
-          Map.set m ~key ~data)
-
-    let arch_width =
-      Fact.require Image.Scheme.bits >>| Int64.to_int_exn
+      Seq.fold s ~f:(fun m (key,data) -> Map.set m ~key ~data)
+        ~init:(Map.empty (module Int64))
 
     let relocations =
-      arch_width >>= fun width ->
       Fact.collect Ogre.Query.(select (from relocation)) >>= fun s ->
-      Fact.return
-        (of_aseq @@ Seq.map s ~f:(fun (addr, data) ->
-             Addr.of_int64 ~width addr, Addr.of_int64 ~width data))
+      Fact.return (of_aseq s)
 
     let external_symbols  =
-      arch_width >>= fun width ->
       Fact.collect Ogre.Query.(select (from external_reference)) >>| fun s ->
-      Seq.fold s ~init:Addr.Map.empty ~f:(fun addrs (addr, name) ->
-          Map.set addrs
-            ~key:(Addr.of_int64 ~width addr)
-            ~data:name)
+      Seq.fold s ~f:(fun addrs (addr, name) -> Map.set addrs addr name)
+        ~init:(Map.empty (module Int64))
   end
 
   let relocations = Fact.eval Request.relocations
   let external_symbols = Fact.eval Request.external_symbols
-  let empty = {rels = Addr.Map.empty; exts = Addr.Map.empty}
+  let empty = {rels = Int64.Map.empty; exts = Int64.Map.empty}
 
 
   let of_spec spec =
@@ -103,11 +94,15 @@ module Relocations = struct
       (Set.to_sequence (references bil))
       (Seq.init len ~f:(Addr.nsucc start))
 
+  let find src addr = match Addr.to_int64 addr with
+    | Ok addr -> Map.find src addr
+    | _ -> None
+
   let find_external {exts} bil mem =
-    Seq.find_map ~f:(Map.find exts) (addresses bil mem)
+    Seq.find_map ~f:(find exts) (addresses bil mem)
 
   let find_internal {rels} bil mem =
-    Seq.find_map ~f:(Map.find rels) (addresses bil mem)
+    Seq.find_map ~f:(find rels) (addresses bil mem)
 
   let override_internal dst =
     Stmt.map (object inherit Stmt.mapper
@@ -130,10 +125,12 @@ module Relocations = struct
     | None -> !!bil
     | Some unit ->
       KB.collect relocations_slot unit >>= fun info ->
+      Theory.Label.target obj >>| Theory.Target.code_addr_size >>= fun width ->
       KB.collect (Value.Tag.slot Sub.stub) obj >>|
       Option.is_some >>| fun is_stub ->
       match find_internal info bil mem with
       | Some dst ->
+        let dst = Word.of_int64 ~width dst in
         override_internal dst bil
       | None ->
         match find_external info bil mem with
