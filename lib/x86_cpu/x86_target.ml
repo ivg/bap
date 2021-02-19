@@ -129,8 +129,8 @@ module M32 = struct
 
   let i386regs = Theory.Role.Register.[
       [general; integer], main @< index @< segment;
-      [stack_pointer], untyped [reg r32 "SP"];
-      [frame_pointer], untyped [reg r32 "BP"];
+      [stack_pointer], untyped [reg r32 "ESP"];
+      [frame_pointer], untyped [reg r32 "EBP"];
       [Role.index], untyped index;
       [Role.segment], untyped segment;
     ] @ M16.status_regs
@@ -143,7 +143,7 @@ module M32 = struct
       [general; floating], untyped mmx;
     ]
 
-  let i686regs = i486regs @ Theory.Role.Register.[
+  let i686regs = i586regs @ Theory.Role.Register.[
       [general; floating], untyped xmmx;
     ]
 end
