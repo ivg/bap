@@ -187,8 +187,8 @@ module M64 = struct
   let regs =  Theory.Role.Register.[
       [general; integer], main @< index @< segment @< rx;
       [general; floating], stx @< mmx @< xmmx;
-      [stack_pointer], untyped [reg r64 "SP"];
-      [frame_pointer], untyped [reg r64 "BP"];
+      [stack_pointer], untyped [reg r64 "RSP"];
+      [frame_pointer], untyped [reg r64 "RBP"];
       [Role.index], untyped index;
       [Role.segment], untyped segment;
     ] @ M16.status_regs
