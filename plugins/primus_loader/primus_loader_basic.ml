@@ -13,6 +13,7 @@ end
 
 type Primus.exn += No_stack of Theory.Target.t
 
+
 module Make(Param : Param)(Machine : Primus.Machine.S)  = struct
   open Param
   open Machine.Syntax
@@ -213,3 +214,12 @@ module Make(Param : Param)(Machine : Primus.Machine.S)  = struct
     setup_registers () >>= fun () ->
     init_names ()
 end
+
+
+let () = Primus.Exn.add_printer (function
+    | No_stack t ->
+      Option.some @@
+      Format.asprintf "Unable to load a program for the target %a. \
+                       No valid stack pointer was provided"
+        Theory.Target.pp t
+    | _ -> None)

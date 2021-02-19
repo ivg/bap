@@ -121,6 +121,13 @@ module State = struct
     KB.Domain.flat ~empty ~equal "disassembly" ~inspect
 
   module Toplevel = struct
+    let compute_target spec =
+      Toplevel.eval Theory.Unit.target @@begin
+        KB.Object.create Theory.Unit.cls >>= fun unit ->
+        KB.provide Image.Spec.slot unit spec >>| fun () ->
+        unit
+      end
+
     let run spec target ~code ~memory file k =
       let result = Toplevel.var "disassembly-result" in
       let compute_target = if Theory.Target.is_unknown target
@@ -190,14 +197,15 @@ module Input = struct
   }
 
   let create
-      ?(finish=ident) arch file ~code ~data () = {
-    arch; file; code; data; finish;
-    target = Theory.Target.unknown;
-    memory = union_memory code data;
-    spec = match arch with
+      ?(finish=ident) arch file ~code ~data () =
+    let spec = match arch with
       | #Arch.unknown -> Ogre.Doc.empty
-      | arch -> Image.Spec.from_arch arch;
-  }
+      | arch -> Image.Spec.from_arch arch in {
+      arch; file; code; data; finish;
+      target = State.Toplevel.compute_target spec;
+      memory = union_memory code data;
+      spec;
+    }
 
   let loaders = String.Table.create ()
   let register_loader name loader =
@@ -212,7 +220,17 @@ module Input = struct
     | None -> false
     | Some s -> not (Image.Segment.is_executable s)
 
-  let result_of_image ?(target=Theory.Target.unknown) finish file img = {
+  let compute_target ?(target=Theory.Target.unknown) spec =
+    let target' = State.Toplevel.compute_target spec in
+    match (Theory.Target.order target target' : KB.Order.partial) with
+    | LT | EQ -> target'
+    | GT -> target
+    | NC -> invalid_argf "the derived target %s is incompatible \
+                          with the target specified by the user - %s"
+              (Theory.Target.to_string target')
+              (Theory.Target.to_string target) ()
+
+  let result_of_image ?target finish file img = {
     arch = Image.arch img;
     code = Memmap.filter ~f:is_code (Image.memory img);
     data = Memmap.filter ~f:is_data (Image.memory img);
@@ -220,7 +238,7 @@ module Input = struct
     file;
     finish;
     spec = Image.spec img;
-    target;
+    target = compute_target ?target (Image.spec img);
   }
 
   let symtab_agent =
@@ -434,7 +452,8 @@ let create
       String (Format.asprintf "Knowledge Base Conflict: %a"
                 KB.Conflict.pp err) in
     Error (to_info msg)
-  | exn -> Or_error.of_exn ~backtrace:`Get exn
+  | exn -> raise exn
+(* Or_error.of_exn ~backtrace:`Get exn *)
 
 let specification = spec
 
