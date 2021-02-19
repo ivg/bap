@@ -1,3 +1,4 @@
+(declare (context (target riscv)))
 ;;; Core Arithmetic
 
 (defun llvm-riscv64:ADDI (dst src off)
