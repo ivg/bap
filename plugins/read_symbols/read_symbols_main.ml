@@ -127,8 +127,7 @@ let build_functions relation =
         | Non_injective_fwd (addrs,name) ->
           match List.min_elt addrs ~compare:Bitvec.compare with
           | None -> assert false
-          | Some addr ->
-            Hashtbl.add_exn functions addr name);
+          | Some addr -> Hashtbl.set functions addr name);
   functions
 
 let chop_suffix p = try Filename.chop_extension p with _ -> p
