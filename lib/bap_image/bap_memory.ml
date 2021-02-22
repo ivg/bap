@@ -354,12 +354,12 @@ module Make_iterators( M : Monad.S) = struct
 
   let find_map ?word_size t ~f =
     with_return (fun s ->
-        iteri t ~f:(fun a w -> f a w >>= function
+        iteri ?word_size t ~f:(fun a w -> f a w >>= function
           | None -> return ()
           | some -> s.return (return some)) >>| fun () -> None)
 
   let find_if ?word_size t ~f =
-    find_map t ~f:(fun a w -> f a w >>| function
+    find_map ?word_size t ~f:(fun a w -> f a w >>| function
       | true  -> Some w
       | false -> None)
 end
