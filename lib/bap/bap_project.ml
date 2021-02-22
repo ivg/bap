@@ -452,8 +452,7 @@ let create
       String (Format.asprintf "Knowledge Base Conflict: %a"
                 KB.Conflict.pp err) in
     Error (to_info msg)
-  | exn -> raise exn
-(* Or_error.of_exn ~backtrace:`Get exn *)
+  | exn -> Or_error.of_exn ~backtrace:`Get exn
 
 let specification = spec
 
