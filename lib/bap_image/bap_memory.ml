@@ -213,7 +213,7 @@ module Input = struct
   let int256 = read `r256
 end
 
-let view_exn ?(word_size=`r8) ?from ?words  t =
+let view_exn ?(word_size=`r8) ?from ?words t =
   let amin = Option.value from ~default:(min_addr t) in
   let amax = match words with
     | None -> max_addr t
@@ -225,7 +225,7 @@ let view_exn ?(word_size=`r8) ?from ?words  t =
     if off >= t.off && off < t.off + t.size then match size with
       | 0 -> invalid_arg "empty view"
       | 1 -> make_byte t amin off
-      | n when n <= t.size ->
+      | n when n <= t.size && off + size <= t.off + t.size ->
         { t with size; data = t.data; addr = amin; off}
       | _ -> invalid_arg "out-of-bounds"
     else invalid_arg "out-of-bounds"
