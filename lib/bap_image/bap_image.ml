@@ -430,7 +430,10 @@ module Derive = struct
       | None -> `unknown
       | Some a -> a
 
-  let addr_width = Fact.require bits >>| Int64.to_int_exn
+  let addr_width =
+    Fact.request bits >>= function
+    | Some bits -> Fact.return@@Int64.to_int_trunc bits
+    | None -> arch >>| Arch.addr_size >>| Size.in_bits
 
   let endian = Fact.request is_little_endian >>| function
     | Some true -> LittleEndian
