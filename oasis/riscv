@@ -16,7 +16,8 @@ Library riscv_plugin
   Build$:           flag(everything) || flag(riscv)
   BuildDepends:     core_kernel, ppx_bap, ogre,
                     bap-core-theory, bap-knowledge, bap-main,
-                    bap, bap-riscv
+                    bap, bap-riscv, bap-c, bap-abi, bap-api,
+                    monads
   FindlibName:      bap-plugin-riscv
   InternalModules:  Riscv_main
   XMETAExtraLines:  tags="riscv, riscv64, riscv32"
