@@ -44,9 +44,10 @@ let (--) x y = List.range x (y+1)
 let riscv t =
   let mems = Theory.Mem.define t r8 in
   let mem = reg mems "mem" in
+  let pc = reg t "PC" in
   let ints = untyped@@vars 'X' t in
   let flts = untyped@@vars 'F' t in
-  let vars = ints @< flts @< [mem] in
+  let vars = ints @< flts @< [pc] @< [mem] in
   let bits = Theory.Bitv.size t in
   let name = sprintf "riscv%d" bits in
   let x i = select ints ~mask:i in
@@ -59,7 +60,8 @@ let riscv t =
     ~regs:Theory.Role.Register.[
         [general; integer], ints;
         [general; floating], flts;
-        [constant; zero], x[0];
+        [constant; zero; pseudo], x[0];
+        [pseudo], untyped@@[pc];
         [function_argument], x(10--17) @ f(10--17);
         [function_return], x(10--12) @ f(10--12);
         [link], x[1];
