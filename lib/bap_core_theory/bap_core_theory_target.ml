@@ -87,10 +87,11 @@ module Regfile = struct
   type reg = unit Var.t
   type tree = {
     base : reg;
-    regs : tree Map.M(Int).t
+    regs : (int * tree) list;
   }
 
-  type t = tree
+  (* base -> reg -> off *)
+  type t = int Map.M(Var.Top).t Map.M(Var.Top).t
 
   module Bool = Val.Bool
 
@@ -101,79 +102,37 @@ module Regfile = struct
       | None -> invalid_argf "variable %s is not a register"
                   (Var.name v) ()
 
-  let build_tree regs =
-    let noregs = Map.empty (module Int) in
-    let bases = Map.of_alist_exn (module Var.Top) regs in
-    let rec add base =
-      match Map.find bases base with
-      | None | Some [] -> {base; regs=noregs}
-      | Some regs ->
-        let total = regsize base in
-        let width = total / List.length regs in {
-          base;
-          regs = List.foldi regs ~init:noregs ~f:(fun i regs reg ->
-              match reg with
+  let join =
+    List.fold ~f:(fun subs (base,regs) -> match regs with
+        | [] -> subs
+        | _ ->
+          let total = regsize base in
+          let width = total / List.length regs in
+          let regs =
+            List.filter_mapi regs ~f:(fun i -> function
+                | None -> None
+                | Some reg ->
+                  Some (total - i * width - width, reg)) in
+          Map.update subs base ~f:(function
               | None -> regs
-              | Some reg ->
-                Map.add_exn regs (total - i * width - width) (add reg))
-        } in
-    let rec mem reg {base; regs} =
-      Var.Top.equal base reg || Map.exists regs ~f:(mem reg) in
-    List.stable_sort regs ~compare:(fun (r1,_) (r2,_) ->
-        Int.compare (regsize r2) (regsize r1)) |>
-    List.fold ~init:[] ~f:(fun trees (base,_) ->
-        if List.exists trees ~f:(mem base) then trees
-        else add base :: trees)
+              | Some regs' -> regs'@regs))
+      ~init:(Map.empty (module Var.Top))
 
-  let map_regs =
-    let noregs = Map.empty (module Var.Top) in
-    let rec add {base; regs} off map =
-      Map.fold regs ~f:(fun ~key ~data map ->
-          add data (key+off) map)
-        ~init:(Map.add_exn map base off) in
-    List.fold ~f:(fun file {base; regs} ->
-        let regs = add {base; regs} 0 noregs in
-        Map.add_exn file base regs)
-      ~init:noregs
+  let bases subs =
+    Map.fold subs ~f:(fun ~key:base ~data:parts bases ->
+        List.fold parts ~init:bases ~f:(fun bases (off,part) ->
+            Map.add_exn bases part (off,base)))
+      ~init:(Map.empty (module Var.Top))
 
-
-  let build regs = map_regs @@ build_tree regs
-
-
-
-  let base regs reg =
-    let rec find {base; regs} reg offset =
-      if Var.Top.equal base reg then Some offset
-      else Map.to_sequence regs |>
-           Sequence.find_map ~f:(fun (off,sub) ->
-               find sub reg (offset+off)) in
-    List.find_map regs ~f:(fun tree ->
-        match find tree reg 0 with
-        | None -> None
-        | Some off -> Some (tree.base,off))
-  ;;
-
-  let (%:) n m = Var.forget (Var.define (Bitv.define m) n)
-
-  let regfile = build [
-      "RAX"%:64, [Some ("EAX'"%:32); Some ("EAX"%:32)];
-      "EAX"%:32, [Some ("AX'"%:16); Some ("AX"%:16)];
-      "EAX'"%:32, [Some ("AX'''"%:16); Some ("AX''"%:16)];
-      "AX"%:16, [Some ("AH"%:8); Some ("AL"%:8)];
-      "AX'"%:16, [Some ("AH'"%:8); Some ("AL'"%:8)];
-      "AX''"%:16, [Some ("AH''"%:8); Some ("AL''"%:8)];
-      "AX'''"%:16, [Some ("AH'''"%:8); Some ("AL'''"%:8)];
-      "RBX"%:64, [None; Some ("EBX"%:32)];
-      "EBX"%:32, [None; Some ("BX"%:16)];
-      "BX"%:16, [Some ("BH"%:8); Some ("BL"%:8)];
-      "RCX"%:64, [None; Some ("ECX"%:32)];
-      "ECX"%:32, [None; Some ("CX"%:16)];
-      "CX"%:16, [Some ("CH"%:8); Some ("CL"%:8)];
-      "RDX"%:64, [None; Some ("EDX"%:32)];
-      "EDX"%:32, [None; Some ("DX"%:16)];
-      "DX"%:16, [Some ("DH"%:8); Some ("DL"%:8)];
-    ] |> Map.to_alist |> List.Assoc.map ~f:Map.to_alist
-  ;;
+  let build spec =
+    let bases = bases@@join spec in
+    let rec base off reg = match Map.find bases reg with
+      | None -> off,reg
+      | Some (off',reg') -> base (off+off') reg' in
+    Map.to_alist bases |>
+    List.fold ~f:(fun regs (reg, (off,breg)) ->
+        Map.add_exn regs reg (base off breg))
+      ~init:(Map.empty (module Var.Top))
 end
 
 type info = {
