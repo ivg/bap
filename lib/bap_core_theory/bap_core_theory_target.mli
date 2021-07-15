@@ -2,6 +2,7 @@ open Core_kernel
 open Bap_knowledge
 
 module KB = Knowledge
+module Bitv = Bap_core_theory_value.Bitv
 module Var = Bap_core_theory_var
 module Mem = Bap_core_theory_value.Mem
 
@@ -14,6 +15,8 @@ type filetype
 type role
 type options = (options_cls,unit) KB.Class.t KB.Value.t and options_cls
 
+type alias
+
 val declare :
   ?parent:t ->
   ?bits:int ->
@@ -24,6 +27,7 @@ val declare :
   ?code_alignment:int ->
   ?vars:unit Var.t list ->
   ?regs:(role list * unit Var.t list) list ->
+  ?aliasing:alias list ->
   ?endianness:endianness ->
   ?system:system ->
   ?abi:abi ->
@@ -115,10 +119,19 @@ module Role : sig
   include KB.Enum.S with type t := t
 end
 
+
 module System : KB.Enum.S with type t = system
 module Filetype : KB.Enum.S with type t = filetype
 module Abi : KB.Enum.S with type t = abi
 module Fabi : KB.Enum.S with type t = fabi
+
+module Alias : sig
+  type t = alias
+  type 'a part
+  val def : 'a Bitv.t Var.t -> 'b part list -> alias
+  val reg : 'a Bitv.t Var.t -> 'a part
+  val unk : 'a part
+end
 
 module Options : sig
   type cls = options_cls

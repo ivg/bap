@@ -27,6 +27,7 @@ module Role = struct
   module Register = struct
     let general = declare ~package "general"
     let special = declare ~package "special"
+    let alias = declare ~package "alias"
     let pseudo = declare ~package "pseudo"
     let integer = declare ~package "integer"
     let floating = declare ~package "floating"
@@ -82,58 +83,10 @@ type alignment = {
   data : int;
 }
 
-
-module Regfile = struct
-  type reg = unit Var.t
-  type tree = {
-    base : reg;
-    regs : (int * tree) list;
-  }
-
-  (* base -> reg -> off *)
-  type t = int Map.M(Var.Top).t Map.M(Var.Top).t
-
-  module Bool = Val.Bool
-
-  let regsize v = match Bitv.refine (Var.sort v) with
-    | Some s -> Bitv.size s
-    | None -> match Bool.refine (Var.sort v) with
-      | Some _ -> 1
-      | None -> invalid_argf "variable %s is not a register"
-                  (Var.name v) ()
-
-  let join =
-    List.fold ~f:(fun subs (base,regs) -> match regs with
-        | [] -> subs
-        | _ ->
-          let total = regsize base in
-          let width = total / List.length regs in
-          let regs =
-            List.filter_mapi regs ~f:(fun i -> function
-                | None -> None
-                | Some reg ->
-                  Some (total - i * width - width, reg)) in
-          Map.update subs base ~f:(function
-              | None -> regs
-              | Some regs' -> regs'@regs))
-      ~init:(Map.empty (module Var.Top))
-
-  let bases subs =
-    Map.fold subs ~f:(fun ~key:base ~data:parts bases ->
-        List.fold parts ~init:bases ~f:(fun bases (off,part) ->
-            Map.add_exn bases part (off,base)))
-      ~init:(Map.empty (module Var.Top))
-
-  let build spec =
-    let bases = bases@@join spec in
-    let rec base off reg = match Map.find bases reg with
-      | None -> off,reg
-      | Some (off',reg') -> base (off+off') reg' in
-    Map.to_alist bases |>
-    List.fold ~f:(fun regs (reg, (off,breg)) ->
-        Map.add_exn regs reg (base off breg))
-      ~init:(Map.empty (module Var.Top))
-end
+type aliases = {
+  subs : (int * unit Var.t) Map.M(Var.Top).t;
+  sups : (int * unit Var.t) list Map.M(Var.Top).t;
+}
 
 type info = {
   parent : target;
@@ -143,6 +96,7 @@ type info = {
   code : mem;
   vars : Set.M(Var.Top).t;
   regs : Set.M(Var.Top).t Map.M(Role).t;
+  aliasing : aliases;
   endianness : endianness;
   alignment : alignment;
   system : system;
@@ -177,6 +131,10 @@ let unknown = {
   code = pack@@mem "mem" 32 8;
   vars = Set.empty (module Var.Top);
   regs = Map.empty (module Role);
+  aliasing = {
+    subs = Map.empty (module Var.Top);
+    sups = Map.empty (module Var.Top);
+  };
   endianness = Endianness.eb;
   system = System.unknown;
   abi = Abi.unknown;
@@ -205,6 +163,154 @@ let collect_regs ?pred init roles =
       | None -> Set.union vars vars'
       | Some pred -> Set.union vars (Set.filter vars' pred))
 
+module Alias = struct
+  type t = unit Var.t * unit Var.t option list
+  type 'a part = 'a Bitv.t Var.t option
+
+  let regsize v = match Bitv.refine (Var.sort v) with
+    | Some s -> Bitv.size s
+    | None -> assert false
+
+  (* joins the definitions and calculates offsets *)
+  let join = List.fold ~f:(fun subs (base,regs) ->
+      let total = regsize base in
+      let width = total / List.length regs in
+      let regs =
+        List.filter_mapi regs ~f:(fun i -> function
+            | None -> None
+            | Some reg ->
+              Some (total - i * width - width, reg)) in
+      Map.update subs base ~f:(function
+          | None -> regs
+          | Some regs' -> regs'@regs))
+      ~init:(Map.empty (module Var.Top))
+
+  (** a tree where children a parts of the base register
+
+      {v
+                 whole
+                /  |  \
+               p1  p2 p3
+      v}
+      where  pN = (rN,oN), the register name rN and the offset oN
+      of its LSB from the beginning (LSB) of the whole register.
+  *)
+  let bases subs =
+    Map.fold subs ~f:(fun ~key:base ~data:parts bases ->
+        List.fold parts ~init:bases ~f:(fun bases (off,part) ->
+            Map.add_exn bases part (off,base)))
+      ~init:(Map.empty (module Var.Top))
+
+  let init = {
+    sups = Map.empty (module Var.Top);
+    subs = Map.empty (module Var.Top);
+  }
+
+  let add_sub aliases sub = function
+    | None -> aliases
+    | Some sup -> {
+        aliases with subs = Map.add_exn aliases.subs sub sup;
+      }
+
+  let add_sup aliases sub regs = {
+    aliases with
+    sups = List.fold regs ~init:aliases.sups ~f:(fun sups (off,sup) ->
+        Map.add_multi sups sup (off,sub))
+  }
+
+  let solve regs spec =
+    let bases = bases@@join spec in
+    let aliases = match Map.find regs Role.Register.alias with
+      | None -> Set.empty (module Var.Top)
+      | Some vars -> vars in
+    let is_alias = Set.mem aliases in
+    let rec basis off reg =
+      if is_alias reg
+      then match Map.find bases reg with
+        | Some (off',reg') -> basis (off+off') reg'
+        | None -> None
+      else Some (off,reg) in
+    let rec trace off reg =
+      (off,reg) :: match Map.find bases reg with
+      | Some (off',reg') -> trace (off+off') reg'
+      | None -> [] in
+    Map.to_alist bases |>
+    List.fold ~f:(fun regs (sub, (off,sup)) ->
+        if is_alias sub
+        then add_sub regs sub (basis off sup)
+        else add_sup regs sub (trace off sup))
+      ~init
+
+  let find bases reg = match Map.find bases (Var.forget reg) with
+    | None -> None
+    | Some (off,base) ->
+      match Bitv.refine (Var.sort base) with
+      | None ->
+        failwithf "broken invariant: non-register in a file: %s"
+          (Var.name base) ()
+      | Some s ->
+        Some (off, Var.resort base s)
+
+  let error def =
+    Format.kasprintf @@ fun details ->
+    invalid_argf "%s: bad aliasing defintion of %s - %s"
+      "Theory.Alias.def" (Var.name def) details ()
+
+  let check var = function
+    | [] -> error var "the parts list is empty"
+    | parts ->
+      let total = Bitv.size (Var.sort var) in
+      let width = total / List.length parts in
+      List.iter parts ~f:(Option.iter ~f:(fun v ->
+          if Bitv.size (Var.sort v) <> width
+          then error var "the size of %s must be %d divided by %d"
+              (Var.name v) total (List.length parts)))
+
+  let def var parts : t =
+    check var parts;
+    Var.forget var,
+    List.map ~f:(Option.map ~f:Var.forget) parts
+  let reg x = Some x
+  let unk = None
+
+
+  module Test = struct
+    let (%) v m = Var.define (Bitv.define m) v
+    let forget = List.map ~f:Var.forget
+
+    module XYZ = struct
+      let x = "X"%16 and y = "Y"%16 and z = "Z"%32
+      let r = Array.init 4 ~f:(fun i -> sprintf "R%d" (i+1) % 8)
+      let h = Array.init 4 ~f:(fun i -> sprintf "H%d" (i+1) % 4)
+      let l = Array.init 4 ~f:(fun i -> sprintf "L%d" (i+1) % 4)
+
+      let roles = Map.of_alist_exn (module Role) [
+          Role.Register.alias,
+          Set.of_list (module Var.Top) @@ forget [
+            x; y; z;
+            h.(0); h.(1); h.(2); h.(3);
+            l.(0); l.(1); l.(2); l.(3);
+          ]
+        ]
+
+      let spec = [
+        def z [reg x; reg y];
+        def x [reg r.(0); reg r.(1)];
+        def y [reg r.(2); reg r.(3)];
+        def r.(0) [reg h.(0); reg l.(0)];
+        def r.(1) [reg h.(1); reg l.(1)];
+        def r.(2) [reg h.(2); reg l.(2)];
+        def r.(3) [reg h.(3); reg l.(3)];
+      ]
+
+      let aliasing = solve roles spec
+      ;;
+
+    end
+  end
+  ;;
+end
+
 let extend parent
     ?(bits=parent.bits)
     ?(byte=parent.byte)
@@ -214,6 +320,7 @@ let extend parent
     ?(code_alignment=parent.alignment.code)
     ?vars
     ?regs
+    ?aliasing
     ?(endianness=parent.endianness)
     ?(system=parent.system)
     ?(abi=parent.abi)
@@ -229,11 +336,15 @@ let extend parent
   and regs = Option.value_map regs
       ~default:parent.regs
       ~f:make_roles in
+  let aliasing = Option.value_map aliasing
+      ~default:parent.aliasing
+      ~f:(Alias.solve regs) in
   let (+) s (Var v) = Set.add s (Var.forget v) in
   {
     parent=name; bits; byte; endianness;
     system; abi; fabi; filetype; data; code; regs;
     vars = collect_regs (vars + code + data) regs;
+    aliasing;
     options;
     alignment = {
       code=code_alignment;
@@ -248,7 +359,7 @@ let declare
     ?(parent=unknown.parent)
     ?bits ?byte ?data ?code
     ?data_alignment ?code_alignment
-    ?vars ?regs ?endianness
+    ?vars ?regs ?aliasing ?endianness
     ?system ?abi ?fabi ?filetype ?options
     ?nicknames ?package name =
   let t = Self.declare ?package name in
@@ -260,7 +371,7 @@ let declare
       (Name.package (Self.name t)) ();
   let p = Hashtbl.find_exn targets parent in
   let info = extend ?bits ?byte ?data ?code
-      ?data_alignment ?code_alignment ?vars ?regs ?endianness
+      ?data_alignment ?code_alignment ?vars ?regs ?aliasing ?endianness
       ?system ?abi ?fabi ?filetype ?options ?nicknames p parent in
   Hashtbl.add_exn targets t info;
   t
@@ -337,6 +448,7 @@ let vars t = (info t).vars
 let var t name =
   let key = Var.define Sort.Top.t name in
   Set.binary_search (vars t) ~compare:Var.Top.compare `First_equal_to key
+
 
 let data_addr_size,
     code_addr_size =
@@ -416,6 +528,9 @@ let partition xs =
   sort_by_parent_name
 
 let families () = partition@@declared ()
+
+
+type alias = Alias.t
 
 include (Self : Base.Comparable.S with type t := t)
 include (Self : Stringable.S with type t := t)
