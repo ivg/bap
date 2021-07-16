@@ -85,7 +85,7 @@ type alignment = {
 
 type aliases = {
   subs : (int * unit Var.t) Map.M(Var.Top).t;
-  sups : (int * unit Var.t) list Map.M(Var.Top).t;
+  sups : unit Var.t Map.M(Int).t Map.M(Var.Top).t;
 }
 
 type info = {
@@ -164,92 +164,97 @@ let collect_regs ?pred init roles =
       | Some pred -> Set.union vars (Set.filter vars' pred))
 
 module Alias = struct
-  type t = unit Var.t * unit Var.t option list
+  type t = unit Var.t * (int * unit Var.t) list
   type 'a part = 'a Bitv.t Var.t option
 
   let regsize v = match Bitv.refine (Var.sort v) with
     | Some s -> Bitv.size s
     | None -> assert false
 
-  (* joins the definitions and calculates offsets *)
-  let join = List.fold ~f:(fun subs (base,regs) ->
-      let total = regsize base in
-      let width = total / List.length regs in
-      let regs =
-        List.filter_mapi regs ~f:(fun i -> function
-            | None -> None
-            | Some reg ->
-              Some (total - i * width - width, reg)) in
-      Map.update subs base ~f:(function
-          | None -> regs
-          | Some regs' -> regs'@regs))
-      ~init:(Map.empty (module Var.Top))
-
-  (** a tree where children a parts of the base register
-
-      {v
-                 whole
-                /  |  \
-               p1  p2 p3
-      v}
-      where  pN = (rN,oN), the register name rN and the offset oN
-      of its LSB from the beginning (LSB) of the whole register.
-  *)
-  let bases subs =
-    Map.fold subs ~f:(fun ~key:base ~data:parts bases ->
-        List.fold parts ~init:bases ~f:(fun bases (off,part) ->
-            Map.add_exn bases part (off,base)))
-      ~init:(Map.empty (module Var.Top))
 
   let init = {
     sups = Map.empty (module Var.Top);
     subs = Map.empty (module Var.Top);
   }
 
-  let add_sub aliases sub = function
-    | None -> aliases
-    | Some sup -> {
-        aliases with subs = Map.add_exn aliases.subs sub sup;
-      }
+  let is_solved {subs; sups} v = (Map.mem subs v || Map.mem sups v)
+  let solved_variables {subs; sups} =
+    Map.length subs + Map.length sups
 
-  let add_sup aliases sub regs = {
-    aliases with
-    sups = List.fold regs ~init:aliases.sups ~f:(fun sups (off,sup) ->
-        Map.add_multi sups sup (off,sub))
+  let add_sup sol lhs rhs =
+    let rhs = Map.of_alist_exn (module Int) rhs in {
+      sol with sups = Map.update sol.sups lhs ~f:(function
+        | None -> rhs
+        | Some rhs' ->
+          Map.merge rhs rhs' ~f:(fun ~key:_ -> function
+              | `Left x | `Right x -> Some x
+              | `Both (x,y) ->
+                if not (Var.Top.equal x y)
+                then failwith "invalid equation";
+                Some x))
+    }
+
+  let add_sub sol lhs rhs = {
+    sol with subs = Map.set sol.subs lhs rhs;
   }
 
+  let pp_spec ppf spec =
+    List.iter spec ~f:(fun (lhs,rhs) ->
+        Format.fprintf ppf "%s = " (Var.name lhs);
+        List.iter rhs ~f:(fun (off,var) ->
+            Format.fprintf ppf "%d:%s " off (Var.name var));
+        Format.fprintf ppf "@\n%!")
+
+  let substitute_one sol lhs (n,r) =
+    match Map.find sol.subs r with
+    | Some (m,x) -> [n+m,x]
+    | None -> match Map.find sol.sups r with
+      | None -> [n,r]
+      | Some parts ->
+        let parts = Map.to_alist parts in
+        let partsize =
+          regsize @@ snd (List.hd_exn parts) in
+        if regsize lhs > partsize
+        then List.map parts ~f:(fun (m,r) -> (m+n,r))
+        else List.concat_map parts ~f:(fun (m,x) ->
+            if n >= m && n + regsize lhs <= m + regsize x
+            then [n-m,x]
+            else [])
+
   let solve regs spec =
-    let bases = bases@@join spec in
     let aliases = match Map.find regs Role.Register.alias with
       | None -> Set.empty (module Var.Top)
       | Some vars -> vars in
     let is_alias = Set.mem aliases in
-    let rec basis off reg =
-      if is_alias reg
-      then match Map.find bases reg with
-        | Some (off',reg') -> basis (off+off') reg'
-        | None -> None
-      else Some (off,reg) in
-    let rec trace off reg =
-      (off,reg) :: match Map.find bases reg with
-      | Some (off',reg') -> trace (off+off') reg'
-      | None -> [] in
-    Map.to_alist bases |>
-    List.fold ~f:(fun regs (sub, (off,sup)) ->
-        if is_alias sub
-        then add_sub regs sub (basis off sup)
-        else add_sup regs sub (trace off sup))
-      ~init
-
-  let find bases reg = match Map.find bases (Var.forget reg) with
-    | None -> None
-    | Some (off,base) ->
-      match Bitv.refine (Var.sort base) with
-      | None ->
-        failwithf "broken invariant: non-register in a file: %s"
-          (Var.name base) ()
-      | Some s ->
-        Some (off, Var.resort base s)
+    let all_solved = List.for_all ~f:(fun (_,r) ->
+        not (is_alias r)) in
+    let substitute spec sol =
+      List.map spec ~f:(function
+          | lhs,[rhs] -> lhs,substitute_one sol lhs rhs
+          | other -> other) in
+    let invert sol spec =
+      List.concat_map spec ~f:(fun (lhs,rhs) ->
+          match rhs with
+          | [off,rhs] when is_solved sol lhs -> [rhs,[off,lhs]]
+          | [_] -> [lhs,rhs]
+          | rhs -> List.map rhs ~f:(fun (off,sub) -> sub,[off,lhs])) in
+    let reduce spec sol =
+      List.fold spec ~init:([],sol) ~f:(fun (spec,sol) (lhs,rhs) ->
+          if is_alias lhs && all_solved rhs then
+            spec, match rhs with
+            | [res] -> add_sub sol lhs res
+            | sum -> add_sup sol lhs sum
+          else (lhs,rhs)::spec,sol) in
+    let rec loop spec sol =
+      let solved = solved_variables sol in
+      let spec,sol = reduce spec sol in
+      let spec = invert sol spec in
+      let spec = substitute spec sol in
+      if solved_variables sol = solved then match spec with
+        | [] -> sol
+        | _ -> failwith "failed to converge to the solution"
+      else loop spec sol in
+    loop spec init
 
   let error def =
     Format.kasprintf @@ fun details ->
@@ -268,48 +273,46 @@ module Alias = struct
 
   let def var parts : t =
     check var parts;
-    Var.forget var,
-    List.map ~f:(Option.map ~f:Var.forget) parts
+    let var = Var.forget var in
+    let total = regsize var in
+    let width = total / List.length parts in
+    var,
+    List.filter_mapi parts ~f:(fun i -> function
+        | None -> None
+        | Some reg ->
+          Some (total - i * width - width, Var.forget reg))
+
   let reg x = Some x
   let unk = None
-
-
-  module Test = struct
-    let (%) v m = Var.define (Bitv.define m) v
-    let forget = List.map ~f:Var.forget
-
-    module XYZ = struct
-      let x = "X"%16 and y = "Y"%16 and z = "Z"%32
-      let r = Array.init 4 ~f:(fun i -> sprintf "R%d" (i+1) % 8)
-      let h = Array.init 4 ~f:(fun i -> sprintf "H%d" (i+1) % 4)
-      let l = Array.init 4 ~f:(fun i -> sprintf "L%d" (i+1) % 4)
-
-      let roles = Map.of_alist_exn (module Role) [
-          Role.Register.alias,
-          Set.of_list (module Var.Top) @@ forget [
-            x; y; z;
-            h.(0); h.(1); h.(2); h.(3);
-            l.(0); l.(1); l.(2); l.(3);
-          ]
-        ]
-
-      let spec = [
-        def z [reg x; reg y];
-        def x [reg r.(0); reg r.(1)];
-        def y [reg r.(2); reg r.(3)];
-        def r.(0) [reg h.(0); reg l.(0)];
-        def r.(1) [reg h.(1); reg l.(1)];
-        def r.(2) [reg h.(2); reg l.(2)];
-        def r.(3) [reg h.(3); reg l.(3)];
-      ]
-
-      let aliasing = solve roles spec
-      ;;
-
-    end
-  end
-  ;;
 end
+
+module Origin = struct
+  type sup = Sub
+  type sub = Sup
+  type ('a,'k) t =
+    | Any : ('a,'k) t -> ('a,unit) t
+    | Sup : 'a Bitv.t Var.t list -> ('a,sup) t
+    | Sub : int * 'a Bitv.t Var.t -> ('a,sub) t
+
+  let forget : type k. ('a,k) t -> ('a,unit) t = function
+    | Any _ as x -> x
+    | x -> Any x
+
+  let cast_sub = function
+    | Any (Sub _ as x) -> Some x
+    | Any _ -> None
+
+  let cast_sup = function
+    | Any (Sup _ as x) -> Some x
+    | Any _ -> None
+
+  let reg (Sub (_,v)) = v
+  let hi (Sub (lo,v)) = lo + Bitv.size (Var.sort v) - 1
+  let lo (Sub (lo,_)) = lo
+  let regs (Sup regs) = regs
+end
+
+type ('a,'k) origin = ('a,'k) Origin.t
 
 let extend parent
     ?(bits=parent.bits)
@@ -448,6 +451,26 @@ let vars t = (info t).vars
 let var t name =
   let key = Var.define Sort.Top.t name in
   Set.binary_search (vars t) ~compare:Var.Top.compare `First_equal_to key
+
+let unalias t reg : ('a,unit) origin option =
+  let {sups; subs} = (info t).aliasing in
+  let reg = Var.forget reg in
+  let refine v =
+    match Bitv.refine (Var.sort v) with
+    | None ->
+      failwithf "broken invariant: non-register in a file: %s"
+        (Var.name v) ()
+    | Some s -> Var.resort v s in
+  match Map.find sups reg with
+  | Some parts ->
+    let parts =
+      Map.to_alist parts ~key_order:`Decreasing |>
+      List.map ~f:(fun (_,v) -> refine v) in
+    Some Origin.(forget (Sup parts))
+  | None -> match Map.find subs reg with
+    | None -> None
+    | Some (off,v) ->
+      Some Origin.(forget (Sub (off,refine v)))
 
 
 let data_addr_size,
