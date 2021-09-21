@@ -212,19 +212,36 @@ end
 
  *)
 
+
+(* a distinguished element of a set to denote values that exhibit
+   special properties wrt the operation, e.g., annihilating elements,
+   identities, idempotents, etc.
+*)
+
+type elt =
+  | No                          (* an absence of an element *)
+  | Zero'1                      (* ~0, aka -1, aka zero one-complement *)
+  | Zero                        (* 0 *)
+  | One                         (* 1 *)
+  | Self                        (* equal to itself, [x] *)
+  | Self'1                      (* self one-complement, [~x] *)
+  | Self'2                      (* self two-complement, [-x] *)
+[@@deriving compare, equal, hash]
+
 type arith_props = {
   lass : bool;   (* left-associative:  xyz = (xy)z*)
   rass : bool;   (* right-associative: xyz = x(yz) *)
   comm : bool;   (* commutative:       xy  = yx *)
-  idem : bool;   (* idempotent:        xx  = x *)
+  unit : elt;    (* has unit, U, s.t., xU  = x *)
+  zero : elt;    (* has zero, Z, s.t., xZ  = 0 *)
+  cero : elt;    (* has cero, C, s.t., xC  = ~0, i.e., complement zero *)
+  self : elt;    (* has self, S, s.t., xx  = S *)
 }
 [@@deriving compare, equal, hash]
 
 type bool_props =
   | Chainable  (* (f x y .. z) = (and (f x y) ...(f y z) *)
   | Pairwise   (* (f x y .. z) = (and (f x y) (f x z) ... (f y z)*)
-
-
 
 module Op = struct
   module Self = KB.Enum.Make()
@@ -243,8 +260,17 @@ module Op = struct
     Option.iter ps (fun ps -> Hashtbl.add_exn bool_props p ps);
     p
 
+  (** [{only x; y; z}] means only [x], [y], [z] holds. *)
+  let only = {
+    lass=false;
+    rass=false;
+    comm=false;
+    unit=No;
+    zero=No;
+    cero=No;
+    self=No;
+  }
 
-  let only = {lass=false; rass=false; comm=false; idem=false}
   let lass = true
   let rass = true
   let comm = true
@@ -255,22 +281,33 @@ module Op = struct
   let pairwise = Some Pairwise
 
 
-  let add = "add" %: {only with lass; rass; comm}
-  let sub = "sub" %: {only with lass}
-  let mul = "mul" %: {only with lass; rass; comm}
-  let div = "div" %: {only with lass}
-  let sdiv = "sdiv" %: {only with lass}
-  let smul = "smul" %: {only with lass}
-  let modulo = "modulo" %: {only with lass}
-  let smodulo = "smodulo" %: {only with lass}
-  let logand = "logand" %: {lass; rass; comm; idem}
-  let logor = "logor" %: {lass; rass; comm; idem}
-  let logxor = "logxor" %: {only with lass; rass; comm}
-  let shiftr = def "shiftr"
-  let shiftl = def "shiftl"
+  let add = "add" %: {only with lass; rass; comm; unit=Zero; zero=Self'2}
+  let sub = "sub" %: {only with lass; unit=Zero; zero=Self; self=Zero}
+  let mul = "mul" %: {only with lass; rass; comm; unit=One; zero=Zero}
+  let div = "div" %: {only with lass; unit=One; cero=Zero; self=One}
+  let sdiv = "sdiv" %: {only with lass; unit=One; self=One}
+  let modulo = "modulo" %: {only with lass; unit=Zero; zero=One; self=Zero}
+  let smodulo = "smodulo" %: {only with lass; unit=Zero; zero=One; self=Zero}
+  let logand = "logand" %: {only with lass; rass; comm; zero=Zero; unit=Zero'1; self=Self}
+  let logor = "logor" %: {only with lass; rass; comm; unit=Zero; self=Self}
+  let logxor = "logxor" %: {only with lass; rass; comm; unit=Zero; self=Zero}
+  let shiftr = "rshift" %: {only with lass; unit=Zero; self=Zero(*1*)}
+  let shiftl = "lshift" %: {only with lass; unit=Zero}
+  let arshift = "arshift" %: {only with lass; unit=Zero}
   let sle = "sle" &: chainable
   let ule = "ule" &: chainable
   let cast = def "cast"
+
+
+  (** Notes:
+      1) [x >> x = 0], since [x >> y = 0] when [y >= ceil(log2(x))],
+       where [ceil(log2(x))] denotes the number of significant bits in
+      [x], i.e., it means that we shifted out all non-zero bits.
+      Since [x >= ceil(log2(x)], for all integers (well we can put
+      aside the special case of [x=0], since [0 >> 0] is also trivally
+      [0]).
+
+  *)
 
 
   include Self
@@ -646,3 +683,11 @@ end
 let () = register "desugar-variables" (module Desugar)
     ~package
     ~desc:"desugars assignments and access to register aliases"
+
+
+module If_nothing_chosen = struct
+  type (_, _) t =
+    | Default_to : 'a -> ('a, 'a) t
+    | Raise : ('a, 'a) t
+    | Return_none : ('a, 'a option) t
+end
