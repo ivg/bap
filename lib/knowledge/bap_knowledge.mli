@@ -893,7 +893,6 @@ module Knowledge : sig
     *)
     val in_package : string -> (unit -> 'a knowledge) -> 'a knowledge
 
-
     (** [set_package pkg] makes the package named [pkg] the current package.
 
         @since 2.2.0
@@ -942,6 +941,75 @@ module Knowledge : sig
         function.
     *)
     val import : ?strict:bool -> ?package:string -> string list -> unit knowledge
+  end
+
+
+  (** Global Objects.
+
+      Global objects have persistent identifiers that could be either
+      string literals or integers. The global objects have the same
+      representation that doesn't depend on the host architecture,
+      compiler version, or version of the library.
+
+      Ideally, global objects shall be created when the file is
+      loaded, i.e., either on top-level (i.e., in the library) or when
+      a plugin is initialized, e.g.,
+      {[
+        let entry = KB.Global.named "entry"
+        let exit = KB.Global.named "exit"
+      ]}
+
+      @since 2.4.0
+  *)
+  module Global : sig
+
+    (** [named ident] creates a named global object.
+
+        The identifier [ident] must follow the common identifier
+        rules, i.e., must not start with a digit, and shall include
+        only alphanumeric characters, underscores ([_]) and hyphens
+        ([-]). If [ident] is not a valid identifier the [Invalid_arg]
+        exception is raised.
+
+        Named global objects should be used sparingly and only for
+        values that are known in the compile-time or load time, i.e.,
+        the set of created constants shall not depend on the
+        input. Ideally, constants shall be created with the toplevel
+        definitions, e.g., [let entry = KB.Constant.string program
+        "entry"]
+
+        The strings are represented with hashes and any hash-collision
+        is considered a logic error. The probability is very low,
+        especially when the number of created strings is limited to
+        manually crafted literals. But what is more important, is that
+        the set of literals should not depend on the inputs and be
+        decided during the loading time.
+    *)
+    val named : ('a,_) cls -> string -> 'a obj
+
+
+    (** [numbered id] creates a numbered global objects.
+
+        Numbered global objects are identified by their number and
+        otherwise are much like the named objects, except that they
+        are not hashed.
+    *)
+    val numbered : ('a,_) cls -> int -> 'a obj
+
+
+    (** [is_named obj] is true [obj] was created with [named]  *)
+    val is_named : 'a obj -> bool
+
+
+    (** [is_numbered obj] is true if [obj] was created with [numbered].  *)
+    val is_numbered : 'a obj -> bool
+
+
+    (** [name obj] if [is_named obj] retuns its name.  *)
+    val name : 'a obj -> string option
+
+    (** [number obj] if [is_numbered obj] returns its number.   *)
+    val number : 'a obj -> int option
   end
 
   (** An information provider.

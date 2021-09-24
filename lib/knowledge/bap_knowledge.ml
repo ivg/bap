@@ -27,7 +27,6 @@ module type Id = sig
   type t [@@deriving sexp, hash]
   val zero : t
   val pp : Format.formatter -> t -> unit
-  val of_string : string -> t
   include Comparable.S_binable with type t := t
   include Binable.S with type t := t
 end
@@ -41,7 +40,7 @@ module type Sid = sig
 end
 
 
-(* temporal identifiers
+(* Identifiers.
 
    Identifiers work like pointers in our runtime, and
    are tagged words. We use 63 bit words, which are
@@ -50,42 +49,48 @@ end
 
    We add extra tags:
 
-   Numbers:
+   Strings:
      +------------------+---+
      |     payload      | 1 |
      +------------------+---+
       62              1   0
 
-   Atoms:
+   Numbers:
      +--------------+---+---+
      |     payload  | 1 | 0 |
      +--------------+---+---+
       62              1   0
 
-
-   Cells:
+   Objects:
      +--------------+---+---+
      |     payload  | 0 | 0 |
      +--------------+---+---+
       62              1   0
 
-
-   So numbers, are tagged with the least significand
-   bit set to 1. Not numbers (aka pointers), always
+   Strings are tagged with the least significand
+   bit set to 1. Non-strings always
    have the lowest bit set to 0, and are either
-   atoms (symbols or objects) with the second bit set,
-   and cells, with the second bit cleared. Finally,
+   numbers  with the second bit set or objects,
+   with the second bit cleared. Finally,
    we have the null value, which is represented with
-   all zeros, which is neither number, cell, or atom.
+   all zeros, which is neither numbers, symbol, or object.
 
    The same arithmetically,
-     numbers = {1 + 2*n}  -- all odd numbers
-     cells = {4 + 4*n}
-     atoms = {6 + 4*n}
+     strings = {1 + 2*n}  -- all odd numbers
+     objects = {4 + 4*n}
+     numbers = {6 + 4*n}
      null = 0
 
    Those four sets are disjoint.
 
+   Strings and Numbers are static (pure), i.e., their computation
+   doesn't require the state of the knowledge base. We map OCaml
+   strings into indentifiers using hash without collisions (much like
+   OCaml polymporhic variant, but with a much larger representation).
+   Integers are mapped directly, but we support only up to 62 bits.
+
+   Objects are stored in the knowledge base heap and require the
+   knowledge base computation.
 
    The chosen representation, allows us to represent
    the following number of elements per class (since
@@ -93,71 +98,152 @@ end
    of different classes may have the same values, basically,
    each class has its own heap):
 
-   numbers: 2^62 values (or [-2305843009213693953, 2305843009213693951]
-   atoms and cells: 2^61 values.
+   strings: 2^62 values (or [-2305843009213693953, 2305843009213693951]
+   objects and numbers: 2^61 values.
 
+   Note, that we reserve more space for strings as we would like to
+   minimize the chance of collision.
 *)
 module type Tid = sig
   include Id
   val null : t
-  val first_atom : t
-  val first_cell : t
-  val next : t -> t
+  val first_object : t
+  val next_object : t -> t
+
+  val named : string -> t
+  val numbered : int -> t
 
   val is_null : t -> bool
-  val is_atom : t -> bool
-  val is_cell : t -> bool
+  val is_object : t -> bool
+  val is_string : t -> bool
   val is_number : t -> bool
 
-  val fits : int -> bool
-  val of_int : int -> t
-  val fits_int : t -> bool
-  val to_int : t -> int
+  val parse_string : string -> t
 
-  val untagged : t -> Int63.t
-  val atom_of_string : string -> t
-  val cell_of_string : string -> t
-  val number_of_string : string -> t
+  val numbered_to_int : t -> int option
+  val named_to_string : t -> string option
+  val repr : t -> Int63.t
 end
 
 
+(* using FNV-1a algorithm *)
+let hash_fnv1a =
+  let open Int63 in
+  let init = of_int64_exn 0xCBF29CE484222325L in
+  let m = of_int64_exn 0x100000001B3L in
+  let hash init = String.fold ~init ~f:(fun h c ->
+      (h lxor of_int (Char.to_int c)) * m) in
+  fun ?(init=init) s -> hash init s
+
 module Oid : Tid = struct
   include Int63
+
+  let interned = Hashtbl.create (module Int63)
+  let clear () = Hashtbl.clear interned
+
   let null = zero
-  let first_atom = of_int 6
-  let first_cell = of_int 4
-  let next x = Int63.(x + of_int 4) [@@inline]
+  let first_object = of_int 4
+  let first_symbol = of_int 6
+  let next_object x = Int63.(x + of_int 4) [@@inline]
   let is_null x = x = zero
-  let is_number x = x land one <> zero [@@inline]
-  let is_atom x =
+  let is_string x = x land one <> zero [@@inline]
+  let is_number x =
     x land of_int 0b01 = zero &&
     x land of_int 0b10 <> zero
-  let is_cell x = x land of_int 0b11 = zero
+  let is_object x = x land of_int 0b11 = zero
   let to_int63 x = x
-  let number_of_string s = (of_string s lsl 1) lor of_int 1
-  let cell_of_string s = (of_string s lsl 2)
-  let atom_of_string s = (of_string s lsl 2) lor of_int 0b10
-  let min_value = min_value asr 1
-  let max_value = max_value asr 1
-  let fits x =
-    let x = of_int x in
-    x >= min_value && x <= max_value
-  [@@inline]
-  let fits_int x =
-    x >= of_int Int.min_value &&
-    x <= of_int Int.max_value
-  [@@inline]
-  let of_int x = (of_int x lsl 1) + one [@@inline]
-  let to_int x = to_int_trunc (x asr 1) [@@inline]
+  let create_string s = (s lsl 1) lor of_int 1
+  let create_object s = (s lsl 2)
+  let create_number s = (s lsl 2) lor of_int 0b10
+
 
   (* ordinal of a value in the given category (atoms, cells, numbers) *)
   let untagged x =
-    if is_number x then x asr 1 else x asr 2
+    if is_string x then x asr 1 else x asr 2
   [@@inline]
 
-  let pp ppf x =
-    Format.fprintf ppf "<%#0Lx>" (Int63.to_int64 x)
+  let repr x = x
 
+  let int64_untagged x = Int63.to_int64 (untagged x)
+
+  let pp_object ppf x =
+    Format.fprintf ppf "%%%08Lx" (int64_untagged x)
+
+  let pp_number ppf x =
+    Format.fprintf ppf "$%Ld" (int64_untagged x)
+
+  let pp_string ppf x =
+    match Hashtbl.find interned x with
+    | None ->
+      Format.fprintf ppf "<#%08Lx>" (int64_untagged x)
+    | Some name ->
+      Format.fprintf ppf "<%s>" name
+
+  let is_hexdigit = function
+    | '0' .. '9' | 'a' .. 'f' -> true
+    | _ -> false
+
+  let is_ident s =
+    not (String.is_empty s) &&
+    not (Char.equal '0' s.[0]) &&
+    String.for_all s ~f:(function
+        | 'a'..'z' | 'A'..'Z' | '0'..'9' | '_' | '-' -> true
+        | _ -> false)
+
+  let named s =
+    if not (is_ident s)
+    then invalid_arg "Oid.intern: expected an identifier"
+    else
+      let id = create_string (hash_fnv1a s) in
+      match Hashtbl.find interned id with
+      | None ->
+        Hashtbl.add_exn interned ~key:id ~data:s;
+        id
+      | Some s' when String.equal s s' ->
+        id
+      | Some s' ->
+        invalid_argf "The object identifier %S has the same hash value \
+                      as %S. Change one of them." s s' ()
+
+  let numbered x =
+    create_number (Int63.of_int x)
+
+  let numbered_to_int x =
+    if is_number x then Some (Int63.to_int_trunc (untagged x))
+    else None
+
+  let named_to_string x = Hashtbl.find interned x
+
+  let of_hexstr s = of_string ("0x"^s)
+
+  let pp ppf x =
+    if is_string x
+    then pp_string ppf x
+    else if is_number x
+    then pp_number ppf x
+    else pp_object ppf x
+
+  let hash_text s =
+    if String.is_empty s
+    then failwith "empty string"
+    else if Char.equal '#' s.[0]
+    then of_hexstr (String.subo ~pos:1 s)
+    else hash_fnv1a s
+
+  let parse_string s =
+    try
+      Scanf.sscanf s "%c%s@>" @@ fun pref body -> match pref with
+      | '%' -> create_object (of_hexstr body)
+      | '$' -> create_number (of_string body)
+      | '<' -> create_string (hash_text body)
+      | _ -> invalid_arg "Oid.parse_string: invalid starting prefix"
+    with
+    | End_of_file ->
+      invalid_arg "Oid.parse_string: invalid input (too small)"
+    | Failure s ->
+      invalid_argf "Oid.parse_string: failed to parse a number - %s" s ()
+    | Scanf.Scan_failure s ->
+      invalid_argf "Oid.parse_string: invalid input - %s" s ()
 end
 
 module Pid : Sid = Int63
@@ -316,15 +402,9 @@ end = struct
 
     let registry = Hashtbl.create (module Int63)
 
-    (* using FNV-1a algorithm *)
     let hash_name =
-      let open Int63 in
-      let init = of_int64_exn 0xCBF29CE484222325L in
-      let m = of_int64_exn 0x100000001B3L in
-      let hash init = String.fold ~init ~f:(fun h c ->
-          (h lxor of_int (Char.to_int c)) * m) in
       fun {package; name} ->
-        hash (hash init package) name
+      hash_fnv1a ~init:(hash_fnv1a package) name
 
     let intern name =
       let id = hash_name name in
@@ -1998,8 +2078,6 @@ module Knowledge = struct
       vals : Record.t Oid.Map.t;
       comp : work Map.M(Name).t Oid.Map.t;
       syms : fullname Oid.Map.t;
-      heap : cell Oid.Map.t;
-      data : Oid.t Cell.Map.t;
       objs : Oid.t String.Map.t String.Map.t;
       pubs : Oid.Set.t String.Map.t;
     }
@@ -2010,8 +2088,6 @@ module Knowledge = struct
       objs = Map.empty (module String);
       syms = Map.empty (module Oid);
       pubs = Map.empty (module String);
-      heap = Map.empty (module Oid);
-      data = Map.empty (module Cell);
     }
 
     type t = {
@@ -2222,12 +2298,12 @@ module Knowledge = struct
     type 'a ord = Oid.comparator_witness
 
     let with_new_object objs f = match Map.max_elt objs.Env.vals with
-      | None -> f Oid.first_atom {
+      | None -> f Oid.first_object {
           objs
-          with vals = Map.singleton (module Oid) Oid.first_atom Record.empty
+          with vals = Map.singleton (module Oid) Oid.first_object Record.empty
         }
       | Some (key,_) ->
-        let key = Oid.next key in
+        let key = Oid.next_object key in
         f key {
           objs
           with vals = Map.add_exn objs.vals ~key ~data:Record.empty
@@ -2246,17 +2322,17 @@ module Knowledge = struct
     let is_null = Oid.is_null
 
     (* an interesting question, what we shall do if
-       1) an symbol is deleted
+       1) a symbol is deleted
        2) a data object is deleted?
-
-       So far we ignore both deletes.
     *)
     let delete {Class.name} obj =
       update @@ function {classes} as s -> {
           s with
           classes = Map.change classes name ~f:(function
               | None -> None
-              | Some objs -> Some {
+              | Some objs ->
+                assert (not (Map.mem objs.syms obj));
+                Some {
                   objs with
                   vals = Map.remove objs.vals obj;
                   comp = Map.remove objs.comp obj;
@@ -2283,10 +2359,10 @@ module Knowledge = struct
           } in
       let createsym ~public ~package name classes clsid objects s =
         with_new_object objects @@ fun obj objects ->
-        let syms = Map.set objects.syms obj {package; name} in
+        let syms = Map.add_exn objects.syms obj {package; name} in
         let objs = Map.update objects.objs package ~f:(function
             | None -> Map.singleton (module String) name obj
-            | Some names -> Map.set names name obj) in
+            | Some names -> Map.add_exn names name obj) in
         let objects = {objects with objs; syms} in
         let objects = if public
           then publicize ~package obj objects else objects in
@@ -2325,8 +2401,8 @@ module Knowledge = struct
         } in
         do_intern ?public ?desc name cls
 
-    let uninterned_repr cls obj =
-      Format.asprintf "#<%s %a>" cls Oid.pp obj
+    let uninterned_repr _cls obj =
+      Format.asprintf "%a" Oid.pp obj
 
     let to_string
         {Class.name=cls as cname} {Env.package; classes} obj =
@@ -2347,20 +2423,22 @@ module Knowledge = struct
         get () >>| fun env ->
         to_string cls env obj
 
+    let read_symbol cls input =
+      get () >>= fun {Env.package} ->
+      do_intern (Name.Full.read ~package input) cls
+
     let read cls = function
       | "nil" -> !!(null cls)
+      | "" -> invalid_arg "KB.Object.read: empty string"
       | input ->
-        try
-          Scanf.sscanf input "#<%s %s@>" @@ fun _ obj ->
-          Knowledge.return (Oid.atom_of_string obj)
-        with _ ->
-          get () >>= fun {Env.package} ->
-          do_intern (Name.Full.read ~package input) cls
+        match input.[0] with
+        | '<' | '%' | '$' -> !!(Oid.parse_string input)
+        | _ -> read_symbol cls input
 
     let cast : type a b. (a obj, b obj) Type_equal.t -> a obj -> b obj =
       fun Type_equal.T x -> x
 
-    let id x = Oid.untagged x
+    let id x = Oid.repr x
 
     module type S = sig
       type t [@@deriving sexp]
@@ -2724,70 +2802,13 @@ module Knowledge = struct
     let set_package name = update @@ fun s -> {s with package = name}
   end
 
-
-  module Data : sig
-    type +'a t
-    type 'a ord
-
-    val atom : ('a,_) cls -> 'a obj -> 'a t knowledge
-    val cons : ('a,_) cls -> 'a t -> 'a t -> 'a t knowledge
-
-    val case : ('a,_) cls -> 'a t ->
-      null:'r knowledge ->
-      atom:('a obj -> 'r knowledge) ->
-      cons:('a t -> 'a t -> 'r knowledge) -> 'r knowledge
-
-
-    val id : 'a obj -> Int63.t
-
-
-    module type S = sig
-      type t [@@deriving sexp]
-      include Base.Comparable.S with type t := t
-      include Binable.S with type t := t
-    end
-
-    val derive : ('a,_) cls -> (module S
-                                 with type t = 'a t
-                                  and type comparator_witness = 'a ord)
-  end = struct
-    type +'a t = 'a obj
-    type 'a ord = Oid.comparator_witness
-
-    let atom _ x = Knowledge.return x
-
-    let add_cell {Class.name} objects oid cell =
-      let {Env.data; heap} = objects in
-      let data = Map.add_exn data ~key:cell ~data:oid in
-      let heap = Map.add_exn heap ~key:oid ~data:cell in
-      update (fun s -> {
-            s with classes = Map.set s.classes name {
-          objects with data; heap
-        }}) >>| fun () ->
-      oid
-
-    let cons cls car cdr =
-      let cell = {car; cdr} in
-      objects cls >>= function {data; heap} as s ->
-      match Map.find data cell with
-      | Some id -> Knowledge.return id
-      | None -> match Map.max_elt heap with
-        | None ->
-          add_cell cls s Oid.first_cell cell
-        | Some (id,_) ->
-          add_cell cls s (Oid.next id) cell
-
-    let case cls x ~null ~atom ~cons =
-      if Oid.is_null x then null else
-      if Oid.is_atom x || Oid.is_number x then atom x
-      else objects cls >>= fun {Env.heap} ->
-        let cell = Map.find_exn heap x in
-        cons cell.car cell.cdr
-
-    let id = Object.id
-
-    module type S = Object.S
-    let derive = Object.derive
+  module Global = struct
+    let numbered _ = Oid.numbered
+    let named _ = Oid.named
+    let is_named x = Option.is_some (Oid.named_to_string x)
+    let is_numbered x = Option.is_some (Oid.numbered_to_int x)
+    let name = Oid.named_to_string
+    let number = Oid.numbered_to_int
   end
 
   module Syntax = struct
@@ -2853,11 +2874,10 @@ module Knowledge = struct
           Map.iteri vals ~f:(fun ~key:oid ~data ->
               if not (Dict.is_empty data) then
                 let () = match Map.find syms oid with
-                  | None ->
-                    Format.fprintf ppf "@[<hv2>(%a@ " Oid.pp oid
+                  | None -> ()
                   | Some name ->
-                    Format.fprintf ppf "@[<hv2>(%a@ "
-                      (pp_fullname ~package) name in
+                    Format.fprintf ppf "@[<hv2>(%a<%a>@ "
+                      (pp_fullname ~package) name Oid.pp oid in
                 Format.fprintf ppf "%a)@]@;"
                   Record.pp_hum (Dict.sexp_of_t data));
           Format.fprintf ppf "@]"
@@ -2910,12 +2930,15 @@ module Knowledge = struct
         ({Env.vals; syms; objs} as self)
         {key; sym; data; comp} =
       let value = make_value data in
-      let self = {self with vals = Map.add_exn vals key value} in
+      let self = {
+        self with
+        vals = Map.add_exn vals key value;
+        comp = Map.set self.comp key (expand_comp comp)
+      } in
       match sym with
       | None -> self
       | Some s -> {
           self with
-          comp = Map.set self.comp key (expand_comp comp);
           syms = Map.add_exn syms key s;
           objs = Map.update objs s.package ~f:(function
               | None -> Map.singleton (module String) s.name key
