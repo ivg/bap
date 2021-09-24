@@ -2434,7 +2434,8 @@ module Knowledge = struct
       | input ->
         match input.[0] with
         | '<' | '%' | '$' -> !!(Oid.parse_string input)
-        | _ -> read_symbol cls input
+        | '@' -> read_symbol cls (String.subo ~pos:1 input)
+        | _ -> invalid_arg "KB.Object.read: invalid input symbol"
 
     let pp = Oid.pp
 
