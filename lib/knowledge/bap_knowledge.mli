@@ -598,6 +598,17 @@ module Knowledge : sig
     val id : 'a obj -> Int63.t
 
 
+    (** pretty prints the object
+        For non global object, prints the internal identifier prefixed
+        with [%], for global named objects print their name delimited
+        with [<] and [>], e.g., [<foo>], for numbered objects print
+        their number prefixed with [$], e.g., [$1].
+
+        @since 2.4.0
+    *)
+    val pp : Format.formatter -> 'a obj -> unit
+
+
     (** Ordered and persistent data types.  *)
     module type S = sig
       type t [@@deriving sexp]

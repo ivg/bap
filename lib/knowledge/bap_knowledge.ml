@@ -123,6 +123,7 @@ module type Tid = sig
   val numbered_to_int : t -> int option
   val named_to_string : t -> string option
   val repr : t -> Int63.t
+  val pp : Format.formatter -> t -> unit
 end
 
 
@@ -2434,6 +2435,8 @@ module Knowledge = struct
         match input.[0] with
         | '<' | '%' | '$' -> !!(Oid.parse_string input)
         | _ -> read_symbol cls input
+
+    let pp = Oid.pp
 
     let cast : type a b. (a obj, b obj) Type_equal.t -> a obj -> b obj =
       fun Type_equal.T x -> x
