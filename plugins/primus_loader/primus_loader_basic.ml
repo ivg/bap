@@ -194,13 +194,29 @@ module Make(Param : Param)(Machine : Primus.Machine.S)  = struct
     save_word endian argc sp >>= fun _ ->
     set_word "posix:environ" envp_table_ptr
 
+  let term_kind cls =
+    Term.switch cls
+      ~program:(fun _ -> "<program>")
+      ~sub:(fun _ -> "<sub>")
+      ~arg:(fun _ -> "<arg>")
+      ~blk:(fun _ -> "<blk>")
+      ~phi:(fun _ -> "<phi>")
+      ~def:(fun _ -> "<def>")
+      ~jmp:(fun _ -> "<jmp>")
+
 
   let names prog = (object
     inherit [addr String.Map.t] Term.visitor
-    method! enter_term _ t env =
+    method! enter_term cls t env =
       match Term.get_attr t address with
       | None -> env
-      | Some addr -> Map.set env ~key:(Term.name t) ~data:addr
+      | Some addr ->
+        Term.cata cls t ~init:env
+          ~sub:(fun sub ->
+              Map.add_exn env ~key:(Sub.name sub) ~data:addr)
+          ~blk:(fun blk ->
+              let key = Term.tid blk |> Tid.to_string in
+              Map.add_exn env ~key ~data:addr)
   end)#run prog String.Map.empty
 
   let init_names () =

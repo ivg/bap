@@ -1,3 +1,5 @@
+[@@@alert toplevel]
+
 open Bap_knowledge
 
 type 'a t = 'a
@@ -21,3 +23,10 @@ val var : string -> 'p var
 val reset : unit -> unit
 val set : Knowledge.state -> unit
 val current : unit -> Knowledge.state
+
+val acquire : unit -> Knowledge.state
+val discard : Knowledge.state -> unit
+val release : Knowledge.state -> unit
+
+val update : (Knowledge.state -> Knowledge.state) -> unit
+val borrow : (Knowledge.state -> 'a) -> 'a

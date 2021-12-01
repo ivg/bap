@@ -16,7 +16,7 @@ module Std = struct
   (** A definition for a regular type, and a handy module,
       that can create regular types out of thin air. *)
   module Integer = Integer
-  module Toplevel = Bap_toplevel
+  module Toplevel = Bap_toplevel [@@alert "-toplevel"]
   module Trie = struct
     include Bap_trie_intf
     include Bap_trie

@@ -123,7 +123,7 @@ module Main(Machine : Primus.Machine.S) = struct
       | Some visits ->
         if visits > max_visited
         then terminate
-            (sprintf "visits of the %s destination" (Tid.name name))
+            (sprintf "visits of the %a destination" Tid.pps name)
         else Machine.return ()
       | _ -> Machine.return ()
 

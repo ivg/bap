@@ -2862,13 +2862,17 @@ module Std : sig
 
         A newly created variable has version equal to 0.
 
-        If [fresh] is [true] (defaults to [false]), then a unique salt
-        is mixed to the name of variable, making it unique.
+        If [fresh] is [true] (defaults to [false]), then creates a
+        unqiue anonymous variable (the name field is ignored).
 
         If [is_virtual] is [true] (defaults to [false]), then a
         variable is virtual, i.e., it doesn't correspond to some
         physical register or memory location and was added to a program
         artificially.
+
+        @before 2.0.0 fresh variables were represented as [nameXXX],
+        where [XXX] is a number stored in a reference inside the
+        project state.
     *)
     val create : ?is_virtual:bool -> ?fresh:bool -> string -> typ -> t
 
@@ -7935,24 +7939,33 @@ module Std : sig
   module Tid : sig
     type t = tid
 
-    (** [create ()] creates a fresh newly term identifier.
+    (** [create ()] uses the toplevel to compute a fresh term identifier.
 
-        This function has a side-effect of changing the Toplevel
-        knowledge base.
+        {{!Toplevel}KB-Unsafe}. This function uses the
+        [Toplevel.exec] function to interact with the knowledge base
+        and must not be called inside a knowledge base computation.
+
+        Use {!Theory.Label.fresh} when in the knowledge monad.
     *)
-    val create : unit -> t
+    val create : unit -> t [@@alert toplevel]
 
 
-    (** [for_name name] creates a Term identifier for the given [name].
+    (** [for_name name] creates a term identifier for the given [name].
 
-        Creates a new program object that denotes a program with the
-        given name. See [Theory.Label.for_name] from the
-        [Bap_core_theory] interface for more information.
+        Uses the toplevel knowledge base to create a program object
+        that corresponds to the given [name]. See
+        {!Theory.Label.for_name} for more information.
+
+        KB-Unsafe. This function uses the [Toplevel.exec] function to
+        interact with the knowledge base and must not be called inside
+        a knowledge base computation.
+
+        Use {!Theory.Label.for_name} when in the knowledge monad.
 
         @since 2.0.0
         @since 2.2.0 has the optional [package] parameter.
     *)
-    val for_name : ?package:string -> string -> t
+    val for_name : ?package:string -> string -> t [@@alert toplevel]
 
 
     (** [for_addr addr] creates a Term identifier for the given [addr].
@@ -7964,7 +7977,7 @@ module Std : sig
         @since 2.0.0
         @since 2.2.0 has the optional [package] parameter.
     *)
-    val for_addr : ?package:string -> addr -> t
+    val for_addr : ?package:string -> addr -> t [@@alert toplevel]
 
     (** [for_ivec ivec] creates a Term identifier for the given [ivec].
 
@@ -7975,17 +7988,27 @@ module Std : sig
         @since 2.0.0
         @since 2.2.0 has the optional [package] parameter.
     *)
-    val for_ivec : ?package:string -> int -> t
+    val for_ivec : ?package:string -> int -> t [@@alert toplevel]
 
 
     (** [set_name tid name] associates a [name] with a given
-        term identifier [tid]. Any previous associations are
-        overridden.*)
-    val set_name : tid -> string -> unit
+        term identifier [tid].
+
+        @raises Toplevel.Conflict if the newly provided name differs
+        from the name that was previously associated with that tid.
+
+        @before 2.0.0 any previous associations were overridden.
+        @after 2.0.0 raises an exception when the name is changed.
+    *)
+    val set_name : tid -> string -> unit [@@alert toplevel]
 
     (** [name tid] returns a term name: either a string name
-        with at-prefix, or number identifier.   *)
-    val name : tid -> string
+        with at-prefix, or number identifier.
+
+        See also {!to_string} that provides a KB-Safe version and
+        always produces the numeric identifier.
+    *)
+    val name : tid -> string [@@alert toplevel]
 
     (** [from_string s] parses tid from string. The expected
         format is:
@@ -7997,14 +8020,82 @@ module Std : sig
           number = ?ocaml hexadecimal representation?.
         v}
     *)
-    val from_string : string -> tid Or_error.t
+    val from_string : string -> tid Or_error.t [@@alert toplevel]
 
     (** [from_string_exn s] same as [from_string_exn] but throws
         exception on error.  *)
-    val from_string_exn : string -> tid
+    val from_string_exn : string -> tid [@@alert toplevel]
 
     (** infix notation for [from_string_exn]  *)
-    val (!!) : string -> tid
+    val (!!) : string -> tid [@@alert toplevel]
+
+
+    (** A KB-friendly Tid interface.
+
+        The functions in this interface use the knowledge base to
+        generate, when neccessary, term identifiers.
+
+        @since 2.4.0
+    *)
+    module KB : sig
+
+      (** [create ()] uses the toplevel to compute a fresh term
+          identifier.
+
+          Equivalent to {!Theory.Label.fresh}
+
+      *)
+      val create : unit -> t knowledge
+
+
+      (** [for_name name] creates a term identifier for the given [name].
+
+          Equivalent to [Theory.Label.for_name]
+      *)
+      val for_name : ?package:string -> string -> t knowledge
+
+
+      (** [for_addr addr] creates a Term identifier for the given [addr].
+
+          Equivalent to [Theory.Label.for_addr]
+      *)
+      val for_addr : ?package:string -> addr -> t knowledge
+
+      (** [for_ivec ivec] creates a Term identifier for the given [ivec].
+
+          Equivalent to [Theory.Label.for_ivec]
+
+      *)
+      val for_ivec : ?package:string -> int -> t knowledge
+
+
+      (** [set_name tid name] associates a [name] with a given
+          term identifier [tid].
+
+          Sets the [core:label-name] to [name] and adds [name] to
+          the set of [core:label-aliases].
+
+          Results in a conflict if previously set name contradicts
+          with the new name.
+      *)
+      val set_name : tid -> string -> unit knowledge
+
+      (** [name tid] returns a term name: either a string name
+          with at-prefix, or number identifier.   *)
+      val name : tid -> string knowledge
+
+      (** [from_string s] parses tid from string. The expected
+          format is:
+          {v
+          tid = symbol | number.
+          symbol = "@", string.
+          number = "%", hex.
+          string = ?sequence of characters?.
+          number = ?ocaml hexadecimal representation?.
+        v}
+      *)
+      val from_string : string -> tid Or_error.t knowledge
+    end
 
     include Regular.S with type t := t
   end
@@ -8053,17 +8144,19 @@ module Std : sig
         syntactically the same. The clone operation is shallow, all
         subterms of [term] are unchanged.
     *)
-    val clone : 'a t -> 'a t
+    val clone : 'a t -> 'a t [@@alert toplevel]
+
+    (** [name t] returns the name of the term identifier.
+
+        Equivalent to [Tid.name (tid t)].*)
+    val name : 'a t -> string [@@alert toplevel]
+
+    (** [tid entity] returns a unique identifier of the [entity]  *)
+    val tid : 'a t -> tid
 
     (** [same x y] returns true if [x] and [y] represents the same
         entity, i.e., [Tid.(tid x = tid y)] *)
     val same : 'a t -> 'a t -> bool
-
-    (** [name t] returns a string representation of a term [t] identity *)
-    val name : 'a t -> string
-
-    (** [tid entity] returns a unique identifier of the [entity]  *)
-    val tid : 'a t -> tid
 
     (** [length t p] returns an amount of terms of [t] class in a
         parent term [p] *)
@@ -8171,6 +8264,25 @@ module Std : sig
     (** [nth_exn t p n] same as [nth], but raises exception if [n] is
         not a valid position number.  *)
     val nth_exn : ('a,'b) cls -> 'a t -> int -> 'b t
+
+
+    (** A KB-safe interface.
+
+        This interface wraps computations that require access to the
+        knowledge base into the knowledge monad.
+
+        @since 2.4.0 *)
+    module KB : sig
+      (** [clone term] creates an object with a fresh new identifier
+          that has the same contents as [term], i.e., that is
+          syntactically the same. The clone operation is shallow, all
+          subterms of [term] are unchanged.
+      *)
+      val clone : 'a t -> 'a t knowledge
+
+      (** [name t] returns a string representation of a term [t] identity *)
+      val name : 'a t -> string knowledge
+    end
 
     (** {2 Attributes}
 
@@ -8359,11 +8471,28 @@ module Std : sig
 
         @since 2.3.0 has the optional [subs] paramater.
     *)
-    val create : ?subs:sub term list -> ?tid:tid -> unit -> t
+    val create : ?subs:sub term list -> ?tid:tid -> unit -> t [@@alert toplevel]
 
     (** [lift symbols] takes a table of functions and return a whole
         program lifted into IR *)
-    val lift : symtab -> program term
+    val lift : symtab -> program term [@@alert toplevel]
+
+
+    (** A KB-safe interface.
+
+        This interface wraps computations that require access to the
+        knowledge base into the knowledge monad.
+
+        @since 2.4.0 *)
+    module KB : sig
+      (** [create ?subs ?tid ()] creates a new program.
+
+          Creates a program from the given subs. If [tid] is not
+          specified then a fresh tid is generated.
+      *)
+      val create : ?subs:sub term list -> ?tid:tid -> unit -> t knowledge
+
+    end
 
     (** [to_graph program] creates a callgraph of a [program]  *)
     val to_graph : t -> Graphs.Callgraph.t
@@ -8381,8 +8510,39 @@ module Std : sig
     (** Program builder.  *)
     module Builder : sig
       type t
-      (** Initializes an empty builder.  *)
-      val create : ?tid:tid  -> ?subs:int -> unit -> t
+
+      (** [create ()] creates an empty builder.
+
+          @param subs is the initial capacity for subroutines.
+
+          @param tid is the tid of the progam, if it is not set, a
+          fresh tid is generated.
+
+          KB-Unsafe: This function is KB-Unsafe if the tid paramater
+          is not specified (in that case a fresh tid will be generated
+          using the toplevel knowledge base). To use it inside a KB
+          computation either pass a tid or use {!init}.
+      *)
+      val create : ?tid:tid  -> ?subs:int -> unit -> t [@@alert toplevel]
+
+
+      (** A KB-safe interface.
+
+          This interface wraps computations that require access to the
+          knowledge base into the knowledge monad.
+
+          @since 2.4.0 *)
+      module KB : sig
+        (** [create ()] creates an empty builder.
+
+            @param subs is the initial capacity for subroutines.
+
+            @param tid is the tid of the progam, if it is not set, a
+            fresh tid is generated.
+        *)
+        val create : ?tid:tid  -> ?subs:int -> unit -> t knowledge
+      end
+
 
       (** [add_sub builder sub] appends a subroutine term to the
           program.  *)
@@ -8422,17 +8582,24 @@ module Std : sig
       ?args:arg term list ->
       ?blks:blk term list ->
       ?tid:tid ->
-      ?name:string -> unit -> t
+      ?name:string -> unit -> t [@@alert toplevel]
 
     (** [lift entry] takes an basic block of assembler instructions,
         as an entry and lifts it to the subroutine term.  *)
-    val lift : block -> cfg -> sub term
+    val lift : block -> cfg -> sub term [@@alert toplevel]
 
     (** [name sub] returns a subroutine name  *)
     val name : t -> string
 
-    (** updates subroutine name *)
-    val with_name : t -> string -> t
+    (** updates subroutine name.
+
+        @before 2.0.0 any previously associated names were overwritten
+        @after 2.0.0 raises an exception if the name changes
+
+        @rases Toplevel.Conflict if a name is already associated with
+        the subroutine and it is different from the new one.
+    *)
+    val with_name : t -> string -> t [@@alert toplevel]
 
     (** [ssa sub] returns [sub] in SSA form. If program is already in
         SSA, then do nothing (see also {!is_ssa}). The underlying
@@ -8550,13 +8717,64 @@ module Std : sig
     (** a subroutine is the binary entry point *)
     val entry_point : unit tag
 
+    (** A KB-safe interface.
+
+        This interface wraps computations that require access to the
+        knowledge base into the knowledge monad.
+
+        @since 2.4.0 *)
+    module KB : sig
+      (** [create ?name ()] creates a new subroutine.
+
+          Creates a subroutine that includes given arguments and
+          blocks. The order of the terms is preserved with the first
+          block being the entry block. No references between blocks are
+          added, so the blocks shall be correctly linked and be
+          reachable from the entry block.
+
+          If [tid] is not specied then a fresh one is generated.
+          if [name] is not specified then a fresh name is derived from
+          the [tid].
+
+          @since 2.3.0 has the [args] optional parameter
+          @since 2.3.0 has the [blks] optional parameter
+      *)
+      val create :
+        ?args:arg term list ->
+        ?blks:blk term list ->
+        ?tid:tid ->
+        ?name:string -> unit -> t knowledge
+
+      (** updates subroutine name *)
+      val with_name : t -> string -> t knowledge
+
+    end
+
     (** Subroutine builder *)
     module Builder : sig
       type t
 
-      (** initializes empty subroutine builder.  *)
+      (** [create ()] initializes a builder.
+
+          KB-Unsafe: This function is KB-Unsafe if the tid paramater
+          is not specified (in that case a fresh tid will be generated
+          using the toplevel knowledge base). To use it inside a KB
+          computation either pass a tid or use {!KB.create}.
+      *)
       val create : ?tid:tid -> ?args:int -> ?blks:int -> ?name:string ->
-        unit -> t
+        unit -> t [@@alert toplevel]
+
+      (** A KB-safe interface.
+
+          This interface wraps computations that require access to the
+          knowledge base into the knowledge monad.
+
+          @since 2.4.0 *)
+      module KB : sig
+        (** [create ()] initializes a builder.*)
+        val create : ?tid:tid -> ?args:int -> ?blks:int -> ?name:string ->
+          unit -> t knowledge
+      end
 
       (** appends a block to a subroutine  *)
       val add_blk : t -> blk term -> unit
@@ -8586,7 +8804,25 @@ module Std : sig
     type t = def term
 
     (** [reify v x] reifies Core Theory terms into the IR term.  *)
-    val reify : ?tid:tid -> 'a Theory.var -> 'a Theory.value -> t
+    val reify : ?tid:tid -> 'a Theory.var -> 'a Theory.value -> t [@@alert toplevel]
+
+    (** [create ?tid x exp] creates definition [x := exp]  *)
+    val create : ?tid:tid -> var -> exp -> t [@@alert toplevel]
+
+    (** A KB-safe interface.
+
+        This interface wraps computations that require access to the
+        knowledge base into the knowledge monad.
+
+        @since 2.4.0 *)
+    module KB : sig
+
+      (** [reify v x] reifies Core Theory terms into the IR term.  *)
+      val reify : ?tid:tid -> 'a Theory.var -> 'a Theory.value -> t knowledge
+
+      (** [create ?tid x exp] creates definition [x := exp]  *)
+      val create : ?tid:tid -> var -> exp -> t knowledge
+    end
 
     (** [var def] is the left-hand-side as a Core Theory variable.   *)
     val var : t -> unit Theory.var
@@ -8594,8 +8830,6 @@ module Std : sig
     (** [value def] is the right-hand-side as a Core Theory value.  *)
     val value : t -> unit Theory.value
 
-    (** [create ?tid x exp] creates definition [x := exp]  *)
-    val create : ?tid:tid -> var -> exp -> t
 
     (** returns the left hand side of a definition  *)
     val lhs : t -> var
@@ -8652,8 +8886,9 @@ module Std : sig
 
     type t = jmp term
 
-    type dst
 
+    (** a jump destination  *)
+    type dst
 
 
     (** [reify ()] reifies inputs into a jump term.
@@ -8679,7 +8914,7 @@ module Std : sig
     *)
     val reify : ?tid:tid ->
       ?cnd:Theory.Bool.t Theory.value ->
-      ?alt:dst -> ?dst:dst -> unit -> t
+      ?alt:dst -> ?dst:dst -> unit -> t [@@alert toplevel]
 
     (** [guard jmp] if [jmp] is conditional, returns its condition.  *)
     val guard : t -> Theory.Bool.t Theory.value option
@@ -8707,23 +8942,23 @@ module Std : sig
     val resolve : dst -> (tid,'a Theory.Bitv.t Theory.value) Either.t
 
     (** [create ?cond kind] creates a jump of a given kind  *)
-    val create : ?tid:tid -> ?cond:exp -> jmp_kind -> t
+    val create : ?tid:tid -> ?cond:exp -> jmp_kind -> t [@@alert toplevel]
 
     (** [create_call ?cond target] transfer control to subroutine
         [target] *)
-    val create_call : ?tid:tid -> ?cond:exp -> call  -> t
+    val create_call : ?tid:tid -> ?cond:exp -> call  -> t [@@alert toplevel]
 
     (** [create_goto ?cond label] local jump  *)
-    val create_goto : ?tid:tid -> ?cond:exp -> label -> t
+    val create_goto : ?tid:tid -> ?cond:exp -> label -> t [@@alert toplevel]
 
     (** [create_ret ?cond label] return from a procedure  *)
-    val create_ret  : ?tid:tid -> ?cond:exp -> label -> t
+    val create_ret  : ?tid:tid -> ?cond:exp -> label -> t [@@alert toplevel]
 
     (** [create_int ?cond int_number return] call interrupt subroutine  *)
-    val create_int  : ?tid:tid -> ?cond:exp -> int -> tid -> t
+    val create_int  : ?tid:tid -> ?cond:exp -> int -> tid -> t [@@alert toplevel]
 
     (** [kind jmp] evaluates to a kind of jump  *)
-    val kind : t -> jmp_kind
+    val kind : t -> jmp_kind [@@alert toplevel]
 
     (** [cond jmp] returns the jump guard condition  *)
     val cond : t -> exp
@@ -8731,7 +8966,7 @@ module Std : sig
     (** [exps jmp] returns a sequence of expressions occurring in
         different positions of a jump [jmp], e.g., in [cond],
         [target], etc.  *)
-    val exps : t -> exp seq
+    val exps : t -> exp seq [@@alert toplevel]
 
     (** [free_vars jmp] returns a set of all variables that are free
         in some expression in the jump [jmp].  *)
@@ -8739,11 +8974,11 @@ module Std : sig
 
     (** [map_exp jmp ~f] applies [f] to each expression in a [jmp],
         e.g., conditions and indirect labels.  *)
-    val map_exp : t -> f:(exp -> exp) -> t
+    val map_exp : t -> f:(exp -> exp) -> t [@@alert toplevel]
 
     (** [substitute jmp x y] substitutes [x] by [y] in all expressions
         that occur in jump [jmp] expressions.*)
-    val substitute : t -> exp -> exp -> t
+    val substitute : t -> exp -> exp -> t [@@alert toplevel]
 
     (** [with_cond jmp c] updates jump's guard condition
 
@@ -8753,7 +8988,7 @@ module Std : sig
     (** [with_kind jmp k] updates jump's kind
 
         @since 2.0.0 *)
-    val with_kind : t -> jmp_kind -> t
+    val with_kind : t -> jmp_kind -> t [@@alert toplevel]
 
     (** [with_alt jmp d] updates jump's inter-procedural destination
 
@@ -8787,7 +9022,7 @@ module Std : sig
     val reify : ?tid:tid ->
       'a Theory.var ->
       (tid * 'a Theory.value) list ->
-      t
+      t [@@alert toplevel]
 
     (** [var phi] is the left-hand-side of the [phi] term.  *)
     val var : t -> unit Theory.var
@@ -8805,13 +9040,13 @@ module Std : sig
         should be selected if a control flow enters a block, that owns
         this phi-node from a block labeled with [label]. Example,
         [create x loop_header y].*)
-    val create : ?tid:tid -> var -> tid -> exp -> t
+    val create : ?tid:tid -> var -> tid -> exp -> t [@@alert toplevel]
 
     (** [of_list var bindings] creates a phi-node, that for each pair
         of [label,exp] in the [bindings] list associates variable [var]
         with expression [exp] if control flow reaches this point via block
         labeled with [label].  *)
-    val of_list : ?tid:tid -> var -> (tid * exp) list -> t
+    val of_list : ?tid:tid -> var -> (tid * exp) list -> t [@@alert toplevel]
 
     (** [values phi] enumerate all possible values.  *)
     val values : t -> (tid * exp) seq
@@ -8904,12 +9139,12 @@ module Std : sig
       ?phis:phi term list ->
       ?defs:def term list ->
       ?jmps:jmp term list ->
-      ?tid:tid -> unit -> t
+      ?tid:tid -> unit -> t [@@alert toplevel]
 
     (** [lift block] takes a basic block of assembly instructions and
         lifts it to a list of blk terms. The first term in the list
         is the entry. *)
-    val lift : cfg -> block -> blk term list
+    val lift : cfg -> block -> blk term list [@@alert toplevel]
 
     (** [from_insn ?addr insn] creates an IR representation of a single
         machine instruction [insn].
@@ -8924,7 +9159,7 @@ module Std : sig
 
         @since 2.3.0 has [addr] parameter.
     *)
-    val from_insn : ?addr:addr -> insn -> blk term list
+    val from_insn : ?addr:addr -> insn -> blk term list [@@alert toplevel]
 
     (** [from_insns block] translates a basic block of instructions
         into IR.
@@ -8952,7 +9187,7 @@ module Std : sig
       ?fall:[`Inter of Jmp.dst | `Intra of Jmp.dst ] ->
       ?addr:addr ->
       insn list ->
-      blk term list
+      blk term list [@@alert toplevel]
 
 
     (** [split_while blk ~f] splits [blk] into two block: the first
@@ -8965,7 +9200,7 @@ module Std : sig
         Note: if [f def] is [true] for all blocks, then the second
         block will not contain any definitions, i.e., the result would
         be the same as of {{!split_bot}split_bot} function. *)
-    val split_while : t -> f:(def term -> bool) -> t * t
+    val split_while : t -> f:(def term -> bool) -> (t * t) [@@alert toplevel]
 
     (** [split_after blk def] creates two new blocks, where the first
         block contains all defintions up to [def] inclusive, the
@@ -8973,25 +9208,25 @@ module Std : sig
 
         Note: if def is not in a [blk] then the first block will contain
         all the defintions, and the second block will be empty.  *)
-    val split_after : t -> def term -> t * t
+    val split_after : t -> def term -> (t * t) [@@alert toplevel]
 
     (** [split_before blk def] is like {{!split_after}split_after} but
         [def] will fall into the second [blk] *)
-    val split_before : t -> def term -> t * t
+    val split_before : t -> def term -> (t * t) [@@alert toplevel]
 
     (** [split_top blk] returns two blocks, where first block shares
         the same tid as [blk] and has all $\Phi$-nodes of [blk], but
         has only one destination, namely the second block. Second
         block has new tidentity, but inherits all definitions and
         jumps from the [blk]. *)
-    val split_top : t -> t * t
+    val split_top : t -> (t * t) [@@alert toplevel]
 
     (** [split_top blk] returns two blocks, where first block shares
         the same tid as [blk], has all $\Phi$-nodes and definitions
         from [blk], but has only one destination, namely the second
         block. Second block has new tidentity, all jumps from the
         [blk]. *)
-    val split_bot : t -> t * t
+    val split_bot : t -> (t * t) [@@alert toplevel]
 
     (** [elts ~rev blk] return all elements of the [blk].  if [rev] is
         false or left unspecified, then elements are returned in the
@@ -9066,22 +9301,30 @@ module Std : sig
         [def] in [blk].  *)
     val occurs : t -> after:tid -> tid -> bool
 
-    (** Builder interface.  *)
+    (** Builder interface.
+
+        This interface provides an efficient way to build new
+        blocks. It is also useful, when rebuilding existing block.
+        It is the user responsibility to preserve the uniqueness of
+        identifiers throughout the program instance. *)
     module Builder : sig
-      (** This interface provides an efficient way to build new
-          blocks. It is also useful, when rebuilding existing block.
-          It is the user responsibility to preserve the uniqueness of
-          identifiers throughout the program instance.  *)
+
       type t
 
       (** [create ~tid ~phis ~defs ~jmp ()] creates a block builder.
           If [tid] parameter is specified, then the new block will
           have this tid. If any of [phis], [defs] or [jmps] parameters
-          are specified, the provtided number would be used as a hint
-          of the expected amount of the corresponding entries. Since
+          are specified, the provided number is used as a hint
+          for the expected bumber of the corresponding entries. Since
           it is the hint, it can mismatch with the actual size. The
-          hint must be a positive number.  *)
-      val create : ?tid:tid -> ?phis:int -> ?defs:int -> ?jmps:int -> unit -> t
+          hint must be a positive number.
+
+          KB-Unsafe: This function is KB-Unsafe if the tid paramater
+          is not specified (in that case a fresh tid will be generated
+          using the toplevel knowledge base). To use it inside a KB
+          computation either pass a tid or use {!init}.
+      *)
+      val create : ?tid:tid -> ?phis:int -> ?defs:int -> ?jmps:int -> unit -> t [@@alert toplevel]
 
       (** [init blk] creates a builder based on an existing
           block. If [copy_phis], [copy_defs] or [copy_jmps] is [true]
@@ -9094,7 +9337,7 @@ module Std : sig
         ?copy_phis:bool ->       (** defaults to [false] *)
         ?copy_defs:bool ->       (** defaults to [false] *)
         ?copy_jmps:bool ->       (** defaults to [false] *)
-        blk term -> t
+        blk term -> t [@@alert toplevel]
 
       (** appends a definition  *)
       val add_def : t -> def term -> unit
@@ -9130,7 +9373,7 @@ module Std : sig
     (** [reify v x] reifies Core Theory terms into an [arg] term.  *)
     val reify : ?tid:tid -> ?intent:intent ->
       'a Theory.var ->
-      'a Theory.value -> t
+      'a Theory.value -> t [@@alert toplevel]
 
 
     (** [var arg] is the left-hand-side of the [arg] term.  *)
@@ -9141,7 +9384,7 @@ module Std : sig
 
     (** [create ?intent var exp] creates an argument. If intent is
         not specified it is left unknown.   *)
-    val create : ?tid:tid -> ?intent:intent -> var -> exp -> t
+    val create : ?tid:tid -> ?intent:intent -> var -> exp -> t [@@alert toplevel]
 
     (** [lhs arg] returns a variable associated with the argument.  *)
     val lhs : t -> var
@@ -9883,6 +10126,15 @@ module Std : sig
     (** [current ()] is the current state of the knowledge base.  *)
     val current : unit -> Knowledge.state
 
+    val acquire : unit -> Knowledge.state
+
+    val release : Knowledge.state -> unit
+
+    val discard : KB.state -> unit
+
+    val with_state : (Knowledge.state -> 'a) -> 'a
+
+    val update : (Knowledge.state -> Knowledge.state) -> unit
 
     (** [reset ()] resets the knowledge state to the empty state.
 

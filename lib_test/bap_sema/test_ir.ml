@@ -1,3 +1,5 @@
+[@@@alert "-toplevel"]
+
 open Core_kernel
 open Bap.Std
 open OUnit2
@@ -107,7 +109,7 @@ let def_order = assert_vars Term.to_sequence
 let seq f ?rev def =
   assert_vars (fun t blk -> Term.(f t ?rev blk (tid def)))
 
-let look which z id blk ctxt =
+let look which z id _ ctxt =
   match z, which def_t xyz id with
   | Some z, Some x -> equal_var ctxt z (Def.lhs x)
   | None, Some _ -> assert_string "unexpected neighbour"
@@ -142,7 +144,7 @@ let before_def def blk = Blk.split_before blk def
 let top = Blk.split_top
 let bot = Blk.split_bot
 
-let lookup cls hay ctxt =
+let lookup cls hay _ =
   match Program.lookup cls program (Term.tid hay) with
   | Some t -> assert_bool "Found wrong" (Term.same hay t)
   | None -> assert_string "Not_found"
@@ -239,7 +241,7 @@ module Example = struct
     ]
 
 
-  let phi_node sub var var_ver blk blk_ver ctxt =
+  let phi_node sub var var_ver blk blk_ver _ =
     Term.enum blk_t sub |> Seq.find_map ~f:(fun blk ->
         Term.enum phi_t blk |> Seq.find ~f:(fun phi ->
             let v = Phi.lhs phi in

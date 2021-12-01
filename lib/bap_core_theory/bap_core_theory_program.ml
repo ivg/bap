@@ -256,7 +256,11 @@ module Label = struct
 
   let for_name ?package s =
     Knowledge.Symbol.intern ?package s cls >>= fun obj ->
-    Knowledge.provide name obj (Some s) >>| fun () -> obj
+    Knowledge.sequence [
+      Knowledge.provide name obj (Some s);
+      Knowledge.provide aliases obj (Set.singleton (module String) s)
+    ] >>|
+    fun () -> obj
 
   let for_addr ?package x =
     let s = Bitvec.to_string x in

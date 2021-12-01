@@ -1,3 +1,4 @@
+
 open Core_kernel
 open Bap.Std
 
@@ -37,7 +38,11 @@ type invariant = {
 
 type Exn.t += Broken_invariant of invariant
 
-let (^^) name {me} = sprintf "%s(%s)" name (Term.name me)
+let (>>) = Fn.compose
+
+let term_name t = (Tid.to_string >> Term.tid) t
+
+let (^^) name {me} = sprintf "%s(%s)" name (term_name me)
 
 let to_string = function
   | Top t -> "top" ^^ t
@@ -64,7 +69,6 @@ let level name f x = Sexp.List [
     Sexp.Atom name;
     Sexp.Atom (f x)
   ]
-let (>>) = Fn.compose
 let leaf name str t = Sexp.List [
     Sexp.Atom name;
     Sexp.Atom (String.strip (str t));
@@ -74,7 +78,7 @@ let sexp_of_t = function
   | Top _   -> Sexp.Atom "top"
   | Sub {me} -> level "sub" Sub.name me
   | Arg {me} -> level "arg" (Var.name >> Arg.lhs) me
-  | Blk {me} -> level "blk" (Tid.name >> Term.tid ) me
+  | Blk {me} -> level "blk" term_name me
   | Phi {me} -> leaf "phi" Phi.to_string me
   | Def {me} -> leaf "def" Def.to_string me
   | Jmp {me} -> leaf "jmp" Jmp.to_string me

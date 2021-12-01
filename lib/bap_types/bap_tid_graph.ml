@@ -1,6 +1,7 @@
 open Core_kernel
 open Regular.Std
 open Graphlib.Std
+open Bap_core_theory
 open Bap_ir
 
 
@@ -18,8 +19,8 @@ let of_sub sub =
             let edge = G.Edge.create sid did jid in
             G.Edge.insert edge g))
 
-let start = Tid.for_name ~package:"bap" "start-pseudo-node"
-let exit = Tid.for_name ~package:"bap" "exit-pseudo-node"
+let start : tid = KB.Global.named Theory.Program.cls "start"
+let exit : tid  = KB.Global.named Theory.Program.cls "exit"
 
 let connect_with_exit n =
   if Tid.equal n exit then ident

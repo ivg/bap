@@ -4,28 +4,59 @@ open Knowledge.Syntax
 
 let package = "bap"
 type 'a t = 'a
-type env = Knowledge.state ref
 type main = Main
 type 'p var = (main,'p option) Knowledge.slot
 
-let state = ref Knowledge.empty
-let slots = ref 0
-let env = state
+type env = {
+  mutable locked : bool;
+  mutable state : Knowledge.state;
+}
 
-let set s = state := s
-let reset () = state := Knowledge.empty
-let current () = !state
+let env = {
+  locked = false;
+  state = Knowledge.empty
+}
+
+let slots = ref 0
+
+let set s = env.state <- s
+let reset () =
+  env.state <- Knowledge.empty;
+  env.locked <- false
+
+let current () = env.state
 
 exception Conflict of Knowledge.conflict
 exception Not_found
 
+let require c =
+  if not c then Printf.exitf
+      "Aborting due to a logic error: a nested call to the toplevel\n\
+       Consult the Bap.Std.Toplevel module for more information\n\
+       Backtrace:\n%s\n"
+      (Printexc.get_backtrace ())
+      ()
+
+
+let unlock () =
+  require env.locked;
+  env.locked <- false
+
+let lock () =
+  require (not env.locked);
+  env.locked <- true
+
 let try_eval slot exp =
+  lock ();
   let cls = Knowledge.Slot.cls slot in
-  match Knowledge.run cls exp !state with
+  match Knowledge.run cls exp env.state with
   | Ok (v,s) ->
-    state := s;
+    unlock ();
+    env.state <- s;
     Ok (Knowledge.Value.get slot v)
-  | Error conflict -> Error conflict
+  | Error conflict ->
+    unlock ();
+    Error conflict
 
 let eval slot exp =
   try_eval slot exp |> function
@@ -50,9 +81,14 @@ let this =
 
 let try_exec stmt =
   let stmt = stmt >>= fun () -> this in
-  match Knowledge.run main stmt !state with
-  | Ok (_,s) -> Ok (state := s)
-  | Error conflict -> Error conflict
+  lock ();
+  match Knowledge.run main stmt env.state with
+  | Ok (_,s) ->
+    unlock ();
+    Ok (env.state <- s)
+  | Error conflict ->
+    unlock ();
+    Error conflict
 
 let exec stmt =
   try_exec stmt |> function
@@ -67,6 +103,20 @@ let put slot exp = exec @@begin
 let get slot = eval slot this |> function
   | None -> raise Not_found
   | Some x -> x
+
+let acquire () = lock (); current ()
+let release s = unlock (); set s
+let discard _ = unlock ()
+let borrow f =
+  let s = acquire () in
+  protect ~f:(fun () -> f s) ~finally:unlock
+
+let update f =
+  let s = acquire () in
+  let s = try f s with exn ->
+    discard s;
+    raise exn in
+  release s
 
 
 let () = Caml.Printexc.register_printer @@ function

@@ -46,7 +46,7 @@ module Intro(Machine : Primus.Machine.S) = struct
   open Machine.Syntax
 
   let kind t =
-    Kind.create (sprintf "user-%s" (Tid.name t))
+    Kind.create (sprintf "user-%a" Tid.pps t)
 
   let connect tid taint =
     Machine.Local.update mapper ~f:(fun m -> {

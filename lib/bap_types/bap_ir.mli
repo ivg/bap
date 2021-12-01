@@ -51,18 +51,27 @@ val jmp_t : (blk, jmp) cls
 
 module Tid : sig
   type t = tid
+  val for_name : ?package:string -> string -> t [@@alert toplevel]
+  val for_addr : ?package:string -> addr -> t [@@alert toplevel]
+  val for_ivec : ?package:string -> int -> t [@@alert toplevel]
 
-  val for_name : ?package:string -> string -> t Bap_toplevel.t
-  val for_addr : ?package:string -> addr -> t Bap_toplevel.t
-  val for_ivec : ?package:string -> int -> t Bap_toplevel.t
+  val create : unit -> t [@@alert toplevel]
+  val set_name : t -> string -> unit [@@alert toplevel]
+  val set_addr : t -> word -> unit [@@alert toplevel]
+  val name : t -> string [@@alert toplevel]
+  val from_string : string -> tid Or_error.t [@@alert toplevel]
+  val from_string_exn : string -> tid [@@alert toplevel]
+  val (!!) : string -> tid [@@alert toplevel]
+  module KB : sig
+    val create : unit -> t KB.t
+    val for_name : ?package:string -> string -> t KB.t
+    val for_addr : ?package:string -> addr -> t KB.t
+    val for_ivec : ?package:string -> int -> t KB.t
+    val set_name : tid -> string -> unit KB.t
+    val name : tid -> string KB.t
+    val from_string : string -> tid Or_error.t KB.t
+  end
 
-  val create : unit -> t Bap_toplevel.t
-  val set_name : t -> string -> unit Bap_toplevel.t
-  val set_addr : t -> word -> unit Bap_toplevel.t
-  val name : t -> string Bap_toplevel.t
-  val from_string : string -> tid Or_error.t
-  val from_string_exn : string -> tid
-  val (!!) : string -> tid
   include Regular.S with type t := t
 end
 
@@ -71,9 +80,9 @@ module Term : sig
 
   val slot : (Theory.Semantics.cls, blk term list) KB.slot
 
-  val clone : 'a t -> 'a t
+  val clone : 'a t -> 'a t [@@alert toplevel]
   val same : 'a t -> 'a t -> bool
-  val name : 'a t -> string
+  val name : 'a t -> string [@@alert toplevel]
   val tid : 'a t -> tid
   val find : ('a,'b) cls -> 'a t -> tid -> 'b t option
   val find_exn : ('a,'b) cls -> 'a t -> tid -> 'b t
@@ -193,12 +202,12 @@ end
 
 module Ir_program : sig
   type t = program term
-  val create : ?subs:sub term list -> ?tid:tid -> unit -> t
+  val create : ?subs:sub term list -> ?tid:tid -> unit -> t [@@alert toplevel]
   val lookup : (_,'b) cls -> t -> tid -> 'b term option
   val parent : ('a,'b) cls -> t -> tid -> 'a term option
   module Builder : sig
     type t
-    val create : ?tid:tid  -> ?subs:int -> unit -> t
+    val create : ?tid:tid  -> ?subs:int -> unit -> t  [@@alert toplevel]
     val add_sub : t -> sub term -> unit
     val result : t -> program term
   end
@@ -209,12 +218,13 @@ end
 module Ir_sub : sig
   type t = sub term
   val create : ?args:arg term list -> ?blks:blk term list ->
-    ?tid:tid -> ?name:string -> unit -> t
+    ?tid:tid -> ?name:string -> unit -> t  [@@alert toplevel]
   val name : t -> string
   val with_name : t -> string -> t
   module Builder : sig
     type t
-    val create : ?tid:tid -> ?args:int -> ?blks:int -> ?name:string -> unit -> t
+    val create : ?tid:tid -> ?args:int -> ?blks:int -> ?name:string ->
+      unit -> t  [@@alert toplevel]
     val add_blk : t -> blk term -> unit
     val add_arg : t -> arg term -> unit
     val result : t -> sub term
@@ -247,11 +257,23 @@ module Ir_blk : sig
     ?defs:def term list ->
     ?jmps:jmp term list ->
     ?tid:tid -> unit -> t
+  [@@alert toplevel]
+
   val split_while : t -> f:(def term -> bool) -> t * t
+  [@@alert toplevel]
+
   val split_after : t -> def term -> t * t
+  [@@alert toplevel]
+
   val split_before : t -> def term -> t * t
+  [@@alert toplevel]
+
   val split_top : t -> t * t
+  [@@alert toplevel]
+
   val split_bot : t -> t * t
+  [@@alert toplevel]
+
   val elts : ?rev:bool -> t -> elt Sequence.t
   val map_exp :
     ?skip:[`phi | `def | `jmp] list ->
@@ -278,12 +300,15 @@ module Ir_blk : sig
   module Builder : sig
     type t
     val create : ?tid:tid -> ?phis:int -> ?defs:int -> ?jmps:int -> unit -> t
+    [@@alert toplevel]
+
     val init :
       ?same_tid :bool ->
       ?copy_phis:bool ->
       ?copy_defs:bool ->
       ?copy_jmps:bool ->
       blk term -> t
+    [@@alert toplevel]
 
     val add_def : t -> def term -> unit
     val add_jmp : t -> jmp term -> unit
@@ -299,12 +324,14 @@ module Ir_def : sig
   type t = def term
 
   val reify : ?tid:tid -> 'a Theory.var -> 'a Theory.value -> t
+  [@@alert toplevel]
 
   val var : t -> unit Theory.var
   val value : t -> unit Theory.value
 
 
-  val create : ?tid:tid -> var -> exp -> t
+  val create : ?tid:tid -> var -> exp -> t [@@alert toplevel]
+
   val lhs : t -> var
   val rhs : t -> exp
   val with_lhs : t -> var -> t
@@ -323,7 +350,7 @@ module Ir_jmp : sig
 
   val reify : ?tid:tid ->
     ?cnd:Theory.Bool.t Theory.value ->
-    ?alt:dst -> ?dst:dst -> unit -> t
+    ?alt:dst -> ?dst:dst -> unit -> t [@@alert toplevel]
 
   val guard : t -> Theory.Bool.t Theory.value option
   val with_guard : t -> Theory.Bool.t Theory.value option -> t
@@ -334,20 +361,20 @@ module Ir_jmp : sig
   val indirect : 'a Theory.Bitv.t Theory.value -> dst
   val resolve : dst -> (tid,'a Theory.Bitv.t Theory.value) Either.t
 
-  val create      : ?tid:tid -> ?cond:exp -> jmp_kind -> t
-  val create_call : ?tid:tid -> ?cond:exp -> call -> t
-  val create_goto : ?tid:tid -> ?cond:exp -> label -> t
-  val create_ret  : ?tid:tid -> ?cond:exp -> label -> t
-  val create_int  : ?tid:tid -> ?cond:exp -> int -> tid -> t
-  val kind : t -> jmp_kind
+  val create      : ?tid:tid -> ?cond:exp -> jmp_kind -> t [@@alert toplevel]
+  val create_call : ?tid:tid -> ?cond:exp -> call -> t [@@alert toplevel]
+  val create_goto : ?tid:tid -> ?cond:exp -> label -> t [@@alert toplevel]
+  val create_ret  : ?tid:tid -> ?cond:exp -> label -> t [@@alert toplevel]
+  val create_int  : ?tid:tid -> ?cond:exp -> int -> tid -> t [@@alert toplevel]
+  val kind : t -> jmp_kind [@@alert toplevel]
   val cond : t -> exp
   val with_cond : t -> exp -> t
-  val with_kind : t -> jmp_kind -> t
+  val with_kind : t -> jmp_kind -> t [@@alert toplevel]
   val with_alt : t -> dst option -> t
   val with_dst : t -> dst option -> t
-  val exps : t -> exp Sequence.t
-  val map_exp : t -> f:(exp -> exp) -> t
-  val substitute : t -> exp -> exp -> t
+  val exps : t -> exp Sequence.t [@@alert toplevel]
+  val map_exp : t -> f:(exp -> exp) -> t [@@alert toplevel]
+  val substitute : t -> exp -> exp -> t [@@alert toplevel]
   val free_vars : t -> Bap_var.Set.t
   val pp_slots : string list -> Format.formatter -> t -> unit
 
@@ -360,13 +387,13 @@ module Ir_phi : sig
   val reify : ?tid:tid ->
     'a Theory.var ->
     (tid * 'a Theory.value) list ->
-    t
+    t [@@alert toplevel]
 
   val var : t -> unit Theory.var
   val options : t -> (tid * unit Theory.value) seq
 
-  val create : ?tid:tid -> var -> tid -> exp -> t
-  val of_list : ?tid:tid -> var -> (tid * exp) list -> t
+  val create : ?tid:tid -> var -> tid -> exp -> t [@@alert toplevel]
+  val of_list : ?tid:tid -> var -> (tid * exp) list -> t [@@alert toplevel]
   val lhs : t -> var
   val with_lhs : t -> var -> t
   val values : t -> (tid * exp) Sequence.t
@@ -386,12 +413,12 @@ module Ir_arg : sig
 
   val reify : ?tid:tid -> ?intent:intent ->
     'a Theory.var ->
-    'a Theory.value -> t
+    'a Theory.value -> t [@@alert toplevel]
 
   val var : t -> unit Theory.var
   val value : t -> unit Theory.value
 
-  val create : ?tid:tid -> ?intent:intent -> var -> exp -> t
+  val create : ?tid:tid -> ?intent:intent -> var -> exp -> t [@@alert toplevel]
   val lhs : t -> var
   val rhs : t -> exp
   val intent : t -> intent option
@@ -414,7 +441,7 @@ end
 
 module Call : sig
   type t = call
-  val create : ?return:label -> target:label -> unit -> t
+  val create : ?return:label -> target:label -> unit -> t [@@alert toplevel]
   val target : t -> label
   val return : t -> label option
   val with_target : t -> label -> t
@@ -426,7 +453,7 @@ end
 
 module Label : sig
   type t = label
-  val create : unit -> t
+  val create : unit -> t [@@alert toplevel]
   val direct : tid -> t
   val indirect : exp -> t
   val change : ?direct:(tid -> tid) -> ?indirect:(exp -> exp) -> t -> t

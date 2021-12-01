@@ -1,3 +1,5 @@
+[@@@alert "-toplevel"]
+
 (*
 
   This tests are based on Theorems and Lemmas from [1].
@@ -394,11 +396,6 @@ module OBII =
     (Graph.Persistent.Digraph.ConcreteBidirectionalLabeled
        (Int)(struct include Int let default = 0 end))
 
-module OBSS =
-  Graphlib.Of_ocamlgraph
-    (Graph.Persistent.Digraph.ConcreteBidirectionalLabeled
-       (Tid)(struct include Tid
-       let default = Tid.create () end))
 
 module Intu = Graphlib.Make(Int)(Unit)
 
