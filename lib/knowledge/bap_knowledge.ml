@@ -1931,6 +1931,52 @@ module Dict = struct
     | Equals     -> make2 ka (app m ka kc c a) kb (app m kb kd d b)
   [@@inline]
 
+  let merge_23 m ka a kb b  kc c kd d ke e =
+    (*           ^^^^^^^^^  ^^^^^^^^^^^^^^
+                     x             y       *)
+    match Key.Interval.relate ka kb kc ke with
+    | Meets  -> make4 ka a kb (app m kb kc c b) kd d ke e
+    | Met    -> make4 kc c kd d ke (app m ke ka a e) kb b
+    | Before -> make5 ka a kb b kc c kd d ke e
+    | After  -> make5 kc c kd d ke e ka a kb b
+    | Starts -> begin match Key.compare kb kd with
+        | 0 -> make3 ka (app m ka kc c a) kb (app m kb kd d b) ke e
+        | 1 -> make4 ka (app m ka kc c a) kd d kb b ke e
+        | _ -> make4 ka (app m ka kc c a) kb b kd d ke e
+      end
+    | Started  -> make4 ka (app m ka kc c a) kd d ke e kb b
+    | Finishes -> begin match Key.compare ka kd with
+        | 0 -> make3 kc c kd (app m kd ka a d) ke (app m ke kb b e)
+        | 1 -> make4 kc c kd d ka a ke (app m ke kb b e)
+        | _ -> make4 kc c ka a kd d ke (app m ke kb b e)
+      end
+    | Finished -> make4 ka a kc c kd d ke (app m ke kb b e)
+    | Contains -> make5 ka a kc c kd d ke e kb b
+    | Equals   -> make3 ka (app m ka kc c a) kd d kb (app m kb ke e b)
+    | Overlaps -> begin match Key.Point.relate kb kc kd with
+        | Before   -> assert false
+        | Starts   -> make4 ka a kb (app m kb kc c b) kd d ke e
+        | During   -> make5 ka a kc c kb b kd d ke e
+        | Finishes -> make4 ka a kc c kb (app m kb kd d b) ke e
+        | After    -> make5 ka a kc c kd d kb b ke e
+      end
+    | Overlapped -> begin match Key.Point.relate ka kd ke with
+        | Before   -> make5 kc c ka a kd d ke e kb b
+        | Starts   -> make4 kc c kd (app m kd ka a d) ke e kb b
+        | During   -> make5 kc c kd d ka a ke e kb b
+        | Finishes -> make4 kc c kd d ke (app m ke ka a e) kb b
+        | After    -> assert false
+      end
+    | During -> begin match Key.Point.relate kd ka kb with
+        | Before   -> make5 kc c kd d ka a kb b ke e
+        | Starts   -> make4 kc c kd (app m kd ka a d) kb b ke e
+        | During   -> make5 kc c ka a kd d kb b ke e
+        | Finishes -> make4 kc c ka a kd (app m kd kb b d) ke e
+        | After    -> make5 kc c ka a kb b kd d ke e
+      end
+  [@@inline]
+  [@@specialize]
+
   let merge m x y =
     if phys_equal x y then x
     else match x,y with
@@ -1947,6 +1993,10 @@ module Dict = struct
         merge_13 m ka a kb b kc c kd d
       | T2 (ka, a, kb, b), T2 (kc, c, kd, d) ->
         merge_22 m ka a kb b kc c kd d
+      | T2 (ka, a, kb, b), T3 (kc, c, kd, d, ke, e) ->
+        merge_23 m ka a kb b kc c kd d ke e
+      | T3 (kc, c, kd, d, ke, e), T2 (ka, a, kb, b) ->
+        merge_23 m ka a kb b kc c kd d ke e
       | _ -> fold_merge m x y
   [@@inline]
 
