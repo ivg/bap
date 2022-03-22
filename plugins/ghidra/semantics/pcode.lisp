@@ -159,86 +159,118 @@
 (defun BOOL_XOR (tr r tx x ty y)
   (set# tr r (get# logxor tx x ty y)))
 
+(defparameter fp-rmode 'rne
+  "the floating-point operations rounding mode")
+
+(defparameter fp-format 'ieee754_binary
+  "the floating-point representation")
+
+
+(defmacro fp-binary (name tr r tx x ty y)
+  (set# tr r
+        (intrinsic
+         (symbol-concat name fp-rmode fp-format :sep '_)
+         (get# tx x)
+         (get# ty y)
+         :result tr)))
+
+(defmacro fp-unary (name tr r tx x)
+  (set# tr r
+        (intrinsic
+         (symbol-concat name fp-format :sep '_)
+         (get# tx x)
+         :result tr)))
+
+(defmacro fp-unary/rmode (name tr r tx x)
+  (set# tr r
+        (intrinsic
+         (symbol-concat name fp-rmode fp-format :sep '_)
+         (get# tx x)
+         :result tr)))
+
+(defmacro fp-predicate (name tr r tx x)
+  (set# tr r
+        (intrinsic
+         (symbol-concat 'is name fp-format :sep '_)
+         (get# tx x)
+         :result tr)))
+
+(defun fp-order (tx x ty y)
+  (intrinsic 'forder_ieee754_binary
+             (get# tx x)
+             (get# ty y)
+             :result 8))
+
+(defun fp-round (tr tx x)
+  (intrinsic
+   (symbol-concat 'fround fp-rmode fp-format :sep '_)
+   (get# tx x)
+   :result tr))
+
+(defun INT2FLOAT (tr r tx x)
+  (set# tr r
+        (intrinsic
+         (symbol-concat 'cast_sfloat fp-rmode fp-format :sep '_)
+         (get# tx x)
+         :result tr)))
+
+(defun TRUNC (tr r tx x)
+  (set# tr r
+        (intrinsic
+         (symbol-concat 'cast_sint 'rtz fp-format :sep '_)
+         (get# tx x)
+         :result tr)))
+
+(defun FLOAT2FLOAT (tr r tx x)
+  (set# tr r
+        (intrinsic
+         (symbol-concat 'fconvert fp-rmode fp-format)
+         (get# tx x)
+         :result tr)))
 
 (defun FLOAT_ADD (tr r tx x ty y)
-  (set# tr r (intrinsic '__fadd_rne_ieee754_binary64
-                        (get# tx x) (get# ty y)
-                        :result 64)))
+  (fp-binary 'fadd tr r tx x ty y))
 
-;; the idea is to declare primitives and then depending on
-;; the context use them.
-;; The context should specify the set of logics that we would like
-;; to use and each primitive operation belongs to some logic.
+(defun FLOAT_SUB (tr r tx x ty y)
+  (fp-binary 'fsub tr r tx x ty y))
 
-;; (declare (context empty-float-theory))
+(defun FLOAT_DIV (tr r tx x ty y)
+  (fp-binary 'fdiv tr r tx x ty y))
 
-;; (in-package core)
-;; (defun ieee754-fadd.rne (x y)
-;;   (intrinsic __fadd_rne_ieee754_bin64
-;;              :src1  x y
-;;              :oreg x))
+(defun FLOAT_MULT (tr r tx x ty y)
+  (fp-binary 'fmul tr r tx x ty y))
 
-;; (defun normalize-typ (typ)
-;;   (if (is-symbol typ) (word-size)))
+(defun FLOAT_NEG (tr r tx x)
+  (fp-unary 'fneg tr r tx x))
 
-;; (defun FLOAT_ADD (tr r tx x ty y)
-;;   (set# tr r (intrinsic '__fadd_rne_ieee754_bin64
-;;                         (get# tx x)
-;;                         (get# ty y)
-;;                         :writes 'RAX 64
-;;                         :return tr)))
-;; intrinsic NAME ARGS... OUTPUTS...
-;; calls the intrinsic function passing to it arguments
-;; in the specified order. Then N-th argument is passed
-;; via the variable intrinsic:xN.
-;; The optional OUTPUTS defines how the intrinisc returns
-;; the information back (if it does). If no OUTPUTS are
-;; specified, then the intrinsic doesn't produce any observable
-;; effects and is reified to the call that falls through.
-;; The following keyworded arguments are allowed, :return,
-;; :aborts, :writes, and :stores.
-;;
-;; :RESULT SIZE
-;;
-;; The intrinsic is evaluated to a bitvector with SIZE bits (which has
-;; to be a statically known integer), therefore the whole intrinisc
-;; form could be assigned to a value. The result is returned from the
-;; intrinsic via the intrinsic:result variable.
-;;
-;; :WRITES REG SIZE?
-;;
-;; The intrinsic writes the specified variable REG. If REG is the target
-;; register then SIZE is optional. This parameter can be specified several
-;; times. The value of REG is returned from the intrinsic vi
-;;
+(defun FLOAT_ABS (tr r tx x)
+  (fp-unary 'fabs tr r tx x))
 
-;; (defun CPUID ()
-;;   (set EAX (intrinsic '__example EAX EBX (load-word EDX)
-;;                       :result 32
-;;                       :writes 'EBX
-;;                       :writes 'ECX
-;;                       :writes 'EDX
-;;                       :stores (+ EAX 12) 32)))
+(defun FLOAT_SQRT (tr r tx x)
+  (fp-unary/rmode 'fsqrt tr r tx x))
 
-;; reified to
-;;
-;; intrinsic:x0 := EAX
-;; intrinsic:x1 := EBX
-;; intrinsic:x2 := mem[EDX]:32
-;; call __example with return @next
-;;
-;; next:
-;; EBX := intrinsic:y0
-;; ECX := intrinsic:y1
-;; EDX := intrinsic:y2
-;; mem := mem with [EAX+12]:32 <- intrinsic:y3
-;;
+(defun FLOAT_NAN (tr r tx x)
+  (fp-predicate 'fnan tr r tx x))
 
+(defun FLOAT_EQUAL (tr r tx x ty y)
+  (set# tr r (is-zero (fp-order tx x ty y))))
 
-;; (defun FLOAT_ADD (tr r tx x ty y)
-;;   (set# tr r (apply tr :__ieee754_add_rne (get# tx x) (get# ty y))))
+(defun FLOAT_NOTEQUAL (tr r tx x ty y)
+  (set# tr r (not (is-zero (fp-order tx x ty y)))))
 
+(defun FLOAT_LESS (tr r tx x ty y)
+  (set# tr r (is-negative (fp-order tx x ty y))))
 
-;; we can implement an intrinsic reification for each unhandled LLVM
-;; instruction, e.g.,
-;; (defgeneric (llvm- (arch :word)))
+(defun FLOAT_LESSEQUAL (tr r tx x ty y)
+  (set# tr r (not (is-positive tx x ty y))))
+
+(defun FLOAT_ROUND (tr r tx x)
+  (set# tr r (fp-round tr tx x)))
+
+(defun FLOAT_CEIL (tr r tx x)
+  (let ((fp-rmode 'rtp))
+    (set# tr r (fp-round tr tx x))))
+
+(defun FLOAT_FLOOR (tr r tx x)
+  (let ((fp-rmode 'rtn))
+    (set# tr r (fp-round tr tx x))))
