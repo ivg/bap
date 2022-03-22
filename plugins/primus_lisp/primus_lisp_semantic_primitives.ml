@@ -201,6 +201,12 @@ let export = Primus.Lisp.Type.Spec.[
     "is-symbol", one any @-> bool,
     "(is-symbol X) is true if X has a symbolic value.";
 
+    "symbol-concat", all sym @-> sym,
+    "(symbol-concat S1 S2 .. SN OPT?) concatenates symbols
+    S1 till S2. An optional separator keyworded argument
+    takes form :sep SEP, where SEP is the separator that is
+    used to concatenate symbols";
+
     "alias-base-register", one int @-> int,
     "(alias-base-register x) if X has a symbolic value that is an
      aliased register returns the base register";
@@ -307,6 +313,8 @@ module Primitives(CT : Theory.Core)(T : Target) = struct
   let set_const v x =
     KB.Value.put Primus.Lisp.Semantics.static v (Some x)
   let const_int s x = CT.int s x >>| fun v -> set_const v x
+  let set_sym n v =
+    KB.Value.put Primus.Lisp.Semantics.symbol v (Some n)
   let int s x = const_int s @@ Bitvec.(int x mod modulus (size s))
   let true_ = CT.b1 >>| fun v -> set_const v Bitvec.one
   let false_ = CT.b0 >>| fun v -> set_const v Bitvec.zero
@@ -753,12 +761,28 @@ module Primitives(CT : Theory.Core)(T : Target) = struct
       | _ -> illformed ":result may occur once and with a single argument"
   end
 
+
+  let make_symbol s name =
+    intern name >>= const_int s >>| set_sym name |> forget
+
+  let symbol_concat s syms =
+    List.map syms ~f:symbol |> Option.all |> function
+    | None -> illformed "require all symbols"
+    | Some syms ->
+      let syms,sep =
+        List.split_while syms ~f:(Fn.non@@String.equal ":sep") in
+      let* sep = match sep with
+        | [] -> KB.return ""
+        | [_; sep] -> KB.return sep
+        | _ -> illformed ":sep must be last and followed by an argument" in
+      make_symbol s (String.concat ~sep syms)
+
   let symbol s v =
     match symbol v with
-    | Some name ->
-      intern name >>= const_int s |> forget
+    | Some name -> make_symbol s name
     | None ->
       illformed "symbol requires a symbolic value"
+
 
   let is_symbol v =
     forget@@match KB.Value.get Primus.Lisp.Semantics.symbol v with
@@ -933,6 +957,7 @@ module Primitives(CT : Theory.Core)(T : Target) = struct
     | "get-program-counter",[]
     | "get-current-program-counter",[] -> pure@@get_pc s lbl
     | "set-symbol-value",[sym;x] -> data@@set_symbol t sym x
+    | "symbol-concat",syms -> pure@@symbol_concat s syms
     | "symbol",[x] ->  pure@@symbol s x
     | "is-symbol", [x] -> pure@@is_symbol x
     | "alias-base-register", [x] -> pure@@alias_base_register t x
