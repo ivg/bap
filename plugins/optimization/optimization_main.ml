@@ -124,6 +124,7 @@ let free_vars prog =
   collect sub_t prog ~f:(fun sub -> sub_args sub ++ sub_free sub)
 
 let process_sub free can_touch sub =
+  debug "optimizing %s" (Sub.name sub);
   let rec loop dead s =
     let s = propagate_consts can_touch s in
     let dead' = compute_dead can_touch free s in
@@ -131,6 +132,7 @@ let process_sub free can_touch sub =
     if Set.is_empty dead' then s, dead
     else loop dead (clean can_touch dead' s) in
   let sub', dead = loop Tid.Set.empty (Sub.ssa sub) in
+  debug "%s has %d dead terms" (Sub.name sub) (Set.length dead);
   O.create dead sub'
 
 let digest_of_sub sub level =

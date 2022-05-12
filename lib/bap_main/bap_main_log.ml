@@ -51,7 +51,8 @@ let string_of_level = function
   | Event.Log.Error -> "error"
 
 let print ppf {Event.Log.level; section; message} =
-  fprintf ppf "%s.%s> %s@." section (string_of_level level) message
+  let time = Sys.time () |> Float.to_int in
+  fprintf ppf "%04d: %s.%s> %s@." time section (string_of_level level) message
 
 let print_message ppf msg =
   print ppf msg;
