@@ -4,6 +4,8 @@ open Bap.Std
 
 let package = "bap"
 
+
+
 type r256 and r128 and r80 and r64 and r32 and r16 and r8
 
 type 'a bitv = 'a Theory.Bitv.t Theory.Value.sort
@@ -236,9 +238,11 @@ let i186 = Theory.Target.declare ~package "i186"
     ~parent:i86
     ~nicknames:["80186"; "186"]
 
+
 let i286 = Theory.Target.declare ~package "i286"
     ~parent:i186
     ~nicknames:["80286"; "286"]
+
 
 let i386 = Theory.Target.declare ~package "i386"
     ~parent:i286
@@ -249,6 +253,8 @@ let i386 = Theory.Target.declare ~package "i386"
     ~vars:M32.i386
     ~regs:M32.i386regs
     ~aliasing:M32.aliasing
+
+
 
 let i486 = Theory.Target.declare ~package "i486"
     ~parent:i386
@@ -282,7 +288,47 @@ let amd64 = Theory.Target.declare ~package "amd64"
     ~aliasing:M64.aliasing
 
 
-let family = [amd64; i686; i586; i486; i386; i86]
+let family = [amd64; i686; i586; i486; i386; i186; i86]
+
+
+module Abi = struct
+  let abi = Theory.Abi.declare ~package
+  let cdecl = abi "cdecl"
+  let pascal = abi "pascal"
+  let fortran = abi "fortran"
+  let fastcall = abi "fastcall"
+  let stdcall = abi "stdcall"
+  let thiscall = abi "thiscall"
+  let vectorcall = abi "vectorcall"
+  let watcomstack = abi "watcom-stack"
+  let watcomregs = abi "watcom-regs"
+  let ms = abi "ms"
+  let sysv = abi "sysv"
+
+  let i86_abis = [
+    cdecl;
+    pascal;
+    fortran;
+    fastcall;
+  ]
+
+  let ia32_abis = [
+    cdecl;
+    stdcall;
+    fastcall;
+    pascal;
+    watcomregs;
+    watcomstack
+  ]
+
+  let amd64_abis = [
+    ms;
+    vectorcall;
+    sysv;
+  ]
+
+end
+
 
 let enable_loader () =
   let open KB.Syntax in
