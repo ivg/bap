@@ -80,10 +80,6 @@ module Aapcs64 = struct
   open Arg.Let
   open Arg.Syntax
 
-  let is_floating = function
-    | `Basic {C.Type.Spec.t=#C.Type.real} -> true
-    | _ -> false
-
   let data_model t =
     let bits = Theory.Target.bits t in
     new C.Size.base (if bits = 32 then `ILP32 else `LP64)
@@ -127,7 +123,7 @@ module Aapcs64 = struct
         ] in
 
     let arg refs iregs fregs r =
-      if is_floating r
+      if C.Type.is_real r
       then pass_float iregs fregs r
       else pass_integer refs iregs r in
 
