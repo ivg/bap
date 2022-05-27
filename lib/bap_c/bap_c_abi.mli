@@ -387,11 +387,11 @@ module Arg : sig
 
   (** [size t] is the size in bits of an object of type [t].
 
-      The computation is rejected if the size is unknown.
+      The computation is rejected if the size is unknown, i.e., the
+      type is incomplete.
 
       @since 2.5.0 *)
   val size : ctype -> int t
-
 
   (** [require cnd] rejects the computation if [cnd] doesn't hold.
 
