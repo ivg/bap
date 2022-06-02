@@ -137,3 +137,16 @@ class base :  model -> object
     (** the size of a scalar data type.  *)
     method scalar : scalar -> size
   end
+
+
+type location = {
+  offset : bits;
+  size : bits;
+  t : t;
+}
+
+type value =
+  | Vector of (string * value * location) list
+  | Scalar of location
+
+val layout : #base -> t -> value option

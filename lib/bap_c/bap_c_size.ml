@@ -116,3 +116,60 @@ class base (m : model) = object(self)
           | Some sz' ->
             Some (sz + sz' + padding (self#alignment field) sz))
 end
+
+type location = {
+  offset : bits;
+  size : bits;
+  t : t;
+}
+
+type value =
+  | Vector of (string * value * location) list
+  | Scalar of location
+
+open Option.Monad_infix
+
+let location ?(offset=0) t size = {
+  t; size; offset
+}
+
+let scalar ?offset t size = Scalar (location ?offset t size)
+
+let vector xs = Vector xs
+
+let rec layout : #base -> t -> value option = fun model t ->
+  model#bits t >>= fun size -> match t with
+  | `Void -> None
+  | `Basic _
+  | `Pointer _
+  | `Function _ -> Some (scalar t size)
+  | `Array {t={size=None}} -> None
+  | `Array {t={element; size=Some elts}} ->
+    model#bits element >>= fun size ->
+    layout model element >>| fun value ->
+    vector @@ List.init elts ~f:(fun _ ->
+        "",value,location element size)
+  | `Structure t -> structure model t
+  | `Union t -> union model t
+
+and structure : #base -> compound unqualified -> _ =
+  fun size {t={fields}} ->
+  let open Option.Monad_infix in
+  List.fold fields ~init:(Some (0,[])) ~f:(fun acc (name,field) ->
+      acc >>= fun (off,fields) ->
+      size#bits field >>= fun sz ->
+      layout size field >>| fun value ->
+      let offset = off + padding (size#alignment field) off in
+      let field = name,value,location ~offset field sz in
+      (offset+sz,field::fields)) |> function
+  | None -> None
+  | Some (_,fields) -> Some (vector (List.rev fields))
+
+and union : #base -> compound unqualified -> _ =
+  fun size {t={fields}} ->
+  List.map fields ~f:(fun (name,field) ->
+      size#bits field >>= fun sz ->
+      layout size field >>| fun value ->
+      name,value,location field sz) |>
+  Option.all >>|
+  vector
