@@ -40,6 +40,8 @@ let select arg options =
   | Some action -> action
   | None -> Arg.reject ()
 
+let seq xs arg = Arg.List.iter xs ~f:(fun x -> x arg)
+
 let skip _ = Arg.return ()
 
 let make_return t k = match t with
@@ -85,13 +87,18 @@ let ia32 t k =
   let pass = Arg.memory in
   let return r = make_return r @@ fun size -> [
       C.Type.is_real, Arg.register frets;
-      is_big size, Arg.memory;
+      is_big size, seq [
+        Arg.reference irets;
+        Arg.hidden;
+      ];
       otherwise, Arg.registers irets;
     ] in
   k @@ fun ?(return=return) ?(pass=pass) () ->
-  Arg.define ~return:(return r) @@
-  Arg.List.iter args ~f:(fun (_,arg) ->
-      pass arg)
+  Arg.define ~return:(return r) @@ Arg.sequence [
+    Arg.rebase 1;
+    Arg.List.iter args ~f:(fun (_,arg) ->
+        pass arg)
+  ]
 
 (* stdcall, cdecl, watcom-stack, or ms32 *)
 let cdecl t = ia32 t @@ fun accept -> accept ()
@@ -234,15 +241,17 @@ let sysv t =
       union_fields size fields >>| partition
     | _ -> Arg.return [] in
 
+  let registers = Arg.registers ~rev:true ~limit:2 in
+
   let pass_compound memory iregs vregs t =
     Arg.choice [
       compound_fields t >>= begin function
         | [`Int] -> Arg.register iregs t
         | [`Sse] -> Arg.register vregs t
-        | [`Int; `Int] -> Arg.registers iregs t
+        | [`Int; `Int] -> registers iregs t
         | [`Int; `Sse] -> Arg.split iregs vregs t
         | [`Sse; `Int] -> Arg.split vregs iregs t
-        | [`Sse; `Sse] -> Arg.registers vregs t
+        | [`Sse; `Sse] -> registers vregs t
         | _ -> Arg.reject ()
       end;
       memory t;
@@ -254,7 +263,7 @@ let sysv t =
         is_large bits, Arg.memory;
         is_integer, Arg.register iregs;
         is_sse, Arg.register vregs;
-        is_csse, Arg.registers vregs;
+        is_csse, registers vregs;
         is_compound, pass_compound Arg.memory iregs vregs
       ]) in
 
@@ -262,7 +271,7 @@ let sysv t =
       is_large bits, Arg.reference iregs;
       is_integer, Arg.register irets;
       is_sse, Arg.register vrets;
-      is_csse, Arg.registers vrets;
+      is_csse, registers vrets;
       is_compound, pass_compound (Arg.reference iregs) irets vrets;
     ] in
   Arg.define ~return args
