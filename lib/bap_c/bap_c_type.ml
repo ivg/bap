@@ -300,8 +300,8 @@ let pp_cvr ppf {Qualifier.const;volatile;restrict} =
     (pp_qualifier "restrict") restrict
 
 let pp_size ppf = function
-  | None -> Format.fprintf ppf "[]"
-  | Some size -> Format.fprintf ppf "[%d]" size
+  | None -> ()
+  | Some size -> Format.fprintf ppf "%d" size
 
 let pp_enum_value ppf = function
   | None -> Format.fprintf ppf ","
@@ -347,7 +347,7 @@ let rec pp ppf t = match (t : t) with
     Format.fprintf ppf "void"
   | `Array { qualifier; t={ element; size }; attrs } ->
     Format.fprintf ppf "@[<h>%a%a%a[%a]@]"
-      pp_attrs attrs pp_cvr qualifier pp element pp_size size
+      pp_attrs attrs pp_cvr qualifier pp_incomplete element pp_size size
   |`Basic { qualifier; t; attrs } ->
     Format.fprintf ppf "@[<h>%a%a%a@]"
       pp_attrs attrs pp_cv qualifier pp_basic t
@@ -356,7 +356,7 @@ let rec pp ppf t = match (t : t) with
       pp_proto proto pp_attrs attrs
   | `Pointer { qualifier; t; attrs } ->
     Format.fprintf ppf "@[<h>%a%a%a*@]"
-      pp_attrs attrs pp t pp_cvr qualifier
+      pp_attrs attrs pp_incomplete t pp_cvr qualifier
   | `Union { t={name;fields}; attrs }
   | `Structure { t={name;fields}; attrs } as t ->
     let kind = if is_structure t then "struct" else "union" in
@@ -374,7 +374,7 @@ and pp_arg ppf (name,t) =
 and pp_fields ppf fields =
   Format.pp_print_list pp_field ppf fields
 and pp_field ppf (name,t) =
-  Format.fprintf ppf "%a %s;" pp t name
+  Format.fprintf ppf "%a %s;" pp_incomplete t name
 and pp_incomplete ppf t = match (t : t) with
   | `Union { t={name} }
   | `Structure { t={name} } as t ->
