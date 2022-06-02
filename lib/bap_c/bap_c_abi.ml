@@ -527,14 +527,14 @@ module Arg = struct
 
   let concat = List.reduce_exn ~f:Bil.concat
 
-  let registers ?limit file t =
+  let registers ?(rev=false) ?limit file t =
     let* s = Arg.get () in
     let* bits = size t in
     let* regs_needed = registers_needed file bits in
     let limit = Option.value limit ~default:regs_needed in
     require (regs_needed <= limit) >>= fun () ->
     let* args = Arena.popn ~n:regs_needed s file in
-    push_arg t @@ concat args
+    push_arg t @@ concat (if rev then List.rev args else args)
 
   let align_even file =
     let* s = Arg.get () in
@@ -556,15 +556,7 @@ module Arg = struct
 
   let reference file t =
     with_hidden @@ fun () ->
-    register file (`Pointer C.Type.Spec.{
-        t;
-        attrs = [];
-        qualifier = C.Type.Qualifier.{
-            const = false;
-            volatile = false;
-            restrict = false;
-          }
-      })
+    register file (C.Type.pointer t)
 
   let update_stack f =
     let* s = Arg.get () in
@@ -583,7 +575,15 @@ module Arg = struct
     let* bits = size t in
     update_stack @@ Stack.add t (data s.ruler t) bits
 
+  let hidden t =
+    with_hidden @@ fun () ->
+    memory (C.Type.pointer t)
+
   let skip_memory bits = update_stack @@ Stack.skip bits
+
+  let rebase slots =
+    let* {target} = Arg.get () in
+    skip_memory (slots * Theory.Target.data_addr_size target)
 
   let load t bits sp base =
     let mem = Var.reify (Theory.Target.data t) in
