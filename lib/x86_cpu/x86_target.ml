@@ -296,8 +296,7 @@ module Abi = struct
   open Bap_c.Std
 
   module Arg = C.Abi.Arg
-  open Arg.Let
-  open Arg.Syntax
+  open Arg.Language
 
   module Abi = struct
     let abi = Theory.Abi.declare ~package
@@ -315,17 +314,12 @@ module Abi = struct
     let darwin = abi "darwin"
   end
 
-  let either preds thing = List.exists preds ~f:(fun is -> is thing)
-  let choice options arg =
-    Arg.choice (List.map options ~f:(fun f -> f arg))
-
-  let otherwise = Fn.const true
 
   let is_integer =
-    either C.Type.[is_integer; is_pointer; is_function]
+    any C.Type.[is_integer; is_pointer; is_function]
 
-  let is_compound =
-    either C.Type.[is_structure; is_union]
+  let is_composite =
+    any C.Type.[is_structure; is_union]
 
   let is_sse : C.Type.t -> bool = function
     | `Basic {t=(`float|`double)} -> true
@@ -339,23 +333,13 @@ module Abi = struct
     | `Basic {t=`long_double} -> true
     | _ -> false
 
-
-  let select arg options =
-    List.find_map options ~f:(fun (cnd,action) ->
-        if cnd arg then Some (action arg) else None) |> function
-    | Some action -> action
-    | None -> Arg.reject ()
-
-  let seq xs arg = Arg.List.iter xs ~f:(fun x -> x arg)
-
   let skip _ = Arg.return ()
 
   let make_return t k = match t with
     | `Void -> Arg.return ()
     | t ->
       let* size = Arg.size t in
-      select t (k size)
-
+      select (k size) t
 
   let arena ?low t names = Arg.Arena.of_exps @@
     List.map names ~f:(fun name ->
@@ -369,44 +353,36 @@ module Abi = struct
 
   let ia16 memory t =
     let data = new C.Size.base `LP32 in
-    C.Abi.define t data @@ fun _ {C.Type.Proto.return=r; args} ->
+    install t data @@ fun declare ->
     let* irets = arena t ["AX"; "DX"] in
-    let return = match r with
-      | `Void -> Arg.return ()
-      | r -> Arg.choice [
-          Arg.registers irets r;
-          memory r;
-        ] in
-    Arg.define ~return @@
-    Arg.List.iter args ~f:(fun (_,arg) -> memory arg)
+    let return ~alignment:_ _ = choose [
+        Arg.registers irets;
+        memory;
+      ] in
+    declare ~return @@ fun ~alignment:_ _ -> memory
 
   let cdecl16 = ia16 Arg.memory
-
-  (* pascal or fortran *)
   let pascal16 = ia16 Arg.push
 
 
   let ia32 t k =
     let data = new C.Size.base `ILP32 in
-    let is_big size _ = size > 64 in
-    C.Abi.define t data @@ fun _ {C.Type.Proto.return=r; args} ->
+    install t data @@ fun describe ->
     let* irets = arena t ["EAX"; "EDX"] in
     let* frets = arena t ["ST0"] in
     let pass = Arg.memory in
-    let return r = make_return r @@ fun size -> [
+    let return ~alignment:_ size = select [
         C.Type.is_real, Arg.register frets;
-        is_big size, seq [
+        is (size > 64), combine [
           Arg.reference irets;
           Arg.hidden;
         ];
         otherwise, Arg.registers irets;
       ] in
+    let* () = Arg.rebase 1 in
     k @@ fun ?(return=return) ?(pass=pass) () ->
-    Arg.define ~return:(return r) @@ Arg.sequence [
-      Arg.rebase 1;
-      Arg.List.iter args ~f:(fun (_,arg) ->
-          pass arg)
-    ]
+    describe ~return @@ fun ~alignment:_ _ -> pass
+
 
   (* stdcall, cdecl, watcom-stack, or ms32 *)
   let cdecl t = ia32 t @@ fun accept -> accept ()
@@ -416,16 +392,16 @@ module Abi = struct
     let* iregs = arena t ["ECX"; "EDX"] in
     let pass arg =
       let* size = Arg.size arg in
-      select arg [
-        either [
+      select [
+        any [
           is_big size;
           C.Type.is_floating;
         ], Arg.memory;
-        otherwise, choice [
+        otherwise, choose [
           Arg.register iregs;
           Arg.memory;
         ]
-      ] in
+      ] arg in
     override ~pass ()
 
   let watcomregs t = ia32 t @@ fun override ->
@@ -439,17 +415,16 @@ module Abi = struct
   (* aka borland register *)
   let pascal t = ia32 t @@ fun override ->
     let* iregs = arena t ["eax"; "edx"; "ecx"] in
-    let pass arg = select arg [
-        either C.Type.[is_cint; is_char; is_pointer;],
-        choice Arg.[register iregs; memory];
-      ] in
+    let pass arg = select [
+        any C.Type.[is_cint; is_char; is_pointer],
+        choose Arg.[register iregs; memory];
+      ] arg in
     override ~pass ()
 
 
   let ms64 t =
     let data = new C.Size.base `LP64 in
-    let is_big size _ = size > 64 in
-    C.Abi.define t data @@ fun _ {C.Type.Proto.return=r; args} ->
+    install t data @@ fun describe ->
     let* iregs = arena t ["rcx"; "rdx"; "r8"; "r9"] in
     let* irets = arena t ["rax"; "rdx"] in
     let* vregs = arena t ~low:64 @@ List.init 4 ~f:(sprintf "ymm%d") in
@@ -460,25 +435,21 @@ module Abi = struct
         pass arena arg;
         Arg.List.iter coarena ~f:Arg.discard
       ] in
-    let pass how arena = choice [
+    let pass how arena = choose [
         use how arena;
         Arg.memory;
       ] in
-    let args = Arg.List.iter args ~f:(fun (_,t) ->
-        let* size = Arg.size t in
-        select t [
-          is_big size, pass Arg.reference iregs;
-          C.Type.is_floating, pass Arg.register vregs;
-          otherwise, pass Arg.register iregs;
-        ]) in
-    let return = make_return r @@ fun size -> [
+    let return ~alignment:_ size = select [
         is_x87, pass Arg.reference iregs;
         C.Type.is_floating, pass Arg.register vrets;
-        is_big size, pass Arg.reference iregs;
+        is (size > 64), pass Arg.reference iregs;
         otherwise, pass Arg.register irets;
       ] in
-    Arg.define ~return args
-
+    describe ~return @@ fun ~alignment:_ size -> select [
+      is (size > 64), pass Arg.reference iregs;
+      C.Type.is_floating, pass Arg.register vregs;
+      otherwise, pass Arg.register iregs;
+    ]
 
   let merge_kinds k1 k2 = match k1,k2 with
     | `Nil, t | t, `Nil -> t
@@ -506,9 +477,7 @@ module Abi = struct
 
   let sysv t =
     let data = new C.Size.base `LP64 in
-    let is_large bits _ = bits > 128 in
-    C.Abi.define t data @@ fun _ {C.Type.Proto.return=r; args} ->
-
+    install t data @@ fun describe ->
     let* iregs = arena t ["rdi"; "rsi"; "rdx"; "rcx"; "r8"; "r9"] in
     let* vregs = arena t ~low:64 @@ List.init 8 ~f:(sprintf "ymm%d") in
     let* irets = arena t ["rax"; "rdx"] in
@@ -540,7 +509,7 @@ module Abi = struct
           | _ -> Arg.reject ()) >>| fun (_,acc) ->
       List.rev acc |> List.concat in
 
-    let compound_fields : C.Type.t -> _ list Arg.t = function
+    let composite_fields : C.Type.t -> _ list Arg.t = function
       | `Structure {t} -> fields t >>| partition
       | `Union {t={fields}} as s ->
         let* size = Arg.size s in
@@ -549,9 +518,9 @@ module Abi = struct
 
     let registers = Arg.registers ~rev:true ~limit:2 in
 
-    let pass_compound memory iregs vregs t =
+    let pass_composite memory iregs vregs t =
       Arg.choice [
-        compound_fields t >>= begin function
+        composite_fields t >>= begin function
           | [`Int] -> Arg.register iregs t
           | [`Sse] -> Arg.register vregs t
           | [`Int; `Int] -> registers iregs t
@@ -563,24 +532,20 @@ module Abi = struct
         memory t;
       ] in
 
-    let args = Arg.List.iter args ~f:(fun (_,arg) ->
-        let* bits = Arg.size arg in
-        select arg [
-          is_large bits, Arg.memory;
-          is_integer, Arg.register iregs;
-          is_sse, Arg.register vregs;
-          is_csse, registers vregs;
-          is_compound, pass_compound Arg.memory iregs vregs
-        ]) in
-
-    let return = make_return r @@ fun bits -> [
-        is_large bits, Arg.reference iregs;
+    let return ~alignment:_ bits = select [
+        is (bits > 128), Arg.reference iregs;
         is_integer, Arg.register irets;
         is_sse, Arg.register vrets;
         is_csse, registers vrets;
-        is_compound, pass_compound (Arg.reference iregs) irets vrets;
+        is_composite, pass_composite (Arg.reference iregs) irets vrets;
       ] in
-    Arg.define ~return args
+    describe ~return @@ fun ~alignment:_ bits -> select [
+      is (bits > 128), Arg.memory;
+      is_integer, Arg.register iregs;
+      is_sse, Arg.register vregs;
+      is_csse, registers vregs;
+      is_composite, pass_composite Arg.memory iregs vregs
+    ]
 
 
   let calling_conventions = [
