@@ -278,18 +278,15 @@ let i686 = Theory.Target.declare ~package "i686"
     ~regs:M32.i686regs
     ~aliasing:M32.aliasing
 
-let amd64 = Theory.Target.declare ~package "amd64"
+let amd64 = Theory.Target.declare ~package "x86_64"
     ~parent:i686
-    ~nicknames:["x64"; "x86_64"; "x86-64"; ]
+    ~nicknames:["amd64"; "x64"; "x86-64"; ]
     ~bits:64
     ~data:M64.data
     ~code:M64.data
     ~vars:M64.vars
     ~regs:M64.regs
     ~aliasing:M64.aliasing
-
-
-let family = [amd64; i686; i586; i486; i386; i186; i86]
 
 
 module Abi = struct
@@ -300,20 +297,17 @@ module Abi = struct
 
   module Abi = struct
     let abi = Theory.Abi.declare ~package
-    let cdecl = abi "cdecl"
+    let cdecl = Theory.Abi.cdecl
     let pascal = abi "pascal"
     let fortran = abi "fortran"
-    let fastcall = abi "fastcall"
-    let stdcall = abi "stdcall"
+    let fastcall = Theory.Abi.fastcall
+    let stdcall = Theory.Abi.stdcall
     let thiscall = abi "thiscall"
     let vectorcall = abi "vectorcall"
-    let watcomstack = abi "watcom-stack"
-    let watcomregs = abi "watcom-regs"
-    let ms = abi "ms"
-    let sysv = abi "sysv"
-    let darwin = abi "darwin"
+    let watcom = Theory.Abi.watcom
+    let ms = Theory.Abi.ms
+    let sysv = Theory.Abi.gnu
   end
-
 
   let is_integer =
     any C.Type.[is_integer; is_pointer; is_function]
@@ -550,7 +544,7 @@ module Abi = struct
 
   let calling_conventions = [
     (* 16-bit ABI *)
-    [i86; i186; i286], [
+    [i286], [
       Abi.cdecl, cdecl16;
       Abi.pascal, pascal16;
       Abi.fortran, pascal16;
@@ -559,12 +553,10 @@ module Abi = struct
     (* 32-bit ABI  *)
     [i386; i486; i586; i686], [
       Abi.sysv, cdecl;
-      Abi.darwin, cdecl;
       Abi.cdecl, cdecl;
       Abi.pascal, pascal;
       Abi.fastcall, fastcall;
       Abi.stdcall, cdecl;
-      Abi.watcomstack, cdecl;
       Abi.ms, cdecl;
     ];
 
@@ -572,25 +564,13 @@ module Abi = struct
     [amd64], [
       Abi.ms, ms64;
       Abi.sysv, sysv;
-      Abi.darwin, sysv;
     ]
   ]
 
   let demanglers = Demangler.[
-      [amd64], Abi.darwin, strip_leading_underscore;
-      [i386; i486; i586; i686; amd64], Abi.ms, strip_leading_underscore;
+      Abi.sysv, Theory.Filetype.macho, strip_leading_underscore;
+      Abi.ms, Theory.Filetype.coff, strip_leading_underscore;
     ]
-
-  let name_with_abi target abi =
-    Format.asprintf "%s-%s"
-      (KB.Name.unqualified (Theory.Target.name target))
-      (KB.Name.unqualified (Theory.Abi.name abi))
-
-  let register_target parent abi install =
-    install @@ Theory.Target.declare ~package:"bap"
-      (name_with_abi parent abi)
-      ~parent ~abi
-
 
   let default_calling_conventions = [
     [i86], cdecl16;
@@ -601,26 +581,82 @@ module Abi = struct
   let install_calling_conventions () =
     List.iter calling_conventions ~f:(fun (targets,args) ->
         List.cartesian_product targets args |>
-        List.iter ~f:(fun (target,(abi,install)) ->
-            register_target target abi install));
+        List.iter ~f:(fun (parent,(abi,install)) ->
+            Theory.Target.filter ~parent ~abi () |>
+            List.iter ~f:(fun t ->
+                if Theory.Target.bits t = Theory.Target.bits parent
+                then install t)));
     List.iter default_calling_conventions ~f:(fun (targets,install) ->
         List.iter targets ~f:install)
 
   let install_demanglers () =
-    List.iter demanglers ~f:(fun (targets,abi,demangler) ->
-        List.iter targets ~f:(fun target ->
-            let name = name_with_abi target abi in
-            let target = Theory.Target.get ~package:"bap" name in
+    List.iter demanglers ~f:(fun (abi,filetype,demangler) ->
+        Theory.Target.filter ~parent ~abi ~filetype () |>
+        List.iter ~f:(fun target ->
             Demanglers.install target demangler))
 
   include Abi
 end
 
-let target_with_abi base name =
-  Theory.Target.get ~package:"bap" @@
-  if Theory.Abi.is_unknown name
-  then KB.Name.show (Theory.Target.name base)
-  else Abi.name_with_abi base name
+let subtargets = [
+  (* 16-bit targets *)
+  [i286],
+  Theory.System.[unknown; msdos],
+  Theory.Filetype.[unknown],
+  Theory.Abi.[cdecl; Abi.pascal; Abi.fortran;];
+
+  (* 32-bit generic targets  *)
+  [i686],
+  Theory.System.[unknown],
+  Theory.Filetype.[coff; aout; elf; macho],
+  Theory.Abi.[gnu; cdecl; stdcall; fastcall; watcom; ms];
+
+  (* 64-bit generic targets  *)
+  [amd64],
+  Theory.System.[unknown],
+  Theory.Filetype.[coff; aout; elf; macho],
+  Theory.Abi.[gnu; ms];
+
+  (* 32/64 linux/bsd targets  *)
+  [i686; amd64],
+  Theory.System.[linux; freebsd; openbsd],
+  Theory.Filetype.[unknown; aout; coff; elf],
+  Theory.Abi.[gnu; cdecl];
+
+  (* 32/64 darwin targets *)
+  [i686; amd64],
+  Theory.System.[darwin],
+  Theory.Filetype.[unknown; macho],
+  Theory.Abi.[gnu];
+
+  (* 32-bit windows targets  *)
+  [i686],
+  Theory.System.[windows],
+  Theory.Filetype.[unknown; coff],
+  Theory.Abi.[ms; cdecl; fastcall; Abi.pascal; Abi.fortran; watcom];
+
+  (* 64-bit windows targets  *)
+  [amd64],
+  Theory.System.[windows],
+  Theory.Filetype.[unknown; coff],
+  Theory.Abi.[ms];
+
+  (* x86 UEFI targets *)
+  [i686],
+  Theory.System.[uefi],
+  Theory.Filetype.[unknown; coff],
+  Theory.Abi.[cdecl];
+
+  [amd64],
+  Theory.System.[uefi],
+  Theory.Filetype.[unknown; coff],
+  Theory.Abi.[ms];
+]
+
+let register_subtargets () =
+  List.iter subtargets ~f:(fun (parents,systems,filetypes,abis) ->
+      List.iter parents ~f:(fun parent ->
+          Theory.Target.register parent ~systems ~filetypes ~abis))
 
 let enable_loader ~abi () =
   let open KB.Syntax in
@@ -629,9 +665,10 @@ let enable_loader ~abi () =
            provide Theory.Unit.target |>
            comment "computes target from the OGRE specification");
 
-  let make_target target abi' =
-    target_with_abi target @@
-    if Theory.Abi.is_unknown abi then abi' else abi in
+  let make_target parent abi' filetype =
+    let abi =
+      if Theory.Abi.is_unknown abi then abi' else abi in
+    Theory.Target.select ~strict:true ~parent ~abi ~filetype () in
 
   let request =
     let open Ogre.Syntax in
@@ -656,18 +693,20 @@ let enable_loader ~abi () =
   KB.collect Image.Spec.slot unit >>|
   get_info >>| fun (arch,bits,fmt) ->
 
+  let open Theory.Filetype in
+
   if is_x86 arch then match bits, fmt with
-    | Some 64L, Some "elf" -> make_target amd64 Abi.sysv
-    | Some 64L, Some "coff" -> make_target amd64 Abi.ms
-    | Some 64L, Some "macho" -> make_target amd64 Abi.darwin
-    | Some 32L, Some "elf" -> make_target i686 Abi.sysv
-    | Some 32L, Some "coff" -> make_target i686 Abi.ms
-    | Some 32L, Some "macho" -> make_target i686 Abi.darwin
-    | Some 16L, _ -> make_target i286 abi
-    | Some 32L, _ -> make_target i686 abi
-    | Some 64L, _ -> make_target amd64 abi
-    | _ when is_amd64 arch -> make_target amd64 abi
-    | _ -> make_target i686 abi
+    | Some 64L, Some "elf" -> make_target amd64 Abi.sysv elf
+    | Some 64L, Some "coff" -> make_target amd64 Abi.ms coff
+    | Some 64L, Some "macho" -> make_target amd64 Abi.sysv macho
+    | Some 32L, Some "elf" -> make_target i686 Abi.sysv elf
+    | Some 32L, Some "coff" -> make_target i686 Abi.ms coff
+    | Some 32L, Some "macho" -> make_target i686 Abi.sysv macho
+    | Some 16L, _ -> make_target i286 abi unknown
+    | Some 32L, _ -> make_target i686 abi unknown
+    | Some 64L, _ -> make_target amd64 abi unknown
+    | _ when is_amd64 arch -> make_target amd64 abi unknown
+    | _ -> make_target i686 abi unknown
   else Theory.Target.unknown
 
 let enable_arch () =
@@ -740,6 +779,7 @@ let enable_decoder backend =
   KB.collect unit_encoding unit
 
 let load ?(abi=Theory.Abi.unknown) ?(backend="llvm") () =
+  register_subtargets ();
   Abi.install_calling_conventions ();
   Abi.install_demanglers ();
   enable_loader ~abi ();
