@@ -8,6 +8,8 @@
 (maintainers "Ivan Gotovchits <ivg@ieee.org>")
 (source (github BinaryAnalysisPlatform/bap))
 
+(cram enable)
+
 
 (explicit_js_mode)
 (formatting disabled)

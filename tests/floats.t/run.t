@@ -1,0 +1,1 @@
+  $ bap show pos --primus-lisp-load=pos -tx86_64 -obap:bil
